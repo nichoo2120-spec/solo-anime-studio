@@ -1,0 +1,29 @@
+{
+  "version": "0.5.179",
+  "rootCauses": [
+    "local blur instead of directional pickup",
+    "source-atop blocked paint on transparent paper",
+    "non-finite empty worker dirty bounds",
+    "transient mixStops restarted worker jobs",
+    "provisional one-point dry contact cache"
+  ],
+  "unitTests": 402,
+  "updaterTests": 17,
+  "paintAndLegacyMixExactCases": 144,
+  "savedReplayAndWorkerExactCases": 72,
+  "actualUiBrushes": 24,
+  "mirrorCases": 6,
+  "referenceModes": [
+    "pure Mix",
+    "loaded selected paint"
+  ],
+  "productionBuild": "passed",
+  "broaderRegressionScripts": {
+    "passed": 66,
+    "total": 72,
+    "blocked": "six pre-existing missing historical fixture checks"
+  },
+  "physicalWacomTested": false,
+  "allStressPerformanceTargetsMet": false,
+  "published": false
+}

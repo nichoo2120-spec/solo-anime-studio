@@ -1,3 +1,7 @@
+# Solo Anime Studio — v0.5.179
+
+Native brush Mix now picks up and carries current-layer pigment along the pen stroke. Keep **Add paint at 0%** for pure mixing, or increase it to load the selected colour while picking up canvas paint. Existing normal Paint and saved Mix v1/v2 strokes retain their rendering. See `UPDATE_v0.5.179.md` and `validation/mix-v179/` for rendered checks and remaining heavy-canvas performance limits.
+
 # Solo Anime Studio — v0.5.178
 
 The installed Windows application checks for updates eight seconds after launch, downloads in the background and offers **Install and restart**. Save your drawing before installing. **Later** keeps working without silently installing on close. **Ctrl+Shift+U** checks again. The older ZIP/browser launcher is a separate application and cannot install desktop updates.

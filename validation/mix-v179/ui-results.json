@@ -1,0 +1,175 @@
+{
+  "rows": [
+    {
+      "preset": "hb",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "2b",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "mechanical",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "blue",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "g-pen",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "mapping",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "technical",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "brush-pen",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "color-solid",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "color-soft",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "color-air",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "color-texture",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "soft-paint",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "marker",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "flat",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "paint",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "dry",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "dry-ink-bristle",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "dry-paint",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "water-smooth",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "water-rough",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "water-wet",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "water-flat",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    },
+    {
+      "preset": "water-gradient",
+      "capturedVersion": 3,
+      "pressure": true,
+      "displayChanged": true,
+      "undoRedo": true
+    }
+  ],
+  "loadedPaintSaved": true,
+  "projectReload": true,
+  "errors": []
+}

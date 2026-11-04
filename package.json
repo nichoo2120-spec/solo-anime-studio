@@ -1,7 +1,7 @@
 {
   "name": "solo-anime-studio",
   "private": true,
-  "version": "0.5.178",
+  "version": "0.5.179",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -25,7 +25,8 @@
     "electron": "vite build && electron .",
     "dist:win": "node scripts/dist-win.cjs",
     "release": "bash scripts/publish_release.sh",
-    "test:desktop-update": "node --test tests/desktop-update.test.cjs tests/desktop-release.test.cjs"
+    "test:desktop-update": "node --test tests/desktop-update.test.cjs tests/desktop-release.test.cjs",
+    "test:mix": "node tests/mix-v179-browser.mjs && node tests/mix-v179-deep.mjs && node tests/mix-v179-reference.mjs && node tests/mix-v179-ui.mjs && node tests/mix-v179-mirror.mjs"
   },
   "dependencies": {
     "electron-updater": "^6.8.11"

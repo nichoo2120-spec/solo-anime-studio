@@ -29,7 +29,7 @@ export class LiveBlendWorker{
  takeRegion(s:Stroke){if(this.job?.id!==s.id)return undefined;const r=this.dirty??{x:0,y:0,width:0,height:0};this.dirty=undefined;return r;}
  preview(s:Stroke,source:HTMLCanvasElement,geometry:unknown){
   this.warm();if(!this.worker||this.failed||!workerBlendEligible(s))return undefined;
-  const signature=JSON.stringify({...s,points:undefined});
+  const signature=JSON.stringify({...s,points:undefined,mixStops:undefined});
   if(!this.job||this.job.id!==s.id||this.job.source!==source||this.job.signature!==signature){
    this.cancel();const token=++this.token,j:Job={token,id:s.id,source,signature,ready:false,inFlight:false};this.job=j;
    this.surface.width=source.width;this.surface.height=source.height;this.surface.getContext('2d')!.drawImage(source,0,0);

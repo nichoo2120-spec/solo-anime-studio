@@ -1,0 +1,249 @@
+{
+  "phase": "after",
+  "rows": [
+    {
+      "preset": "hb",
+      "changedPixels": 39823,
+      "carriedPixels": 7075,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 30
+    },
+    {
+      "preset": "2b",
+      "changedPixels": 39915,
+      "carriedPixels": 7079,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 27.199999999254942
+    },
+    {
+      "preset": "mechanical",
+      "changedPixels": 39809,
+      "carriedPixels": 7076,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 25.799999999813735
+    },
+    {
+      "preset": "blue",
+      "changedPixels": 39882,
+      "carriedPixels": 7076,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 32.799999999813735
+    },
+    {
+      "preset": "g-pen",
+      "changedPixels": 31653,
+      "carriedPixels": 5610,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 26.59999999962747
+    },
+    {
+      "preset": "mapping",
+      "changedPixels": 24801,
+      "carriedPixels": 4727,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 30
+    },
+    {
+      "preset": "technical",
+      "changedPixels": 63386,
+      "carriedPixels": 17265,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 34.799999999813735
+    },
+    {
+      "preset": "brush-pen",
+      "changedPixels": 27509,
+      "carriedPixels": 4525,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 23.5
+    },
+    {
+      "preset": "color-solid",
+      "changedPixels": 21530,
+      "carriedPixels": 5191,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 25.799999999813735
+    },
+    {
+      "preset": "color-soft",
+      "changedPixels": 22816,
+      "carriedPixels": 5121,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 27.700000000186265
+    },
+    {
+      "preset": "color-air",
+      "changedPixels": 27150,
+      "carriedPixels": 5594,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 22.600000000558794
+    },
+    {
+      "preset": "color-texture",
+      "changedPixels": 38851,
+      "carriedPixels": 6960,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 23.100000000558794
+    },
+    {
+      "preset": "soft-paint",
+      "changedPixels": 53377,
+      "carriedPixels": 13771,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 33.200000000186265
+    },
+    {
+      "preset": "marker",
+      "changedPixels": 29500,
+      "carriedPixels": 5711,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 23.200000000186265
+    },
+    {
+      "preset": "flat",
+      "changedPixels": 31741,
+      "carriedPixels": 7147,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 30.299999999813735
+    },
+    {
+      "preset": "paint",
+      "changedPixels": 29858,
+      "carriedPixels": 5834,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 23
+    },
+    {
+      "preset": "dry",
+      "changedPixels": 46310,
+      "carriedPixels": 10136,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 20.399999999441206
+    },
+    {
+      "preset": "dry-ink-bristle",
+      "changedPixels": 28881,
+      "carriedPixels": 4535,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 23.100000000558794
+    },
+    {
+      "preset": "dry-paint",
+      "changedPixels": 23060,
+      "carriedPixels": 3857,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 25
+    },
+    {
+      "preset": "water-smooth",
+      "changedPixels": 42559,
+      "carriedPixels": 8067,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 24.40000000037253
+    },
+    {
+      "preset": "water-rough",
+      "changedPixels": 40931,
+      "carriedPixels": 7698,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 58.200000000186265
+    },
+    {
+      "preset": "water-wet",
+      "changedPixels": 47944,
+      "carriedPixels": 9237,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 24.5
+    },
+    {
+      "preset": "water-flat",
+      "changedPixels": 42014,
+      "carriedPixels": 7860,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 24.299999999813735
+    },
+    {
+      "preset": "water-gradient",
+      "changedPixels": 41876,
+      "carriedPixels": 7774,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 30.09999999962747
+    }
+  ],
+  "workerRows": [
+    {
+      "preset": "color-solid",
+      "max": 0,
+      "changed": 0
+    },
+    {
+      "preset": "dry-ink-bristle",
+      "max": 0,
+      "changed": 0
+    },
+    {
+      "preset": "water-wet",
+      "max": 0,
+      "changed": 0
+    },
+    {
+      "preset": "g-pen",
+      "max": 0,
+      "changed": 0
+    },
+    {
+      "preset": "hb",
+      "max": 0,
+      "changed": 0
+    }
+  ],
+  "workerErrors": []
+}
