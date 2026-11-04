@@ -1,6 +1,7 @@
 import {cameraAt,cameraMatrix,layerDepth} from '../animation/sceneCamera';
 import {HistoryTiles} from './HistoryTiles';
 import {dryRasterPadding} from '../core/dryBrush';
+import {resetDryBristleV3MixModel} from './dryBristleV3';
 import {compositePaintStroke,strokeRasterBounds} from './paintCompositing';
 import type {Layer,Point,Project,Stroke,Matrix} from '../core/model';
 import {pressureWidth} from '../core/geometry';
@@ -26,6 +27,7 @@ export function paintVectorLayer(ctx:CanvasRenderingContext2D,layer:Layer){
 }
 export function polygonPath(ctx:CanvasRenderingContext2D,points:Point[]){ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();}
 export function drawStroke(ctx:CanvasRenderingContext2D,s:Stroke,phase:'live'|'final'='final',geometry?:ReturnType<typeof strokeGeometry>){
+ if(phase==='final'&&s.nativeMixVersion===3&&s.dryBristleVersion===3)resetDryBristleV3MixModel(s);
  if(s.rasterTransformVersion===1&&s.transform){const c=reflectedSurface??=makeCanvas(ctx.canvas.width,ctx.canvas.height);if(c.width!==ctx.canvas.width)c.width=ctx.canvas.width;if(c.height!==ctx.canvas.height)c.height=ctx.canvas.height;const cc=c.getContext('2d')!;cc.clearRect(0,0,c.width,c.height);drawStroke(cc,{...s,id:s.rasterSourceId??s.id,transform:undefined,rasterTransformVersion:undefined},phase,geometry);ctx.save();ctx.transform(...s.transform);ctx.drawImage(c,0,0);ctx.restore();return;}
  if(s.perspective){
   const g=geometry??finalGeometry(s),raw=g.cubics.length?g.cubics.flatMap((c,i)=>flattenCubic(c,1.0).slice(i?1:0)):g.points;

@@ -6,11 +6,13 @@
  */
 import type {Stroke} from '../core/model';
 import type {RasterRegion} from './liveRaster';
+import {applyPigmentMix} from './pigmentMix';
 const clamp=(x:number)=>Math.max(0,Math.min(1,x));
 const canvas=()=>document.createElement('canvas') as HTMLCanvasElement;
 let sample:HTMLCanvasElement|undefined,tiny:HTMLCanvasElement|undefined,blur:HTMLCanvasElement|undefined,masked:HTMLCanvasElement|undefined;
 function fit(c:HTMLCanvasElement,w:number,h:number){if(c.width!==w)c.width=w;if(c.height!==h)c.height=h;}
 export function applyNativeBrushMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElement,s:Stroke,sourceX=0,sourceY=0,dirty?:RasterRegion,base?:HTMLCanvasElement){
+ if(s.nativeMixVersion===3&&s.tool!=='eraser'){applyPigmentMix(ctx,mask,s,sourceX,sourceY,dirty,base);return;}
  if(s.nativeMixVersion!==1&&s.nativeMixVersion!==2||s.tool==='eraser')return;
  sample??=canvas();tiny??=canvas();blur??=canvas();masked??=canvas();
  const amount=clamp(s.nativeMixAmount??.58)*clamp(s.opacity);

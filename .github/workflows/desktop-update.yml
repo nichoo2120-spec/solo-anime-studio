@@ -35,6 +35,22 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm test -- --maxWorkers=2
       - run: node --test tests/desktop-update.test.cjs tests/desktop-release.test.cjs
+      - run: npx playwright install chromium
+      - uses: actions/checkout@v4
+        with:
+          ref: v0.5.178
+          path: baseline-mix-178
+      - name: Reuse dependencies for the unchanged baseline
+        run: node -e "require('fs').symlinkSync(require('path').resolve('node_modules'),require('path').resolve('baseline-mix-178/node_modules'),'junction')"
+      - run: node tests/mix-v179-deep.mjs
+        env:
+          MIX_BASELINE: baseline-mix-178
+      - run: node tests/mix-v179-browser.mjs
+        env:
+          MIX_PHASE: after
+      - run: node tests/mix-v179-reference.mjs
+      - run: node tests/mix-v179-ui.mjs
+      - run: node tests/mix-v179-mirror.mjs
       - run: npm run dist:win
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -52,7 +68,9 @@ jobs:
         if: always()
         with:
           name: desktop-verification
-          path: validation/desktop-*
+          path: |
+            validation/desktop-*
+            validation/mix-v179/**
 
   publish:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

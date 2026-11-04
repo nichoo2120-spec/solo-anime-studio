@@ -20,6 +20,14 @@ let pooled:HTMLCanvasElement|undefined,output:HTMLCanvasElement|undefined,output
 const littleEndian=new Uint8Array(new Uint32Array([1]).buffer)[0]===1;
 const material=(s:Stroke)=>s.dryMaterial??'ink';
 const signature=(s:Stroke)=>JSON.stringify({...s,points:undefined,mixStops:undefined});
+/** Rebuild only this Mix stroke's canonical contact after provisional pen-down.
+ * The one-point head uses different landing contact than a finished stroke.
+ * Ordinary Paint and all saved legacy render paths keep their existing caches.
+ */
+export function resetDryBristleV3MixModel(s:Stroke){
+ if(s.nativeMixVersion!==3)return;
+ const key=signature(s),m=models.get(key);if(m?.finished)m.finished.canvas.width=m.finished.canvas.height=0;models.delete(key);
+}
 function random32(seed:number){let a=seed>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};}
 function newModel(s:Stroke,key:string):Model{
  const seed=s.dryBristleSeed??watercolorSeedFor(s.rasterSourceId??s.id),rnd=random32(Math.imul(seed,7919)+13),S=s.size,ink=material(s)==='ink';

@@ -1,0 +1,52 @@
+{
+  "package.json": {
+    "before": "664fb67fa661c9a946335ead2d082166010cb01f4b8ffa1c40c88ff4df6e4f0a",
+    "after": "eee6be42c1e2220068bf1018350cb4a05ce9425ec354685c37a9989067fee0f6",
+    "why": "v0.5.179 native Mix v3 carried pigment and optional loaded paint; old Paint and saved Mix versions retain their original render path"
+  },
+  "src/core/buildInfo.ts": {
+    "before": "0fa2f05271b58416e5f377eb6b0ef264ff29d625b014e4ba2b4496ed50e52035",
+    "after": "649583af6035f8a4d3eb0a0ff5c77f5c89a574d68c5ae393235366698068be41",
+    "why": "v0.5.179 native Mix v3 carried pigment and optional loaded paint; old Paint and saved Mix versions retain their original render path"
+  },
+  "src/core/model.ts": {
+    "before": "09125505255b95272c2d4b57ef1486a4eb66cbe2754995f90386850d03bde319",
+    "after": "74f432628ccc1c45a172551e55caec82083f8148b914d74b4a97a2dcb1a51742",
+    "why": "v0.5.179 native Mix v3 carried pigment and optional loaded paint; old Paint and saved Mix versions retain their original render path"
+  },
+  "src/engine/LiveBlendWorker.ts": {
+    "before": "589681d00ba947f09fe776e7c8bd97c0e73a71fc1f827d5e1c96d876fa388b83",
+    "after": "17decb1f087df14e29fbfb7e44f3934ab168fd404c13179cd01b707b3a14f36c",
+    "why": "v0.5.179 native Mix v3 carried pigment and optional loaded paint; old Paint and saved Mix versions retain their original render path"
+  },
+  "src/engine/StudioEngine.ts": {
+    "before": "f9e4a00e2258ae78e556bbd895d8d7b96eed61e821adc1426eb32f317d34377f",
+    "after": "bdf3360de3871eb85ed773c0ec28ee69099215f1ba3a1b3fadf2740ced179c89",
+    "why": "v0.5.179 native Mix v3 carried pigment and optional loaded paint; old Paint and saved Mix versions retain their original render path"
+  },
+  "src/engine/dryBristleV3.ts": {
+    "before": "7d12e79157c7e258174aff6f07ab2cff1fab74b2767a6b6cf554ab3ed5acba1e",
+    "after": "3a78669ead0465cd8b34abfad77e39ae1334a36b4faf423f3f12486c5ad2c951",
+    "why": "v0.5.179 native Mix v3 carried pigment and optional loaded paint; old Paint and saved Mix versions retain their original render path"
+  },
+  "src/engine/liveBlend.worker.ts": {
+    "before": "d9c92e83f7fc27e11cd7ca6d45db4984b4fd22b3820d6f1e3eca87d6a904da79",
+    "after": "4a4c4310b021d60b0064014ffcc1d3675477b10e897dba283963f87753466757",
+    "why": "v0.5.179 native Mix v3 carried pigment and optional loaded paint; old Paint and saved Mix versions retain their original render path"
+  },
+  "src/engine/nativeBrushMix.ts": {
+    "before": "a70ba254a0da99cddedfc008a9eddb7ccd4d5479ef8dc8c8ce5c6e6a74353235",
+    "after": "35c76bbe3022c2fea677e1f1866f64ebbe35a85ecddc3e2ac7e7df7808eae072",
+    "why": "v0.5.179 native Mix v3 carried pigment and optional loaded paint; old Paint and saved Mix versions retain their original render path"
+  },
+  "src/engine/renderer.ts": {
+    "before": "fe0b1b4f04ca6f22558ad96b24263c6e906bffe03303018cd0cb12553c231079",
+    "after": "58887c35d695c0197bb2946cee95410fb19e0e050bca39a216790125d90e50bc",
+    "why": "v0.5.179 native Mix v3 carried pigment and optional loaded paint; old Paint and saved Mix versions retain their original render path"
+  },
+  "src/ui/BrushStudio.tsx": {
+    "before": "91e7c698c1a94eef18db03445ed9f4ea445097285bf37f63a9eef1a185789367",
+    "after": "2d4423b2ab74fb48571cc14c17e56d5f9cbf245ff7159c299cfcc59e98d3b3d1",
+    "why": "v0.5.179 native Mix v3 carried pigment and optional loaded paint; old Paint and saved Mix versions retain their original render path"
+  }
+}

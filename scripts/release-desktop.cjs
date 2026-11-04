@@ -40,7 +40,9 @@ async function publish({ directory, version, release, sha, token, request = fetc
   if (existing && !existing.draft) { console.log(`v${version} is already published; preserving it.`); return; }
   if (latest && compareVersions(version, latest.tag_name.replace(/^v/, '')) <= 0) throw Error('Refusing a downgrade or replacement of an existing release');
   // The feed remains on the old release until ALL verified assets have uploaded.
-  const draft = existing || await call(api + '/releases', { method: 'POST', body: JSON.stringify({ tag_name: `v${version}`, target_commitish: sha, name: `Solo Anime Studio ${version}`, body: 'Desktop update delivery improvements. Existing brush rendering is unchanged. Updates download inside the installed app; save your drawing, then choose Install and restart.', draft: true, prerelease: false }) });
+  const note = path.join(root, `UPDATE_v${version}.md`);
+  const body = fs.existsSync(note) ? fs.readFileSync(note, 'utf8') : `Solo Anime Studio ${version}. Save your drawing before installing the update.`;
+  const draft = existing || await call(api + '/releases', { method: 'POST', body: JSON.stringify({ tag_name: `v${version}`, target_commitish: sha, name: `Solo Anime Studio ${version}`, body, draft: true, prerelease: false }) });
   for (const name of files) {
     const previous = draft.assets?.find(asset => asset.name === name);
     if (previous) await call(api + `/releases/assets/${previous.id}`, { method: 'DELETE' });

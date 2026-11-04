@@ -1,0 +1,248 @@
+{
+  "phase": "before",
+  "rows": [
+    {
+      "preset": "hb",
+      "changedPixels": 30600,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 26.600000000093132
+    },
+    {
+      "preset": "2b",
+      "changedPixels": 30542,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 12
+    },
+    {
+      "preset": "mechanical",
+      "changedPixels": 30802,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 13.299999999813735
+    },
+    {
+      "preset": "blue",
+      "changedPixels": 30570,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 12.800000000279397
+    },
+    {
+      "preset": "g-pen",
+      "changedPixels": 24439,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 8.399999999906868
+    },
+    {
+      "preset": "mapping",
+      "changedPixels": 18787,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 8.199999999720603
+    },
+    {
+      "preset": "technical",
+      "changedPixels": 43045,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 6
+    },
+    {
+      "preset": "brush-pen",
+      "changedPixels": 21580,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 15.200000000186265
+    },
+    {
+      "preset": "color-solid",
+      "changedPixels": 15231,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 13
+    },
+    {
+      "preset": "color-soft",
+      "changedPixels": 16416,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 10
+    },
+    {
+      "preset": "color-air",
+      "changedPixels": 19966,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 11.299999999813735
+    },
+    {
+      "preset": "color-texture",
+      "changedPixels": 29715,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 10.400000000372529
+    },
+    {
+      "preset": "soft-paint",
+      "changedPixels": 36911,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 10.5
+    },
+    {
+      "preset": "marker",
+      "changedPixels": 22330,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 10.300000000279397
+    },
+    {
+      "preset": "flat",
+      "changedPixels": 22988,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 11.799999999813735
+    },
+    {
+      "preset": "paint",
+      "changedPixels": 22718,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 3.7999999998137355
+    },
+    {
+      "preset": "dry",
+      "changedPixels": 33454,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 9.200000000186265
+    },
+    {
+      "preset": "dry-ink-bristle",
+      "changedPixels": 22321,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 10
+    },
+    {
+      "preset": "dry-paint",
+      "changedPixels": 17832,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 5.199999999720603
+    },
+    {
+      "preset": "water-smooth",
+      "changedPixels": 32173,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 4.399999999906868
+    },
+    {
+      "preset": "water-rough",
+      "changedPixels": 30824,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 4.899999999906868
+    },
+    {
+      "preset": "water-wet",
+      "changedPixels": 35831,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 4.900000000372529
+    },
+    {
+      "preset": "water-flat",
+      "changedPixels": 31828,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 7.199999999720603
+    },
+    {
+      "preset": "water-gradient",
+      "changedPixels": 31626,
+      "carriedPixels": 0,
+      "greenPixels": 0,
+      "outsideMaskChanged": 0,
+      "opaquePixelsLost": 0,
+      "renderMs": 4.100000000093132
+    }
+  ],
+  "workerRows": [
+    {
+      "preset": "color-solid",
+      "error": "Error: Worker final failed"
+    },
+    {
+      "preset": "dry-ink-bristle",
+      "max": 0,
+      "changed": 0
+    },
+    {
+      "preset": "water-wet",
+      "error": "Error: Worker final failed"
+    },
+    {
+      "preset": "g-pen",
+      "error": "Error: Worker did not deliver preview"
+    },
+    {
+      "preset": "hb",
+      "error": "Error: Worker did not deliver preview"
+    }
+  ],
+  "workerErrors": [
+    "RangeError: Failed to execute 'createImageBitmap' on 'WorkerGlobalScope': The crop rect width is 0.",
+    "RangeError: Failed to execute 'createImageBitmap' on 'WorkerGlobalScope': The crop rect width is 0."
+  ]
+}

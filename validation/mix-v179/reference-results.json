@@ -1,0 +1,22 @@
+[
+  {
+    "preset": "color-solid",
+    "greenOnBarePaper": 3810,
+    "mixed": 3804
+  },
+  {
+    "preset": "soft-paint",
+    "greenOnBarePaper": 10208,
+    "mixed": 4788
+  },
+  {
+    "preset": "color-texture",
+    "greenOnBarePaper": 6726,
+    "mixed": 3367
+  },
+  {
+    "preset": "dry-ink-bristle",
+    "greenOnBarePaper": 4708,
+    "mixed": 2722
+  }
+]
