@@ -1,0 +1,50 @@
+{
+  "name": "solo-anime-studio",
+  "private": true,
+  "version": "0.5.177",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "build:offline": "npm run build && node scripts/build-offline.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "vitest run",
+    "test:regression": "node tests/run-regressions.cjs",
+    "test:browser": "playwright test",
+    "start": "node scripts/launch-offline.mjs",
+    "start:source": "node scripts/fast-start.mjs",
+    "test:offline-start": "node scripts/check-offline-v176.cjs",
+    "test:native-mix": "node scripts/check-native-mix-v170.mjs",
+    "test:warm-cache": "node scripts/check-warmup-v160.cjs",
+    "test:raster-cache": "node scripts/check-raster-v161.cjs",
+    "test:warm-performance": "node scripts/check-warm-performance-v163.cjs",
+    "test:freeze-recovery": "node scripts/check-freeze-recovery-v164.cjs",
+    "test:gentle-blender": "node scripts/check-gentle-blender-v166.cjs",
+    "test:fast-start": "node scripts/check-fast-start-v168.cjs",
+    "test:mix-worker-dirty": "python tests/mix-worker-dirty-v171-browser.py",
+    "electron": "vite build && electron .",
+    "dist:win": "node scripts/dist-win.cjs",
+    "release": "bash scripts/publish_release.sh"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.0",
+    "vitest": "^3.2.4",
+    "fake-indexeddb": "^6.2.0",
+    "@playwright/test": "^1.56.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "lucide-react": "^0.468.0",
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0"
+  },
+  "main": "electron/main.cjs",
+  "description": "Solo Anime Studio - 2D anime drawing and animation studio",
+  "author": "Nicholas"
+}

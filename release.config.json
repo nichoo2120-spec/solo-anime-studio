@@ -1,0 +1,5 @@
+{
+  "_comment": "The ONE place that says where updates are published (GitHub owner / repo). Used by the installer config, the app and scripts/publish_release.sh.",
+  "owner": "nichoo2120-spec",
+  "repo": "solo-anime-studio"
+}

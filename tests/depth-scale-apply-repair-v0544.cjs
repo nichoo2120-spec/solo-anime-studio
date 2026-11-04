@@ -1,0 +1,28 @@
+const assert=require('node:assert/strict'),fs=require('fs'),path=require('path');
+const ts=require('typescript');
+require.extensions['.ts']=(m,file)=>m._compile(ts.transpileModule(fs.readFileSync(file,'utf8').replaceAll('import.meta.url',"'file:///test'"),{fileName:file,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,file);
+const {newProject,appendOperation}=require('../src/core/model.ts');
+const {enableIndependentLayers,addDrawingFrame,syncActiveFrame,frameList}=require('../src/animation/timeline.ts');
+const {progressiveScaleCels}=require('../src/animation/progressiveScale.ts');
+const {boundsOf}=require('../src/engine/strokeSelection.ts');
+const {DocumentStore}=require('../src/core/history.ts');
+const make=(id,x,y)=>({id,kind:'stroke',tool:'brush',points:[{x,y,p:1},{x:x+20,y,p:1},{x:x+20,y:y+20,p:1}],size:2,opacity:1,color:'#000000',pressure:false,response:1});
+let p=enableIndependentLayers(newProject('Depth UI repair',640,400)),layer=p.activeLayerId;
+for(let n=0;n<5;n++){if(n)p=addDrawingFrame(p);p=appendOperation(p,make(`ball${n}`,100+40*n,50));p=syncActiveFrame(p);}
+const ids=frameList(p).map(f=>f.id);const selected=ids;
+const original=frameList(p).map(f=>boundsOf(f.drawings[layer]));
+const arc={id:'arc',name:'Ball path',layerId:layer,points:[{frameId:ids[0],x:original[0].x+original[0].w/2,y:original[0].y+original[0].h/2},{frameId:ids[2],x:original[2].x+original[2].w/2,y:original[2].y+original[2].h/2},{frameId:ids[4],x:original[4].x+original[4].w/2,y:original[4].y+original[4].h/2}],bindings:ids.map((id,n)=>({frameId:id,operationIds:[`ball${n}`]})),mode:'auto'};
+p={...p,motionPlanning:{version:1,notes:[],arcs:[arc]}};
+const out=progressiveScaleCels(p,selected,[layer],.5,1.5);
+assert.equal(out.changed,4,'Motion-bound full range should scale');
+assert.notEqual(out.project,p);
+const after=frameList(out.project).map(f=>boundsOf(f.drawings[layer]));
+for(let n=0;n<5;n++)assert(Math.abs(after[n].w/original[n].w-(.5+.25*n))<.005);
+assert.notDeepEqual(out.project.motionPlanning.arcs[0].points,arc.points,'Path anchors should follow scaled drawings');
+assert.deepEqual(out.project.motionPlanning.arcs[0].bindings,arc.bindings,'Binding identities preserved');
+const stored=new DocumentStore(p);stored.commit(out.project,'Depth Scale');stored.undo();assert.strictEqual(stored.getSnapshot(),p);stored.redo();assert.deepEqual(stored.getSnapshot().motionPlanning.arcs[0].points,out.project.motionPlanning.arcs[0].points);
+const partial=progressiveScaleCels(p,ids.slice(0,3),[layer],.5,1.5);assert.equal(partial.project,p);assert.match(partial.reason,/complete frame range/i);
+const app=fs.readFileSync(path.join(__dirname,'../src/ui/App.tsx'),'utf8');const ui=fs.readFileSync(path.join(__dirname,'../src/ui/ProgressiveScaleCanvas.tsx'),'utf8');
+for(const word of ['Depth target frame','Current frame size percent','role="alert"','corners.map','onApply(factors)','setPointerCapture'])assert(ui.includes(word),word);
+assert(app.includes('const reason=result.reason'), 'Reject reasons must be forwarded from App');
+console.log('PASS v0.5.44: Motion Path-coupled full range depth scaling, partial protection, undo/redo, numeric percentages, visible errors, corner drag');

@@ -1,0 +1,11 @@
+{
+  "tests/fixtures/.dry-v148-compatibility-goldens.json.bgB73W": "6a262adcd8c2b0576dee0b5ef033b60871d1a3b4656fc14565ead5dc21ae92cf",
+  "tests/fixtures/blender-v154-legacy-goldens.json": "6c5989b88104237af70bf16a2486179c41cf4e942fd35e9508bd35e37fc874a7",
+  "tests/fixtures/correction3-raster-goldens.json": "dd9578dc03370ee3ff9cecbfe00f39a94f1c3797e971fcaecb408ae99782d37a",
+  "tests/fixtures/dry-v148-compatibility-goldens.json": "8bfb6cf890e3c0b713e9c73d961fa43ac68fde0516f432fbb3aadb558e3046e6",
+  "tests/fixtures/dry-v153-saved-goldens.json": "829f584f8164e87a1f8a67e3e101d51e82810590e35cb533ab70b06d7da9ea37",
+  "tests/fixtures/smudge-v156-goldens.json": "eaae6b7bbcda14758bae8358eb3c38929a01375b9c039445ca60e46ca7bd6865",
+  "tests/baseline/dry-blend-v0.5.146-provisional.json": "f239fc031c1f5686900d58e7b041886a1563007f3913a27997e884a522cef7cd",
+  "tests/baseline/dry-bristle-v0.5.147.json": "b93d80b82f16d8fbfdff58c4bf278579b970c172ee37f424406891b125481320",
+  "tests/baseline/dry-blend-v0.5.146.json": "b933763116b7868c40440366cbb71b7450a94ceb13c2ac55189c0818edb76cf1"
+}

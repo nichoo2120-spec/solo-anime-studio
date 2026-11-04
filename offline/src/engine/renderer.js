@@ -1,0 +1,512 @@
+import { cameraAt, cameraMatrix, layerDepth } from '../animation/sceneCamera.js';
+import { HistoryTiles } from './HistoryTiles.js';
+import { dryRasterPadding } from '../core/dryBrush.js';
+import { compositePaintStroke, strokeRasterBounds } from './paintCompositing.js';
+import { pressureWidth } from '../core/geometry.js';
+import { drawModernStroke } from './brushRaster.js';
+import { drawVector } from './vector.js';
+import { finalGeometry } from './geometryCache.js';
+import { mapPoint, scaleOf } from './strokeSelection.js';
+import { projectPoint } from './perspectiveWarp.js';
+import { flattenCubic } from './strokeGeometry.js';
+export const makeCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+export const context = (c) => c.getContext('2d', { willReadFrequently: true });
+export const blendOperation = (mode) => mode === 'add' ? 'lighter' : mode && mode !== 'normal' ? mode : 'source-over';
+const releaseRaster = (c) => { if ('close' in c)
+    c.close();
+else
+    c.width = c.height = 0; };
+let reflectedSurface;
+let vectorSurface;
+/** Isolate opacity/blend per layer, not per vector line. Rasterize at display pixels. */
+export function paintVectorLayer(ctx, layer) {
+    if (layer.opacity === 1 && (!layer.blend || layer.blend === 'normal')) {
+        for (const op of layer.operations)
+            if (op.kind === 'vector')
+                drawVector(ctx, op);
+        return;
+    }
+    const c = vectorSurface ??= makeCanvas(ctx.canvas.width, ctx.canvas.height);
+    if (c.width !== ctx.canvas.width)
+        c.width = ctx.canvas.width;
+    if (c.height !== ctx.canvas.height)
+        c.height = ctx.canvas.height;
+    const vc = context(c);
+    vc.resetTransform();
+    vc.clearRect(0, 0, c.width, c.height);
+    vc.setTransform(ctx.getTransform());
+    for (const op of layer.operations)
+        if (op.kind === 'vector')
+            drawVector(vc, op);
+    ctx.save();
+    ctx.resetTransform();
+    ctx.globalAlpha = layer.opacity;
+    ctx.globalCompositeOperation = blendOperation(layer.blend);
+    ctx.drawImage(c, 0, 0);
+    ctx.restore();
+}
+export function polygonPath(ctx, points) { ctx.beginPath(); points.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); }
+export function drawStroke(ctx, s, phase = 'final', geometry) {
+    if (s.rasterTransformVersion === 1 && s.transform) {
+        const c = reflectedSurface ??= makeCanvas(ctx.canvas.width, ctx.canvas.height);
+        if (c.width !== ctx.canvas.width)
+            c.width = ctx.canvas.width;
+        if (c.height !== ctx.canvas.height)
+            c.height = ctx.canvas.height;
+        const cc = c.getContext('2d');
+        cc.clearRect(0, 0, c.width, c.height);
+        drawStroke(cc, { ...s, id: s.rasterSourceId ?? s.id, transform: undefined, rasterTransformVersion: undefined }, phase, geometry);
+        ctx.save();
+        ctx.transform(...s.transform);
+        ctx.drawImage(c, 0, 0);
+        ctx.restore();
+        return;
+    }
+    if (s.perspective) {
+        const g = geometry ?? finalGeometry(s), raw = g.cubics.length ? g.cubics.flatMap((c, i) => flattenCubic(c, 1.0).slice(i ? 1 : 0)) : g.points;
+        const pts = raw.map(pt => projectPoint(pt, s.perspective));
+        // Straight micro-Beziers preserve a projectively curved line, including endpoint pressure.
+        const cubics = pts.slice(1).map((b, i) => { const a = pts[i]; return { a, c1: { ...a, x: a.x + (b.x - a.x) / 3, y: a.y + (b.y - a.y) / 3 }, c2: { ...b, x: a.x + (b.x - a.x) * 2 / 3, y: a.y + (b.y - a.y) * 2 / 3 }, b }; });
+        const warped = { points: pts, cubics };
+        drawStroke(ctx, { ...s, id: s.rasterSourceId ?? s.id, perspective: undefined, transform: undefined, points: pts }, phase, warped);
+        return;
+    }
+    if (s.transform) {
+        ctx.save();
+        ctx.transform(...s.transform);
+        drawStroke(ctx, { ...s, transform: undefined }, phase, geometry);
+        ctx.restore();
+        return;
+    }
+    if ((s.dryBristleVersion === 1 || s.dryBristleVersion === 2 || s.dryBristleVersion === 3)) {
+        drawModernStroke(ctx, s, phase, geometry);
+        return;
+    }
+    if (s.engineVersion === 2 || s.engineVersion === 3 || s.engineVersion === 4 || s.engineVersion === 5 || s.engineVersion === 6 || s.engineVersion === 7 || s.engineVersion === 8 || s.engineVersion === 9 || s.engineVersion === 10) {
+        drawModernStroke(ctx, s, phase, geometry);
+        return;
+    }
+    ctx.save();
+    ctx.fillStyle = s.color;
+    ctx.strokeStyle = s.color;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // Opacity is applied once when compositing this scratch surface, avoiding dark knots.
+    const points = s.points;
+    for (let i = 0; i < points.length; i++) {
+        const p = points[i], prev = points[i - 1] ?? p;
+        const distance = Math.hypot(p.x - prev.x, p.y - prev.y), steps = Math.max(1, Math.ceil(distance / Math.max(.35, s.size * .12)));
+        for (let j = 0; j <= steps; j++) {
+            const t = j / steps, r = pressureWidth(s.size, prev.p + (p.p - prev.p) * t, s.pressure, s.response) / 2;
+            ctx.beginPath();
+            ctx.arc(prev.x + (p.x - prev.x) * t, prev.y + (p.y - prev.y) * t, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    ctx.restore();
+}
+export function applyTransform(canvas, polygon, matrix) {
+    const ctx = context(canvas), selection = makeCanvas(canvas.width, canvas.height), sc = context(selection);
+    sc.save();
+    polygonPath(sc, polygon);
+    sc.clip();
+    sc.drawImage(canvas, 0, 0);
+    sc.restore();
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    polygonPath(ctx, polygon);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.transform(...matrix);
+    ctx.drawImage(selection, 0, 0);
+    ctx.restore();
+}
+export class LayerRenderer {
+    captureHistory;
+    displayRevision = 0;
+    pendingLayer;
+    finalWorker;
+    finalSerial = 0;
+    pendingFinal;
+    scratch;
+    caches = new Map();
+    bitmaps = new Map();
+    strokeRasters = new Map();
+    strokeBytes = 0;
+    /** Accept the exact final scratch pixels, avoiding an immediate second render
+     * of a long paint stroke on release. This shares the existing cache budget. */
+    rememberStrokeRaster(stroke, source) {
+        const { x, y, width: w, height: h } = strokeRasterBounds(stroke, source.width, source.height), bytes = w * h * 4;
+        if (!bytes || bytes > 32 * 1024 * 1024)
+            return;
+        const old = this.strokeRasters.get(stroke);
+        if (old) {
+            this.strokeBytes -= old.bytes;
+            releaseRaster(old.canvas);
+            this.strokeRasters.delete(stroke);
+        }
+        const canvas = makeCanvas(w, h);
+        canvas.getContext('2d').drawImage(source, x, y, w, h, 0, 0, w, h);
+        this.strokeRasters.set(stroke, { canvas, bytes, width: source.width, height: source.height, x, y });
+        this.strokeBytes += bytes;
+        while (this.strokeBytes > 32 * 1024 * 1024)
+            this.dropStroke();
+        this.trim();
+    }
+    rememberStrokeBitmap(stroke, bitmap, rect, width, height) {
+        const bytes = bitmap.width * bitmap.height * 4;
+        if (bytes > 32 * 1024 * 1024) {
+            bitmap.close();
+            return;
+        }
+        const old = this.strokeRasters.get(stroke);
+        if (old) {
+            this.strokeBytes -= old.bytes;
+            releaseRaster(old.canvas);
+            this.strokeRasters.delete(stroke);
+        }
+        this.strokeRasters.set(stroke, { canvas: bitmap, bytes, width, height, x: rect.x, y: rect.y });
+        this.strokeBytes += bytes;
+        while (this.strokeBytes > 32 * 1024 * 1024)
+            this.dropStroke();
+        this.trim();
+    }
+    dropStroke() { const first = this.strokeRasters.keys().next().value, entry = this.strokeRasters.get(first); releaseRaster(entry.canvas); this.strokeBytes -= entry.bytes; this.strokeRasters.delete(first); }
+    checkpoints = [];
+    checkpointBytes = 0;
+    checkpointBudget = 128 * 1024 * 1024;
+    deltaLookup = new Map();
+    deltas = [];
+    deltaBytes = 0;
+    undoHits = 0;
+    redoHits = 0;
+    replayed = 0;
+    cacheStats() { return { checkpoints: this.checkpoints.length, checkpointBytes: this.checkpointBytes, patches: this.deltas.length, patchBytes: this.deltaBytes, strokeBytes: this.strokeBytes, totalBytes: this.checkpointBytes + this.deltaBytes + this.strokeBytes, budget: this.checkpointBudget, layers: this.caches.size, undoHits: this.undoHits, redoHits: this.redoHits, replayedOperations: this.replayed }; }
+    trim() { while (this.checkpointBytes + this.deltaBytes + this.strokeBytes > this.checkpointBudget || this.deltas.length > 160) {
+        if (this.checkpoints.length && this.checkpointBytes + this.deltaBytes + this.strokeBytes > this.checkpointBudget) {
+            const old = this.checkpoints.shift();
+            this.checkpointBytes -= old.bytes;
+            old.canvas.width = 0;
+            old.canvas.height = 0;
+        }
+        else if (this.strokeRasters.size && this.deltas.length <= 160)
+            this.dropStroke();
+        else {
+            const old = this.deltas.shift();
+            if (this.deltaLookup.get(old.operation) === old)
+                this.deltaLookup.delete(old.operation);
+            this.deltaBytes -= old.bytes;
+            old.patch.clear();
+        }
+    } }
+    constructor(captureHistory = true) {
+        this.captureHistory = captureHistory;
+    }
+    remember(layer, canvas, count, force = false) { if (!this.captureHistory)
+        return; const bytes = canvas.width * canvas.height * 4; const interval = bytes >= 4 * 1024 * 1024 ? 24 : 8; if (!count || !force && count % interval || bytes > this.checkpointBudget || this.checkpoints.some(c => c.id === layer.id && c.operations.length === count && c.operations.every((o, i) => o === layer.operations[i])))
+        return; const copy = makeCanvas(canvas.width, canvas.height); context(copy).drawImage(canvas, 0, 0); this.checkpoints.push({ id: layer.id, operations: layer.operations.slice(0, count), canvas: copy, bytes }); this.checkpointBytes += bytes; this.trim(); }
+    beforeOperation(layer, canvas, index) {
+        if (!this.captureHistory)
+            return;
+        const op = layer.operations[index];
+        const previous = this.deltaLookup.get(op);
+        if (previous && previous.id === layer.id && previous.width === canvas.width && previous.height === canvas.height && previous.prefix.length === index && previous.prefix.every((o, i) => o === layer.operations[i]))
+            return;
+        let rect = { x: 0, y: 0, width: canvas.width, height: canvas.height };
+        if (op.kind === 'stroke') {
+            const geometry = op.engineVersion ? finalGeometry(op) : { points: op.points, cubics: [] }, points = [...geometry.points, ...geometry.cubics.flatMap(c => [c.c1, c.c2])], pad = (op.dryBristleVersion === 1 || op.dryBristleVersion === 2 || op.dryBristleVersion === 3) ? dryRasterPadding(op) : op.size + 4;
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (const p of points) {
+                minX = Math.min(minX, p.x);
+                minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x);
+                maxY = Math.max(maxY, p.y);
+            }
+            if (op.transform || op.perspective) {
+                const q = [{ x: minX, y: minY }, { x: minX, y: maxY }, { x: maxX, y: minY }, { x: maxX, y: maxY }].map(p => op.perspective ? projectPoint(p, op.perspective) : mapPoint(p, op.transform));
+                minX = Math.min(...q.map(p => p.x));
+                minY = Math.min(...q.map(p => p.y));
+                maxX = Math.max(...q.map(p => p.x));
+                maxY = Math.max(...q.map(p => p.y));
+            }
+            const newPad = op.transform ? pad * scaleOf(op.transform) : pad;
+            const x = Math.max(0, Math.min(canvas.width, Math.floor(minX - newPad))), y = Math.max(0, Math.min(canvas.height, Math.floor(minY - newPad)));
+            rect = { x, y, width: Math.max(0, Math.min(canvas.width, Math.ceil(maxX + newPad)) - x), height: Math.max(0, Math.min(canvas.height, Math.ceil(maxY + newPad)) - y) };
+        }
+        // Large strokes use exact tiles too. Only the total memory budget may
+        // decline a patch; there is no per-stroke 4 MiB cutoff.
+        const bytes = rect.width * rect.height * 8;
+        if (bytes > this.checkpointBudget)
+            return;
+        const delta = { id: layer.id, prefix: layer.operations.slice(0, index), operation: op, patch: new HistoryTiles(canvas, rect), width: canvas.width, height: canvas.height, bytes };
+        this.deltas.push(delta);
+        this.deltaLookup.set(op, delta);
+        this.deltaBytes += bytes;
+        this.trim();
+    }
+    afterOperation(layer, canvas, index) { const d = this.deltaLookup.get(layer.operations[index]); if (d && d.id === layer.id)
+        d.patch.finish(canvas); }
+    historyPatch(layer, op, index, width, height) { const d = this.deltaLookup.get(op); return d && d.id === layer.id && d.width === width && d.height === height && d.prefix.length === index && d.prefix.every((o, i) => o === layer.operations[i]) ? d : undefined; }
+    async prepare(project) {
+        const images = project.layers.flatMap(l => l.operations).filter(o => o.kind === 'fill' || o.kind === 'image');
+        await Promise.all(images.map(async (o) => { if ((o.kind === 'fill' || o.kind === 'image') && !this.bitmaps.has(o.png)) {
+            const image = new Image();
+            image.src = o.png;
+            await image.decode();
+            if (o.kind === 'fill' && (image.width !== project.width || image.height !== project.height))
+                throw Error('Fill bitmap dimensions do not match the project.');
+            if (image.width * image.height > 16777216)
+                throw Error('Image exceeds the decode limit.');
+            this.bitmaps.set(o.png, image);
+        } }));
+    }
+    clear() { this.pendingLayer = undefined; this.cancelFinal(); this.finalWorker?.terminate(); this.finalWorker = undefined; for (const c of this.caches.values())
+        c.canvas.width = c.canvas.height = 0; this.caches.clear(); if (this.scratch)
+        this.scratch.width = this.scratch.height = 0; this.scratch = undefined; this.bitmaps.clear(); while (this.strokeRasters.size)
+        this.dropStroke(); for (const c of this.checkpoints) {
+        c.canvas.width = 0;
+        c.canvas.height = 0;
+    } for (const d of this.deltas)
+        d.patch.clear(); this.checkpoints = []; this.checkpointBytes = 0; this.deltas = []; this.deltaLookup.clear(); this.deltaBytes = 0; }
+    cancelFinal() { const job = this.pendingFinal; if (job) {
+        clearTimeout(job.timer);
+        job.preview.clear();
+        this.pendingFinal = undefined;
+        job.resolve();
+        this.displayRevision++;
+    } }
+    failedFinal() { const request = this.pendingFinal?.request; this.cancelFinal(); this.finalWorker?.terminate(); this.finalWorker = undefined; request?.(); }
+    /** A temporary renderer serves only on-screen drawing. Canonical get(), PNG
+     * export, transforms and saves can never receive provisional pencil pixels. */
+    getDisplay(layer, p) { const pending = this.pendingLayer, cached = this.caches.get(layer.id); if (pending && pending.layer.id === layer.id && pending.project.id === p.id && pending.project.width === p.width && pending.project.height === p.height && pending.layer.operations.length === layer.operations.length && pending.layer.operations.every((o, i) => o === layer.operations[i]) && cached?.layer.operations !== layer.operations)
+        return pending.preview; const job = this.pendingFinal; return job && job.layer === layer.id && job.width === p.width && job.height === p.height && layer.operations.includes(job.stroke) ? job.preview.get(layer, p) : this.get(layer, p); }
+    /** Provisional display pixels stay separate until the worker returns a
+     * complete canonical layer. Exports and synchronous get() never use them. */
+    deferLayerResult(layer, p, stroke, base, preview, done, request) {
+        const job = { layer, project: p, stroke, base, preview, done };
+        this.pendingLayer = job;
+        done.then(result => { if (this.pendingLayer === job) {
+            this.pendingLayer = undefined;
+            if (result) {
+                const old = this.adoptLayerResult(layer, p, stroke, base, result);
+                if (old) {
+                    old.width = old.height = 0;
+                }
+                else if (![...this.caches.values()].some(c => c.canvas === result))
+                    result.width = result.height = 0;
+            }
+            request();
+        }
+        else if (result && ![...this.caches.values()].some(c => c.canvas === result))
+            result.width = result.height = 0; });
+    }
+    whenSettled() { return Promise.all([this.pendingLayer?.done, this.pendingFinal?.done]).then(() => undefined); }
+    /** A new stroke must pick up exact previous paint, never a provisional layer.
+     * If an unusually slow worker is still pending, retain the synchronous path. */
+    prepareForInput(p) {
+        const pending = this.pendingLayer;
+        this.pendingLayer = undefined;
+        if (pending) {
+            const layer = p.layers.find(l => l.id === pending.layer.id);
+            if (layer)
+                this.get(layer, p);
+        }
+        const pencil = this.pendingFinal;
+        if (pencil) {
+            this.cancelFinal();
+            const layer = p.layers.find(l => l.id === pencil.layer);
+            if (layer)
+                this.get(layer, p);
+        }
+    }
+    deferPencil(stroke, live, layer, p, request) {
+        if (this.pendingFinal || stroke.points.length < 160 || stroke.engineVersion !== 9 || !stroke.brushKind?.startsWith('graphite-') || p.width * p.height * 4 > 32 * 1024 * 1024 || typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined')
+            return false;
+        try {
+            const worker = this.finalWorker ??= new Worker(new URL('./pencilFinal.worker.js', import.meta.url), { type: 'module' }), preview = new LayerRenderer(false), base = this.getDisplay(layer, p), copy = makeCanvas(p.width, p.height);
+            copy.getContext('2d').drawImage(base, 0, 0);
+            preview.bitmaps = new Map(this.bitmaps);
+            preview.caches.set(layer.id, { layer, canvas: copy });
+            preview.rememberStrokeRaster(stroke, live);
+            let resolve;
+            const done = new Promise(r => { resolve = r; });
+            const token = ++this.finalSerial, job = { token, stroke, layer: layer.id, width: p.width, height: p.height, preview, request, done, resolve, timer: setTimeout(() => this.failedFinal(), 5000) };
+            this.pendingFinal = job;
+            this.displayRevision++;
+            worker.onmessage = ({ data }) => { if (this.pendingFinal !== job || data.token !== token) {
+                data.bitmap?.close();
+                return;
+            } if (data.error || !data.bitmap || !data.rect) {
+                data.bitmap?.close();
+                this.failedFinal();
+                return;
+            } this.rememberStrokeBitmap(stroke, data.bitmap, data.rect, job.width, job.height); this.cancelFinal(); request(); };
+            worker.onerror = event => { event.preventDefault(); this.failedFinal(); };
+            worker.onmessageerror = () => this.failedFinal();
+            worker.postMessage({ token, stroke, geometry: finalGeometry(stroke), width: p.width, height: p.height });
+            return true;
+        }
+        catch {
+            this.failedFinal();
+            return false;
+        }
+    }
+    /** Adopt a fully composited, canonical live result. The old native layer
+     * remains available to the engine as its next preview surface. */
+    adoptLayerResult(layer, p, stroke, base, result) {
+        const cached = this.caches.get(layer.id), index = layer.operations.length - 1;
+        if (!cached || cached.canvas !== base || result === base || base.width !== p.width || base.height !== p.height || result.width !== p.width || result.height !== p.height || layer.operations[index] !== stroke || cached.layer.operations.length !== index || !cached.layer.operations.every((o, i) => o === layer.operations[i]))
+            return undefined;
+        this.beforeOperation(layer, base, index);
+        this.caches.set(layer.id, { layer, canvas: result });
+        this.afterOperation(layer, result, index);
+        this.remember(layer, result, index + 1);
+        return base;
+    }
+    get(layer, p) {
+        const cached = this.caches.get(layer.id);
+        if (cached && cached.layer.operations === layer.operations && cached.canvas.width === p.width && cached.canvas.height === p.height)
+            return cached.canvas;
+        if (cached && cached.canvas.width === p.width && cached.canvas.height === p.height) {
+            const old = cached.layer.operations, next = layer.operations, undo = next.length < old.length && next.every((o, i) => o === old[i]), redo = old.length < next.length && old.every((o, i) => o === next[i]);
+            if (undo || redo) {
+                const operations = undo ? old.slice(next.length) : next.slice(old.length), source = undo ? cached.layer : layer, start = undo ? next.length : old.length, patches = operations.map((op, j) => this.historyPatch(source, op, start + j, p.width, p.height));
+                if (patches.every(d => d && (!redo || d.patch.complete))) {
+                    const ctx = context(cached.canvas);
+                    for (const d of undo ? patches.reverse() : patches)
+                        d.patch.restore(ctx, undo ? 'before' : 'after');
+                    this.caches.set(layer.id, { layer, canvas: cached.canvas });
+                    if (undo)
+                        this.undoHits++;
+                    else
+                        this.redoHits++;
+                    return cached.canvas;
+                }
+            }
+        }
+        const incremental = cached && cached.canvas.width === p.width && cached.canvas.height === p.height && cached.layer.operations.length < layer.operations.length && cached.layer.operations.every((o, i) => o === layer.operations[i]);
+        const canvas = cached && cached.canvas.width === p.width && cached.canvas.height === p.height ? cached.canvas : makeCanvas(p.width, p.height), ctx = context(canvas), capture = incremental || !cached && layer.operations.length === 1;
+        let scratch, start = incremental ? cached.layer.operations.length : 0;
+        if (!incremental) {
+            const checkpoint = this.checkpoints.filter(c => c.id === layer.id && c.canvas.width === p.width && c.canvas.height === p.height && c.operations.length <= layer.operations.length && c.operations.every((o, i) => o === layer.operations[i])).sort((a, b) => b.operations.length - a.operations.length)[0];
+            ctx.clearRect(0, 0, p.width, p.height);
+            if (checkpoint) {
+                ctx.drawImage(checkpoint.canvas, 0, 0);
+                start = checkpoint.operations.length;
+                this.checkpoints.splice(this.checkpoints.indexOf(checkpoint), 1);
+                this.checkpoints.push(checkpoint);
+            }
+        }
+        for (let i = start; i < layer.operations.length; i++) {
+            const op = layer.operations[i];
+            if (capture)
+                this.beforeOperation(layer, canvas, i);
+            else
+                this.replayed++;
+            if (op.kind === 'stroke') {
+                const ready = this.strokeRasters.get(op);
+                let source, sourceX = 0, sourceY = 0;
+                if (ready && ready.width === p.width && ready.height === p.height) {
+                    source = ready.canvas;
+                    sourceX = ready.x;
+                    sourceY = ready.y;
+                    this.strokeRasters.delete(op);
+                    this.strokeRasters.set(op, ready);
+                }
+                else {
+                    scratch ??= this.scratch ??= makeCanvas(p.width, p.height);
+                    if (scratch.width !== p.width)
+                        scratch.width = p.width;
+                    if (scratch.height !== p.height)
+                        scratch.height = p.height;
+                    const sc = context(scratch);
+                    sc.clearRect(0, 0, p.width, p.height);
+                    drawStroke(sc, op);
+                    source = scratch;
+                }
+                compositePaintStroke(ctx, source, op, sourceX, sourceY);
+            }
+            else if (op.kind === 'fill') {
+                const image = this.bitmaps.get(op.png);
+                if (image) {
+                    ctx.save();
+                    ctx.globalCompositeOperation = op.under ? 'destination-over' : 'source-over';
+                    ctx.drawImage(image, 0, 0);
+                    ctx.restore();
+                }
+            }
+            else if (op.kind === 'image') {
+                const image = this.bitmaps.get(op.png);
+                if (image)
+                    ctx.drawImage(image, op.x, op.y, op.width, op.height);
+            }
+            else if (op.kind === 'clear') {
+                ctx.save();
+                ctx.globalCompositeOperation = 'destination-out';
+                polygonPath(ctx, op.polygon);
+                ctx.fill();
+                ctx.restore();
+            }
+            else if (op.kind === 'vector')
+                drawVector(ctx, op);
+            else
+                applyTransform(canvas, op.polygon, op.matrix);
+            if (capture) {
+                this.afterOperation(layer, canvas, i);
+                this.remember(layer, canvas, i + 1);
+            }
+        }
+        if (!cached && layer.operations.length >= (p.width * p.height * 4 >= 4 * 1024 * 1024 ? 24 : 8))
+            this.remember(layer, canvas, layer.operations.length, true);
+        this.caches.set(layer.id, { layer, canvas });
+        return canvas;
+    }
+    prune(p) { for (const id of this.caches.keys())
+        if (!p.layers.some(l => l.id === id))
+            this.caches.delete(id); this.checkpoints = this.checkpoints.filter(c => { if (p.layers.some(l => l.id === c.id))
+        return true; this.checkpointBytes -= c.bytes; c.canvas.width = 0; c.canvas.height = 0; return false; }); this.deltas = this.deltas.filter(d => { if (p.layers.some(l => l.id === d.id))
+        return true; this.deltaBytes -= d.bytes; if (this.deltaLookup.get(d.operation) === d)
+        this.deltaLookup.delete(d.operation); d.patch.clear(); return false; }); }
+    /** v174: same as composite(), but each layer is framed by the scene camera
+     * (with multiplane depth). Home camera gives the same pixels as composite(). */
+    compositeCamera(p, frame, options = {}) {
+        const cam = cameraAt(p.camera, frame, p.width, p.height), plain = cameraMatrix(cam, p.width, p.height, 0);
+        const flat = !p.camera || p.layers.every(l => layerDepth(p.camera, l.id) === 0);
+        if (plain.join() === '1,0,0,1,0,0' && flat)
+            return this.composite(p, options);
+        const w = options.width ?? p.width, h = options.height ?? p.height;
+        if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || w > 8192 || h > 8192 || w * h > 16777216)
+            throw Error('Export dimensions must be 1–8192 px and at most 16 megapixels.');
+        const canvas = makeCanvas(w, h), ctx = context(canvas);
+        if (!options.transparent) {
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, w, h);
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        for (const l of [...p.layers].reverse())
+            if ((options.layerId ? l.id === options.layerId : l.visible) && (!l.reference || options.includeReferences === true || options.includeReferences === undefined && l.exportReference)) {
+                const m = cameraMatrix(cam, p.width, p.height, layerDepth(p.camera, l.id));
+                ctx.setTransform(w / p.width, 0, 0, h / p.height, 0, 0);
+                ctx.transform(...m);
+                ctx.globalAlpha = l.opacity;
+                ctx.globalCompositeOperation = blendOperation(l.blend);
+                ctx.drawImage(this.get(l, p), 0, 0);
+            }
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        return canvas;
+    }
+    composite(p, options = {}) { const w = options.width ?? p.width, h = options.height ?? p.height; if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || w > 8192 || h > 8192 || w * h > 16777216)
+        throw Error('Export dimensions must be 1–8192 px and at most 16 megapixels.'); const canvas = makeCanvas(w, h), ctx = context(canvas); if (!options.transparent) {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, w, h);
+    } ctx.scale(w / p.width, h / p.height); for (const l of [...p.layers].reverse())
+        if ((options.layerId ? l.id === options.layerId : l.visible) && (!l.reference || options.includeReferences === true || options.includeReferences === undefined && l.exportReference)) {
+            ctx.globalAlpha = l.opacity;
+            ctx.globalCompositeOperation = blendOperation(l.blend);
+            ctx.drawImage(this.get(l, p), 0, 0);
+        } ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; return canvas; }
+}

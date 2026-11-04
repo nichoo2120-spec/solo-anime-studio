@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+# build outputs (made by npm run build / npm run dist:win)
+dist/
+release/
+*.tsbuildinfo
+# test / browser outputs
+test-results/
+playwright-report/
+blob-report/
+coverage/
+tests/**/out/
+tests/**/*.mp4
+tests/**/*.webm
+*.log
+# temp files
+.*.bg*
+*.tmp
+.DS_Store
+Thumbs.db
+# secrets - never commit tokens
+.env
+.env.*
+*.pem

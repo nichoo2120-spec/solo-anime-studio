@@ -1,0 +1,422 @@
+[
+  {
+    "file": "tests/canvas-context-menu.cjs",
+    "pass": true,
+    "elapsedMs": 82,
+    "output": "PASS: Chrome/Wacom context menu blocked only on main drawing canvas, no global suppression\n\n"
+  },
+  {
+    "file": "tests/depth-scale-apply-repair-v0544.cjs",
+    "pass": true,
+    "elapsedMs": 667,
+    "output": "PASS v0.5.44: Motion Path-coupled full range depth scaling, partial protection, undo/redo, numeric percentages, visible errors, corner drag\n\n"
+  },
+  {
+    "file": "tests/drawing-performance-v0534.cjs",
+    "pass": true,
+    "elapsedMs": 1175,
+    "output": "PASS drawing performance: 100 stopped-playback commits avoid timeline rebuild/cache invalidations; hold edits still update playback; deferred Light Table pending work + safe cancellation; layer pruning gated; audio/brush/wheel callbacks stable.\n\n"
+  },
+  {
+    "file": "tests/free-transform-integration.cjs",
+    "pass": true,
+    "elapsedMs": 1383,
+    "output": "SKIP pixel compositor (optional Skia Canvas module unavailable)\nPASS controller: click hit, selected stroke identity, move, scale, rotate, 4-corner warp, apply, save, undo/redo\n\n"
+  },
+  {
+    "file": "tests/freeform-unified.cjs",
+    "pass": true,
+    "elapsedMs": 1401,
+    "output": "PASS Freeform: scale edge anchored, 90° rotate, perspective corner, move after warp, commit and undo/redo.\n\n"
+  },
+  {
+    "file": "tests/perspective-controls-v0553.cjs",
+    "pass": true,
+    "elapsedMs": 1197,
+    "output": "PASS: corner, side skew, center move, symmetric keystone, angle snap, fold prevention, Free Transform and live grid wiring\n\n"
+  },
+  {
+    "file": "tests/perspective-corners-phase2.cjs",
+    "pass": true,
+    "elapsedMs": 683,
+    "output": "PASS: corners map exactly; shape validation; stroke hit-test; affine-after-warp; editable vector; save schema; timing. 2,000 homographies: 25.0 ms\n\n"
+  },
+  {
+    "file": "tests/perspective-direction-feedback-v0554.cjs",
+    "pass": true,
+    "elapsedMs": 291,
+    "output": "PASS: projected corner edge diagonal + side + centre feedback, reversing direction, stationary/no unrelated feedback, and overlay wiring\n\n"
+  },
+  {
+    "file": "tests/phase2a-export-flow.cjs",
+    "pass": true,
+    "elapsedMs": 1190,
+    "output": "PASS Phase2A export: full holds, unique render reuse, valid ZIP output, cancellation and renderer cleanup.\n\n"
+  },
+  {
+    "file": "tests/phase2a-lighttable-performance.cjs",
+    "pass": true,
+    "elapsedMs": 1283,
+    "output": "PASS light-table performance: 100 active-frame stroke commits trigger 0 extra overlay repaints/ghost renders; pin settings and frame switches still update.\n\n"
+  },
+  {
+    "file": "tests/phase2a-lighttable-sequence.cjs",
+    "pass": true,
+    "elapsedMs": 1242,
+    "output": "PASS Phase2A: holds, unique cels, numbering, source snapshots, pin sanitation, active pin exclusion and archive CRC.\n\n"
+  },
+  {
+    "file": "tests/phase2a-lighttable-shortcuts.cjs",
+    "pass": true,
+    "elapsedMs": 363,
+    "output": "PASS Light Table Shift+L toggle and Shift+P pin: UI+menu wiring, no key collisions, save preference migration, customizable shortcuts, TSX syntax.\n\n"
+  },
+  {
+    "file": "tests/phase2b-add-motion-dots-v0540.cjs",
+    "pass": true,
+    "elapsedMs": 870,
+    "output": "PASS v0.5.40 motion dots: add without moving, drag & remove, Auto/Independent, undo, hold safety, curve and marker match, validation, UI wiring, cold-stroke path\n\n"
+  },
+  {
+    "file": "tests/phase2b-audio-performance.cjs",
+    "pass": true,
+    "elapsedMs": 708,
+    "output": "PASS 100 synthetic drawing commits in 7.5ms with 1MB persisted audio and 40 drawing frames; no waveform recomputes, bounded 80-step history (model test only, not physical pen latency)\n\n"
+  },
+  {
+    "file": "tests/phase2b-audio-selection-delete.cjs",
+    "pass": true,
+    "elapsedMs": 1483,
+    "output": "PASS audio+delete: waveform peaks, project validation/save/undo/redo, hold time mapping, safe stroke/lasso deletion, locked layer guard, focused-frame delete priority, audio playback synchronizer, shortcut + UI.\n\n"
+  },
+  {
+    "file": "tests/phase2b-batch-transform-and-sticky-dots-v0541.cjs",
+    "pass": true,
+    "elapsedMs": 878,
+    "output": "PASS sticky multi-dots + Multi-Cel Transform: 3/5 transforms, unchanged other cels, current layer sync, Undo/Redo, held/locked/raster protections, UI/shortcut wiring\n\n"
+  },
+  {
+    "file": "tests/phase2b-cycle-range-delete.cjs",
+    "pass": true,
+    "elapsedMs": 707,
+    "output": "PASS cycle range & Delete: explicit inclusive frame capture unrelated to active frame, data integrity, validation, source unchanged, Undo/Redo, Mac Backspace and Windows Delete focus scoping\n\n"
+  },
+  {
+    "file": "tests/phase2b-direct-canvas-transform-v0542.cjs",
+    "pass": true,
+    "elapsedMs": 872,
+    "output": "PASS direct canvas W/S/R, nonconsecutive transform, rotation 90°, scale, Undo, bounds gating, pointer handlers\n\n"
+  },
+  {
+    "file": "tests/phase2b-docking-wheel.cjs",
+    "pass": true,
+    "elapsedMs": 329,
+    "output": "PASS side-docked Xsheet and pop-out wheel wiring, TSX parse, resize constraints, Shift+W reservation and no duplicate paint engine\n\n"
+  },
+  {
+    "file": "tests/phase2b-large-audio-storage.cjs",
+    "pass": true,
+    "elapsedMs": 850,
+    "output": "PASS 50 MB/20 min acceptance, 9MB clip, 3 saves store one asset, compact autosaves, hydration, legacy import, deletion; simulated IndexedDB 172.7ms\n\n"
+  },
+  {
+    "file": "tests/phase2b-link-unlink-shortcuts.cjs",
+    "pass": true,
+    "elapsedMs": 718,
+    "output": "PASS link/unlink shortcuts: key mapping, collision safety, old preferences, dropdown targeting, TSX parser, and linked-art semantics\n\n"
+  },
+  {
+    "file": "tests/phase2b-linked-cycle-performance.cjs",
+    "pass": true,
+    "elapsedMs": 660,
+    "output": "PASS reuse performance: 100 synthetic pen commits with linked keys caused no cycle snapshot re-generation or link map mutation; 1.8ms model-only (not hardware pen latency)\n\n"
+  },
+  {
+    "file": "tests/phase2b-linked-cycles.cjs",
+    "pass": true,
+    "elapsedMs": 672,
+    "output": "PASS linked/cycles: propagation both directions, undo/redo, unlink, delete cleanup, project roundtrip, cycle capture/repeat/unique IDs, hold split, other layer preservation\n\n"
+  },
+  {
+    "file": "tests/phase2b-live-depth-floating-v0545.cjs",
+    "pass": true,
+    "elapsedMs": 852,
+    "output": "PASS v0.5.45: auto middle edits, first-frame ramp, multi anchors, independent, sparse selection, atomic undo, legacy depth API, bounded live SVG previews, draggable toolbars\n\n"
+  },
+  {
+    "file": "tests/phase2b-motion-arc-align.cjs",
+    "pass": true,
+    "elapsedMs": 869,
+    "output": "PASS motion arc alignment: 5 frames, smooth interpolation, idempotence, same-layer selection isolation, held/linked locks, undo/redo, validation, pruning and UI syntax\n\n"
+  },
+  {
+    "file": "tests/phase2b-motion-notes-performance.cjs",
+    "pass": true,
+    "elapsedMs": 1363,
+    "output": "PASS Phase 2B timing notes and arcs: save/restore, timeline deletion pruning, editable guides, undo, unchanged drawing; 100-stroke delta index, undo/redo reuse, prune/clear, shortcut and syntax.\n\n"
+  },
+  {
+    "file": "tests/phase2b-motion-path-assist.cjs",
+    "pass": true,
+    "elapsedMs": 929,
+    "output": "PASS Motion Path Assist: Auto/Independent, bound hand-only, selected hand drives other frames, isolated body, single Undo, legacy projects, hold guard, normal draw cold path\n\n"
+  },
+  {
+    "file": "tests/phase2b-multi-onion-depth-scale-v0543.cjs",
+    "pass": true,
+    "elapsedMs": 862,
+    "output": "PASS v0.5.43: 5+5 onion ghosts/fade, clamping, memory bound, 5-frame uniform progression with foot anchor, Undo/Redo, held protection, on-canvas controls\n\n"
+  },
+  {
+    "file": "tests/phase2b-playback-visibility-multiselect-v0539.cjs",
+    "pass": true,
+    "elapsedMs": 1339,
+    "output": "PASS v0.5.39: Shift range and Option toggles, motion playback visibility/edit gates, safe per-release refresh, Xsheet, TS/TSX syntax\nPASS live path preview: on-pen-up picture refresh, no restart, paused preview stays paused\n\n"
+  },
+  {
+    "file": "tests/phase2b-quick-motion-path.cjs",
+    "pass": true,
+    "elapsedMs": 837,
+    "output": "PASS quick motion path: select/range/one-click, auto key generation, ball alignment, Undo, hand isolation, hold guard, drag updates and cold drawing path\n\n"
+  },
+  {
+    "file": "tests/phase2b-reuse-autosave.cjs",
+    "pass": true,
+    "elapsedMs": 707,
+    "output": "PASS metadata autosave: substitutions and cycles mark project dirty; JSON roundtrip valid\n\n"
+  },
+  {
+    "file": "tests/phase2b-substitution-performance.cjs",
+    "pass": true,
+    "elapsedMs": 695,
+    "output": "PASS shelf performance: 100 simulated pen commits preserve immutable shelf entry references and require 0 substitution regeneration (1.1ms store-only; not a Wacom latency measurement)\n\n"
+  },
+  {
+    "file": "tests/phase2b-substitution-shelf.cjs",
+    "pass": true,
+    "elapsedMs": 661,
+    "output": "PASS substitutions: selection capture, named shelf, independent stroke IDs, saved JSON, held-cel split, append/replace, Undo/Redo, missing/locked/kind guards and safe removal\n\n"
+  },
+  {
+    "file": "tests/phase2b-substitution-wiring.cjs",
+    "pass": true,
+    "elapsedMs": 339,
+    "output": "PASS shelf UI/shortcut wiring, TSX syntax, Wacom menu guard, existing Light Table / Xsheet / pop-out wheel shortcuts and bounded previews\n\n"
+  },
+  {
+    "file": "tests/phase2b-xsheet-model.cjs",
+    "pass": true,
+    "elapsedMs": 781,
+    "output": "PASS Xsheet: 2s/3s exposures, independent layer holds, split-to-key, frame select, non-copy timing, Undo/Redo, save compatibility\nPASS Xsheet virtual rows: 5760 exposures, at most 28 mounted rows in a 320px viewport (40 ms full stress setup).\n\n"
+  },
+  {
+    "file": "tests/phase2b-xsheet-performance.cjs",
+    "pass": true,
+    "elapsedMs": 668,
+    "output": "PASS Xsheet frame input performance gate: 99/100 pen commits skipped Xsheet re-render; first-art, timing, selection invalidate; bounded virtual DOM. Browser/Wacom not measured.\n\n"
+  },
+  {
+    "file": "tests/phase2b-xsheet-shortcuts.cjs",
+    "pass": true,
+    "elapsedMs": 447,
+    "output": "PASS side-docked Xsheet shortcut Shift+X, preference migration, no shortcut collisions, wired view/menu/controls, TSX parses.\n\n"
+  },
+  {
+    "file": "tests/project-delete-node.cjs",
+    "pass": true,
+    "elapsedMs": 869,
+    "output": "PASS local cleanup: selected project/snapshot deletion, untouched project protection, duplicates, missing IDs, confirmation + shortcut/UI wiring, TS syntax\n\n"
+  },
+  {
+    "file": "tests/revision-ledger-v174.cjs",
+    "pass": true,
+    "elapsedMs": 78,
+    "output": "\n"
+  },
+  {
+    "file": "tests/skew-distort-arrows-v0555.cjs",
+    "pass": true,
+    "elapsedMs": 1187,
+    "output": "PASS: horizontal/vertical/free skew, angle snap, inside moves, movable pivot; independent corners, edge deform, follow-direction arrows, and UI integration\n\n"
+  },
+  {
+    "file": "tests/stroke-select-startup-regression.cjs",
+    "pass": true,
+    "elapsedMs": 565,
+    "output": "PASS: 3 Stroke Select mode icons are imported, all named and exported. JSX transpiles.\n\n"
+  },
+  {
+    "file": "tests/stroke-selection-v2.cjs",
+    "pass": true,
+    "elapsedMs": 784,
+    "output": "PASS: stroke hit; Shift-toggle; lasso 4 strokes across two layers; locked/hidden protection; cross-layer move/undo/redo/save; unequal-corner perspective; modern selection UI checks\n300 synthetic stroke picks: 1.18 ms (not Wacom latency)\n\n"
+  },
+  {
+    "file": "tests/studio-tool-icons-v0547.cjs",
+    "pass": true,
+    "elapsedMs": 354,
+    "output": "PASS 0.5.47: 16 new artwork symbols, 12 catalog slots and shortcuts, 8 context transform buttons, scoped SVG gradients, responsive wheel/rails and TSX parsing.\n\n"
+  },
+  {
+    "file": "tests/transform-directional-cursors-v0550.cjs",
+    "pass": true,
+    "elapsedMs": 1061,
+    "output": "PASS: v0.5.50 eight Scale directions, small Move Target cursor, drag integration, no duplicate arrows\n\n"
+  },
+  {
+    "file": "tests/transform-source-v0549.cjs",
+    "pass": true,
+    "elapsedMs": 79,
+    "output": "PASS: full transform module structure, overlay, undo and keyboard integration\n\n"
+  },
+  {
+    "file": "tests/transform-thin-icons-v0548.cjs",
+    "pass": true,
+    "elapsedMs": 157,
+    "output": "PASS: five thin SVGs, live directional feedback, single-mode guards, classic Selection Transform toolbar and editable Perspective switching\n\n"
+  },
+  {
+    "file": "tests/transform_commit_scale_regression.cjs",
+    "pass": true,
+    "elapsedMs": 1297,
+    "output": "PASS: PNG decoded before commit; failed decode leaves original unchanged; background cached across drags; Shift proportional scaling stable; Alt centers scaling\n\n"
+  },
+  {
+    "file": "tests/regression/blender-v154.cjs",
+    "pass": true,
+    "elapsedMs": 203,
+    "output": "15 classic-renderer/UI/frozen-fixture integrity guards passed, including the recorded rollback-only v156 exception.\n\n"
+  },
+  {
+    "file": "tests/regression/mesh-contour-scope.cjs",
+    "pass": true,
+    "elapsedMs": 536,
+    "output": "PASS: contour envelope follows varying character silhouette\nPASS: source/destination mapping is identity at rest\nPASS: initial mesh has no folds\nPASS: contour source lattice retained through clone/undo\n\n"
+  },
+  {
+    "file": "tests/regression/mesh-curvature.cjs",
+    "pass": true,
+    "elapsedMs": 388,
+    "output": "PASS curved mesh interpolates through nodes with continuous slope\nPASS pin field is smooth and border anchored\n\n"
+  },
+  {
+    "file": "tests/regression/mesh-fold-guard-v0586.cjs",
+    "pass": true,
+    "elapsedMs": 538,
+    "output": "PASS mesh fold guard accepts normal grid and rejects folded grid\n\n"
+  },
+  {
+    "file": "tests/regression/mesh-free-pins.cjs",
+    "pass": true,
+    "elapsedMs": 395,
+    "output": "PASS free pin moves rendered artwork locally\nPASS unchanged mesh topology and anchored borders\nPASS pins survive cloning, subdivisions and mesh drags\n\n"
+  },
+  {
+    "file": "tests/regression/mesh-geometry-foundation.cjs",
+    "pass": true,
+    "elapsedMs": 297,
+    "output": "PASS mesh geometry foundation: identity, UV inverse map, immutable source, lock, fold guard\n\n"
+  },
+  {
+    "file": "tests/regression/mesh-mode-switch-identity-v0593.cjs",
+    "pass": true,
+    "elapsedMs": 89,
+    "output": "PASS mesh layer-only and original source guard\n\n"
+  },
+  {
+    "file": "tests/regression/mesh-neighbor-influence.cjs",
+    "pass": true,
+    "elapsedMs": 78,
+    "output": "PASS neighbor coupling wired into mesh control nodes and free pins\n\n"
+  },
+  {
+    "file": "tests/regression/mesh-no-edit-pixel-preservation-v0589.cjs",
+    "pass": true,
+    "elapsedMs": 78,
+    "output": "PASS mesh neutral source preservation source-path test\n\n"
+  },
+  {
+    "file": "tests/regression/mesh-no-shrink.cjs",
+    "pass": true,
+    "elapsedMs": 283,
+    "output": "PASS: 100 zero-distance drags preserve grid\nPASS: 50 forward/backward drag cycles preserve grid\nPASS: corners remain fixed when locked\nPASS: zero falloff moves selected point only\n\n"
+  },
+  {
+    "file": "tests/regression/mesh-pin-coupling.cjs",
+    "pass": true,
+    "elapsedMs": 394,
+    "output": "PASS: grid followers, pin followers, locked border, exact pointer drag, local-only isolation, zero-delta\n\n"
+  },
+  {
+    "file": "tests/regression/mesh-scope-layer-only-v0594.cjs",
+    "pass": true,
+    "elapsedMs": 84,
+    "output": "PASS mesh layer-only and original source guard\n\n"
+  },
+  {
+    "file": "tests/regression/mesh-three-modes-v0591.cjs",
+    "pass": true,
+    "elapsedMs": 536,
+    "output": "PASS: three mode presets, contour node order, rest mapping, fold safety, UI wiring\n\n"
+  },
+  {
+    "file": "tests/regression/performance-v155.cjs",
+    "pass": true,
+    "elapsedMs": 93,
+    "output": "27 inherited brush/input/UI source guards passed, with explicitly chained v156/v157 performance revisions.\n\n"
+  },
+  {
+    "file": "tests/regression/performance-v156.cjs",
+    "pass": true,
+    "elapsedMs": 86,
+    "output": "Four scoped performance source guards and 64 frozen v155 smudge expectations PASS.\n\n"
+  },
+  {
+    "file": "tests/regression/performance-v157.cjs",
+    "pass": true,
+    "elapsedMs": 102,
+    "output": "v157 source revisions and unchanged historical golden fixtures PASS.\n\n"
+  },
+  {
+    "file": "tests/regression/performance-v158.cjs",
+    "pass": true,
+    "elapsedMs": 108,
+    "output": "Five scoped v158 runtime changes; historical fixtures and frozen capsule reference unchanged.\n\n"
+  },
+  {
+    "file": "tests/regression/performance-v161.cjs",
+    "pass": true,
+    "elapsedMs": 105,
+    "output": "v161 source revisions recorded; protected golden fixtures and historical chain unchanged.\n\n"
+  },
+  {
+    "file": "tests/regression/performance-v162.cjs",
+    "pass": true,
+    "elapsedMs": 87,
+    "output": "v162 portable checker and versioned historical revisions PASS.\n\n"
+  },
+  {
+    "file": "tests/regression/performance-v163.cjs",
+    "pass": true,
+    "elapsedMs": 114,
+    "output": "v163 canonical warm-prefix source revisions and protected fixtures PASS.\n\n"
+  },
+  {
+    "file": "tests/regression/performance-v164.cjs",
+    "pass": true,
+    "elapsedMs": 130,
+    "output": "PASS: v164 emergency rollback and protected brush-golden hash guards\n\n"
+  },
+  {
+    "file": "tests/regression/performance-v165.cjs",
+    "pass": true,
+    "elapsedMs": 359,
+    "output": "PASS v165 autosave retention, worker timeout and untouched drawing-source guards (source checks)\n\n"
+  },
+  {
+    "file": "tests/regression/performance-v166.cjs",
+    "pass": true,
+    "elapsedMs": 116,
+    "output": "v166 protected golden, version chain and incremental blending source checks PASS\n\n"
+  }
+]

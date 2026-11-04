@@ -1,0 +1,2 @@
+import {rotatePoint} from '../math/matrix';import type {ModeFunction} from './types';
+export const rotate:ModeFunction=(s,d,p,keys)=>{const a=Math.atan2(p.y-d.pivot.y,p.x-d.pivot.x)-Math.atan2(d.point.y-d.pivot.y,d.point.x-d.pivot.x);const delta=keys.shift?Math.round(a/(Math.PI/12))*Math.PI/12:a;s.angle=d.angle+delta*180/Math.PI;s.quad=d.quad.map(v=>rotatePoint(v,d.pivot,delta)) as typeof s.quad;s.grid={rows:d.grid.rows,cols:d.grid.cols,mode:d.grid.mode,nodes:d.grid.nodes.map(v=>rotatePoint(v,d.pivot,delta))};};

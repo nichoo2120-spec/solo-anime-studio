@@ -1,0 +1,17 @@
+import {createServer} from 'vite';import {chromium} from '@playwright/test';import fs from 'node:fs';import assert from 'node:assert/strict';
+const server=await createServer({server:{host:'127.0.0.1',port:5575,strictPort:true}});await server.listen();const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox','--disable-gpu']});
+try{const page=await browser.newPage();await page.goto('http://127.0.0.1:5575/exp/h.html');await page.waitForFunction(()=>window.H);
+ const rows=await page.evaluate(async()=>{
+  const {LiveBlendWorker}=await import('/src/engine/LiveBlendWorker.ts'),{stockPresets}=await import('/src/core/brushes.ts'),{brushStrokeMetadata,watercolorSeedFor}=await import('/src/core/paintTips.ts'),{compositePaintStroke,strokeRasterBounds}=await import('/src/engine/paintCompositing.ts'),{resetWetSmudgeCaches}=await import('/src/engine/wetSmudge.ts');
+  const W=1100,H=440,make=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;return c;},rows=[];let waiting;const client=new LiveBlendWorker(()=>{waiting?.();waiting=undefined;});
+  for(const preset of ['smudge-bristle','blender-soft','wet-mix','color-blender'])for(const size of [30,70,150])for(const opacity of [1,.61])for(const shape of ['line','curve']){
+   const settings={...stockPresets.find(p=>p.id===preset).settings,size},id=`worker-${preset}-${size}-${opacity}-${shape}`,s={...settings,...brushStrokeMetadata(settings),id,kind:'stroke',tool:'brush',color:'#359967',pressure:true,response:1,captureZoom:1,stabilization:.08,smoothness:18,taperStart:0,taperEnd:.08,opacity,colorSeed:watercolorSeedFor(id),points:Array.from({length:101},(_,i)=>({x:120+i*8,y:220+(shape==='curve'?70*Math.sin(i/100*Math.PI*3):0),p:.2+.8*Math.sin(i/100*Math.PI)**2,v:.65-.2*Math.sin(i/100*Math.PI*2)}))};
+   const base=make(),bc=base.getContext('2d');bc.fillStyle=opacity===1?'#d62828':'rgba(214,40,40,.43)';bc.fillRect(30,60,440,320);bc.fillStyle=opacity===1?'#1d4ed8':'rgba(29,78,216,.68)';bc.fillRect(470,60,600,320);
+   const canonical=make(),cc=canonical.getContext('2d'),mask=make();cc.drawImage(base,0,0);resetWetSmudgeCaches();compositePaintStroke(cc,mask,s,0,0,strokeRasterBounds(s,W,H));
+   let reads=0,measure=true;const original=CanvasRenderingContext2D.prototype.getImageData;CanvasRenderingContext2D.prototype.getImageData=function(...args){if(measure)reads++;return original.apply(this,args);};
+   for(const n of [1,8,24,50,75,101])await new Promise(resolve=>{waiting=resolve;const surface=client.preview({...s,points:s.points.slice(0,n)},base,{});if(!surface)throw Error('Worker unavailable');});
+   const pending=client.finish(s);if(!pending)throw Error('No final worker job');const result=await pending.done;measure=false;CanvasRenderingContext2D.prototype.getImageData=original;if(!result)throw Error('Worker failed');
+   const a=cc.getImageData(0,0,W,H).data,b=result.getContext('2d').getImageData(0,0,W,H).data;let max=0,changed=0;for(let i=0;i<a.length;i++){const d=Math.abs(a[i]-b[i]);max=Math.max(max,d);if(d)changed++;}rows.push({preset,size,opacity,shape,max,changed,mainReads:reads});result.width=result.height=0;
+  }client.dispose();return rows;
+ });fs.writeFileSync('validation/v157-worker.json',JSON.stringify(rows,null,2));for(const r of rows){assert.equal(r.max,0,JSON.stringify(r));assert.equal(r.mainReads,0,JSON.stringify(r));}console.log(rows.length+' worker previews/finals match canonical RGBA exactly; no main-thread pixel reads.');
+}finally{await browser.close();await server.close();}

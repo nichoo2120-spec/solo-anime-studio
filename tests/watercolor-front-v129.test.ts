@@ -1,0 +1,4 @@
+import {it,expect} from 'vitest';
+import {joinWaterFront} from '../src/engine/watercolorFront';
+it('joins a narrow wet-front notch without blurring the loaded interior',()=>{const w=21,h=19,d=new Uint8ClampedArray(w*h*4);for(let y=5;y<14;y++)for(let x=5;x<16;x++)d[(y*w+x)*4+3]=128;for(let y=5;y<10;y++)d[(y*w+10)*4+3]=0;joinWaterFront(d,w,h,2,new Float32Array(w*h),new Float32Array(w*h));expect(d[(8*w+10)*4+3]).toBe(128);expect(d[(10*w+7)*4+3]).toBe(128);expect(d[(2*w+2)*4+3]).toBe(0);expect(Math.max(...d)).toBe(128);});
+it('leaves a flat pigment field unchanged without raising its opacity',()=>{const w=17,h=13,d=new Uint8ClampedArray(w*h*4);for(let i=3;i<d.length;i+=4)d[i]=73;const before=d.slice();joinWaterFront(d,w,h,3,new Float32Array(w*h),new Float32Array(w*h));expect(d).toEqual(before);});

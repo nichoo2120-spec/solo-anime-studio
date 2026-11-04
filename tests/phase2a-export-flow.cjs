@@ -1,0 +1,21 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript');
+require.extensions['.ts']=(m,file)=>m._compile(ts.transpileModule(fs.readFileSync(file,'utf8').replaceAll('import.meta.url',"'file:///sequence-test'").replaceAll('import.meta.env.DEV','false'),{fileName:file,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,file);
+const {LayerRenderer}=require('../src/engine/renderer.ts');
+const {renderSequenceZip}=require('../src/animation/sequenceExport.ts');
+const {newProject}=require('../src/core/model.ts');
+const {addDrawingFrame,setDrawingFrameHold,selectDrawingFrame,frameList}=require('../src/animation/timeline.ts');
+let calls=[];
+const old={prepare:LayerRenderer.prototype.prepare,composite:LayerRenderer.prototype.composite,clear:LayerRenderer.prototype.clear};
+LayerRenderer.prototype.prepare=async function(p){calls.push(['prepare',p.layers[0].operations.length]);};
+LayerRenderer.prototype.composite=function(p){calls.push(['composite']);return {toBlob(cb){cb(new Blob([new Uint8Array([137,80,78,71,1,2,3])],{type:'image/png'}));}}};
+LayerRenderer.prototype.clear=function(){calls.push(['clear']);};
+(async()=>{
+ let p=newProject('sequence flow',320,180);p=addDrawingFrame(p);let ids=frameList(p).map(f=>f.id);p=selectDrawingFrame(p,ids[0]);p=setDrawingFrameHold(p,2);p=selectDrawingFrame(p,ids[1]);p=setDrawingFrameHold(p,3);
+ const progress=[];const zip=await renderSequenceZip(p,{transparent:true,fps:24},v=>progress.push(v));
+ assert.equal(calls.filter(c=>c[0]==='composite').length,2,'Do not rasterize each frame held on 2s/3s');
+ assert.equal(progress.at(-1).total,5);assert.equal(progress.at(-1).phase,'Packing ZIP');
+ fs.writeFileSync('/tmp/phase2a-export-flow.zip',Buffer.from(await zip.arrayBuffer()));
+ const abort=new AbortController();abort.abort();await assert.rejects(renderSequenceZip(p,{fps:24},()=>{},abort.signal),/Export canceled/);
+ LayerRenderer.prototype.prepare=old.prepare;LayerRenderer.prototype.composite=old.composite;LayerRenderer.prototype.clear=old.clear;
+ console.log('PASS Phase2A export: full holds, unique render reuse, valid ZIP output, cancellation and renderer cleanup.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

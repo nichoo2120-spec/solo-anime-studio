@@ -1,0 +1,32 @@
+{
+ "src/core/buildInfo.ts": {
+  "before": "80353023669f72706f56f372961dea3db7e878fd6d0668f23bc12f7d58e63175",
+  "after": "e98c910af93d27e247ea2e0bff48b0ca910b53aeaa4bb1d200c658fd677d51f9",
+  "why": "v0.5.176 version bump"
+ },
+ "package.json": {
+  "before": "0b7798f0743a000d4b7497edb0def496e372bcbc527cb83a679feb5b4e24e0ec",
+  "after": "eab8722eb64310f2b08acff26817f670376d03cd3daa6761bbf4235bc737dbc6",
+  "why": "v0.5.176 version bump and build:offline script and test:offline-start -> v176"
+ },
+ "src/engine/StudioEngine.ts": {
+  "before": "c2229979f63ca3894d2f0fc5890302b6d80e0b0d0c8f00d2672d8d3a74cfd825",
+  "after": "f9e4a00e2258ae78e556bbd895d8d7b96eed61e821adc1426eb32f317d34377f",
+  "why": "v0.5.176 faster open: build layer pixels in short tasks during load (same renderer.get, identical pixels)"
+ },
+ "src/ui/App.tsx": {
+  "before": "77dab30aa6488737b278f04acb06ac31b2118bbc0ee935858261177956240b52",
+  "after": "3bf035252bee9a8fb43c98256234156ce1dcd5c681e639d82b098716ccc27346",
+  "why": "v0.5.176 faster open: reopen last project directly instead of reading every saved project"
+ },
+ "src/core/persistence.ts": {
+  "before": "7433919294dbcc671f1c4e7143ada6559392af1523c14837e56cfc42d3c13ad6",
+  "after": "db9130549a598353e2a0dd69ed9322e30fb6d0f630905a1a569f562b5147d12a",
+  "why": "v0.5.176 faster open: repository.get(id)"
+ },
+ "vite.config.ts": {
+  "before": "ebeaca6d003283c749e204e0abc9dcfd1be218b43a2849407c8a5439fdb4420b",
+  "after": "668fe3d6c0decf3803fc7a8b6d2e55fddf2a39d28ff3af2707c9b70f9843d25a",
+  "why": "v0.5.176 dev start: optimizeDeps include + warmup"
+ }
+}

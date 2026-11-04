@@ -1,0 +1,1710 @@
+[
+  {
+    "dpr": 2,
+    "preset": "hb",
+    "size": 45,
+    "options": {},
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "technical",
+    "size": 45,
+    "options": {},
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "g-pen",
+    "size": 60,
+    "options": {
+      "blends": true
+    },
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "dry-ink-bristle",
+    "size": 90,
+    "options": {},
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "dry-paint",
+    "size": 70,
+    "options": {
+      "blends": true
+    },
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "color-solid",
+    "size": 70,
+    "options": {},
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "smudge-bristle",
+    "size": 30,
+    "options": {
+      "blends": true
+    },
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "blender-soft",
+    "size": 30,
+    "options": {},
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "wet-mix",
+    "size": 60,
+    "options": {},
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "eraser-hard",
+    "size": 65,
+    "options": {},
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "eraser-soft",
+    "size": 65,
+    "options": {
+      "blends": true
+    },
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "color-solid",
+    "size": 35,
+    "options": {
+      "edge": true
+    },
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "g-pen",
+    "size": 50,
+    "options": {
+      "zoom": 2
+    },
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "g-pen",
+    "size": 5,
+    "options": {
+      "zoom": 8,
+      "panX": -780,
+      "panY": -800,
+      "x0": 110,
+      "y0": 120,
+      "length": 70,
+      "amplitude": 10
+    },
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "dry-ink-bristle",
+    "size": 60,
+    "options": {
+      "rotation": 0.18,
+      "edge": true
+    },
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 0,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "color-solid",
+    "size": 40,
+    "options": {
+      "mirror": true,
+      "axis": "vertical"
+    },
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 0,
+    "operations": 283
+  },
+  {
+    "dpr": 2,
+    "preset": "color-solid",
+    "size": 40,
+    "options": {
+      "mirror": true,
+      "axis": "horizontal"
+    },
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 0,
+    "operations": 283
+  },
+  {
+    "dpr": 2,
+    "preset": "color-solid",
+    "size": 45,
+    "options": {
+      "bottom": true
+    },
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 2800000
+      }
+    ],
+    "maxBytes": 33600000,
+    "operations": 282
+  },
+  {
+    "dpr": 2,
+    "preset": "hb",
+    "size": 35,
+    "options": {
+      "resize": [
+        820,
+        580
+      ]
+    },
+    "diffs": [
+      {
+        "sample": 0,
+        "max": 0,
+        "changed": 0,
+        "pixels": 1902400
+      },
+      {
+        "sample": 4,
+        "max": 0,
+        "changed": 0,
+        "pixels": 1902400
+      },
+      {
+        "sample": 8,
+        "max": 0,
+        "changed": 0,
+        "pixels": 1902400
+      },
+      {
+        "sample": 12,
+        "max": 0,
+        "changed": 0,
+        "pixels": 1902400
+      },
+      {
+        "sample": 16,
+        "max": 0,
+        "changed": 0,
+        "pixels": 1902400
+      },
+      {
+        "sample": 20,
+        "max": 0,
+        "changed": 0,
+        "pixels": 1902400
+      },
+      {
+        "sample": 24,
+        "max": 0,
+        "changed": 0,
+        "pixels": 1902400
+      },
+      {
+        "sample": 28,
+        "max": 0,
+        "changed": 0,
+        "pixels": 1902400
+      },
+      {
+        "sample": 32,
+        "max": 0,
+        "changed": 0,
+        "pixels": 1902400
+      },
+      {
+        "sample": 36,
+        "max": 0,
+        "changed": 0,
+        "pixels": 1902400
+      },
+      {
+        "sample": 40,
+        "max": 0,
+        "changed": 0,
+        "pixels": 1902400
+      },
+      {
+        "sample": 44,
+        "max": 0,
+        "changed": 0,
+        "pixels": 1902400
+      },
+      {
+        "sample": 48,
+        "max": 0,
+        "changed": 0,
+        "pixels": 1902400
+      }
+    ],
+    "maxBytes": 22828800,
+    "operations": 282
+  }
+]

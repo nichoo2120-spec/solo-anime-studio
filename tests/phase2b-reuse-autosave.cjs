@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript');
+require.extensions['.ts']=(mod,file)=>mod._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{fileName:file,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,file);
+const {newProject,uid,validateProject}=require('../src/core/model.ts');
+const {documentDirty}=require('../src/core/viewPreferences.ts');
+const {saveSubstitution}=require('../src/animation/substitutions.ts');
+const {saveDrawingCycle}=require('../src/animation/reuse.ts');
+const {addDrawingFrame,selectDrawingFrame,frameList}=require('../src/animation/timeline.ts');
+let p=newProject('autosave metadata',640,360),id=p.activeLayerId;
+const stroke={id:uid(),kind:'stroke',tool:'brush',color:'#ff0000',opacity:1,size:2,pressure:false,response:1,points:[{x:2,y:3,p:1}]};
+p={...p,layers:p.layers.map(l=>l.id===id?{...l,operations:[stroke]}:l)};
+const a=saveSubstitution(p,'Mouth','mouth');assert(documentDirty(a,p),'Saved substitution must mark project dirty');
+let b=addDrawingFrame(a),fid=frameList(b)[0].id;b=selectDrawingFrame(b,fid);
+const c=saveDrawingCycle(b,'A',2);assert(documentDirty(c,b),'Cycle metadata must trigger autosave');
+validateProject(JSON.parse(JSON.stringify(c)));
+console.log('PASS metadata autosave: substitutions and cycles mark project dirty; JSON roundtrip valid');

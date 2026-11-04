@@ -1,0 +1,13 @@
+import {describe,it,expect} from 'vitest';
+import {DocumentStore} from '../src/core/history';
+import {newProject,newLayer,appendOperation,type Stroke} from '../src/core/model';
+import {initialShortcuts,normalizeShortcuts,keyChord,shortcutValid} from '../src/core/shortcuts';
+describe('shared navigable history',()=>{
+ it('jumps backward/forward without corrupting layers and clears abandoned branches',()=>{const store=new DocumentStore(newProject()),initial=store.getSnapshot(),l=newLayer('Test');store.commit({...initial,layers:[l,...initial.layers]},'Add layer');const added=store.getSnapshot();store.commit(appendOperation(added,{id:'s',kind:'stroke',tool:'brush',points:[{x:2,y:2,p:1}],size:4,opacity:1,color:'#112233',pressure:false,response:1} as Stroke),'Draw HB Pencil');const drawn=store.getSnapshot();store.goTo(0);expect(store.getSnapshot()).toBe(initial);store.goTo(2);expect(store.getSnapshot()).toBe(drawn);store.undo();expect(store.getSnapshot()).toBe(added);store.commit({...added,name:'New branch'},'Rename project');expect(store.canRedo).toBe(false);expect(store.getHistory().map(e=>e.label)).toEqual(['Initial document','Add layer','Rename project']);});
+ it('retains the configured undo limit and keeps active layer selection valid',()=>{const s=new DocumentStore(newProject());for(let i=0;i<200;i++)s.commit({...s.getSnapshot(),name:'State '+i});expect(s.getHistory()).toHaveLength(DocumentStore.MAX_UNDO+1);const before=s.getSnapshot();s.select('invalid');expect(s.getSnapshot()).toBe(before);s.goTo(-1);s.goTo(999);expect(s.getSnapshot()).toBe(before);});
+});
+describe('configurable command mappings',()=>{
+ it('preserves old user keys when a new default would otherwise occupy them',()=>{const bindings=normalizeShortcuts({brush:'p',eraser:'z',lasso:'r'});expect(bindings.brush).toBe('p');expect(bindings.eraser).toBe('z');expect(bindings.lasso).toBe('r');expect(bindings.zoom).not.toBe('z');expect(new Set(Object.values(bindings)).size).toBe(Object.keys(bindings).length);});
+ it('preserves B and provides P/Z/R, reset rotation and fit without collisions',()=>{expect(initialShortcuts.brush).toBe('b');expect(initialShortcuts.pencil).toBe('p');expect(initialShortcuts.zoom).toBe('z');expect(initialShortcuts.rotate).toBe('r');expect(initialShortcuts.resetRotation).toBe('shift+r');expect(new Set(Object.values(initialShortcuts)).size).toBe(Object.keys(initialShortcuts).length);expect(keyChord({key:'R',shiftKey:true})).toBe('shift+r');});
+ it('retains old custom bindings and rejects duplicates or invalid entries',()=>{expect(normalizeShortcuts({eraser:'q'}).eraser).toBe('q');expect(shortcutValid('b','eraser',initialShortcuts)).toBe(false);expect(normalizeShortcuts({eraser:'ctrl+z'}).eraser).toBe('e');});
+});

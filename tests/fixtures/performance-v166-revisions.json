@@ -1,0 +1,38 @@
+{
+  "src/core/buildInfo.ts": {
+    "before": "299ca05557b484d18b4d98d4865b74a3270faf5a3ebb8bc7bd2b5e401d19d7bf",
+    "after": "df95c34a70ba99a9224234e12be251dde6a24707f4f501fa8ab7f19c54fbd006"
+  },
+  "package.json": {
+    "before": "c20bf5bdac5a80a86610001d69070c8afd81cdde1a1d26ba65620fcb35a22ed9",
+    "after": "3e60ac6b4eae5b57e53f2ec1e02c0cb6d7d3d5550fec48c3c08d056aa55377dc"
+  },
+  "src/core/brushes.ts": {
+    "before": "4b13db07d90ca7d0358d08ff8bc87ada57524398cee2ffec25d68bc492fc5c3b",
+    "after": "ab16182deb758223bb2ae8aec7cb756ed290a6c12d5c9d1fe3dbbeab48e644ba"
+  },
+  "src/core/smudge.ts": {
+    "before": "cc0230b1c7197cf8618f3825c71f589439f1bdd927333367dd936703222f4e7a",
+    "after": "6e9f393791e01010e034739b29af59e652fcecf5a7c0b674036fccc88909ebdf"
+  },
+  "src/core/model.ts": {
+    "before": "55cdb0111530a2bc869fa1acc37ff9848771084b7f9e5ef438fac099bb21dd4d",
+    "after": "9a8089940bebef746e64569f2d20b0f6d3010e46c49b71511b225e8526d9922c"
+  },
+  "src/ui/BrushStudio.tsx": {
+    "before": "c219719984a1962f52b40c770606a920f6b48359c47eb1100eb611b8b802161c",
+    "after": "cf2b8327d203389cc0b88bd10f4149df61cd08a14558988b88dab16e7ce04fc1"
+  },
+  "src/engine/paintCompositing.ts": {
+    "before": "c96d476e90d001dd802387fca3133184ddb9c8abae92c9aef73ad692779cce2b",
+    "after": "6dca9b60c72a1a65cf2fcd8ed0fd673ddfe8f74006aae9e4266b55aa20af3024"
+  },
+  "src/engine/liveBlend.worker.ts": {
+    "before": "9cf55bba9a77fc58c22946d691c71bea2242b57e007d4b6a24a786ac1cf9ac4c",
+    "after": "aeafd72cd85932e561680680e589f91fca2da7b0ea4e7e5068f33890b53ef0ce"
+  },
+  "src/engine/gentleBlend.ts": {
+    "before": null,
+    "after": "f2b3a3c63c044441eea26946ed98c89e1337c69b75aaef7ade29ab318d04567e"
+  }
+}

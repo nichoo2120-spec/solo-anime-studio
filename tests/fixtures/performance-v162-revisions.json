@@ -1,0 +1,10 @@
+{
+  "src/core/buildInfo.ts": {
+    "before": "13837582ecedf6b198a40d148d1bee85c4948fbea0a34f07d06d15245746a9c2",
+    "after": "6c475bf0b1cddc84954e67c447a65bef8bd1af5b47f7b094c7cc22bd854e3189"
+  },
+  "package.json": {
+    "before": "39880decaae96243ef931ae1858ced4476d188b581d6062ff5252c740d254b68",
+    "after": "e7afb6937439c4be9e2ad8b396f64f3c1cc9f18aa7628ffd2fcd350846531c20"
+  }
+}

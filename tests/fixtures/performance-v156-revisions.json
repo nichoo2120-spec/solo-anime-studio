@@ -1,0 +1,18 @@
+{
+  "src/engine/wetSmudge.ts": {
+    "before": "cf9cadb818ce6b70b95f51a441db65899e798e33d3c6cf003c86bf34c1bac87c",
+    "after": "ec91821432651dfe04fddf4f3d14db76661a68c4c72a864051d2be4759a67f9e"
+  },
+  "src/engine/bristleSmudge.ts": {
+    "before": "c35a10b382663b43d61f171ba3e4b063857e3c87425b9fd8f2c3ecbd51b125ca",
+    "after": "739ceb31b3f070566fb6e34be45efc8ec40f8f51de769a4959f16be7481b6e06"
+  },
+  "src/engine/LivePaintingRaster.ts": {
+    "before": "98547722f9aaf0165823fb6146eb35cda5b7a359c37a483bdb9a952d02c448c3",
+    "after": "7af63e40b459d4dda473593c126178e26afea96d5e0260a52f603397ef0f1164"
+  },
+  "src/engine/InkDisplay.ts": {
+    "before": "826a80c0df9accc01b7d9da393b9281c0a203786aacc463ee807289ebc4063d4",
+    "after": "471bd4871b783563e86032237c3b97f6f9133f83d6807796f583b91855b4a608"
+  }
+}

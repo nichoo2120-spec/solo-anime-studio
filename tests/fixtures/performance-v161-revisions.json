@@ -1,0 +1,19 @@
+{
+  "src/engine/DrawingFrameCache.ts": {
+    "before": "b2d4c3194872ceacef65fbd27f7202854ac1f59bee902c7226fee9dd872019a8",
+    "v160": "88bf5218674be58c92a6e63c8ea02786f6799d437555aaa29f34d685995a7103",
+    "after": "747b4691e8300cf93a7f5e91de8c7863518c956f34197893a33bdc1503bc9884"
+  },
+  "src/engine/RasterSceneDisplay.ts": {
+    "before": "9aeaa75631753337368544bd8d729288115e159c14577c0217f17c0a6ae85117",
+    "after": "fc83759b1f0c4f820be1c98cb000835dbec853126535e4826e0a6d3a2468cb1d"
+  },
+  "src/core/buildInfo.ts": {
+    "before": "f8eb1cf99b663505a92f033ad90d7e203187b54d3f85b1ecc246b0096b058d48",
+    "after": "13837582ecedf6b198a40d148d1bee85c4948fbea0a34f07d06d15245746a9c2"
+  },
+  "package.json": {
+    "before": "66ccecc119a86e13803dfdfe6c70de984c57ebe35dfa27735d04e658f934b6e4",
+    "after": "39880decaae96243ef931ae1858ced4476d188b581d6062ff5252c740d254b68"
+  }
+}

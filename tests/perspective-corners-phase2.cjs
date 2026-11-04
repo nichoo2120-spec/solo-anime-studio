@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict'),ts=require('typescript'),fs=require('fs');
+require.extensions['.ts']=(mod,filename)=>mod._compile(ts.transpileModule(fs.readFileSync(filename,'utf8'),{fileName:filename,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,filename);
+const {homography,projectPoint,quadValid,H_ID,affineH,multiplyH}=require('../src/engine/perspectiveWarp.ts');
+const {hitStroke,projectiveStroke,transformedStroke,polyline,boundsOf}=require('../src/engine/strokeSelection.ts');
+const {createVector,projectiveVector,transformVector}=require('../src/engine/vector.ts');
+const {newProject,validateProject}=require('../src/core/model.ts');
+const src=[{x:0,y:0},{x:100,y:0},{x:100,y:80},{x:0,y:80}];
+const dest=[{x:0,y:0},{x:150,y:-10},{x:95,y:90},{x:20,y:80}];
+assert(quadValid(dest),'valid convex warp');const h=homography(src,dest);assert(h,'homography exists');
+for(let i=0;i<4;i++){const m=projectPoint(src[i],h);assert(Math.hypot(m.x-dest[i].x,m.y-dest[i].y)<1e-6,'each corner maps exactly');}
+assert(!quadValid([{x:0,y:0},{x:80,y:80},{x:100,y:0},{x:0,y:80}]),'invalid crossed quad rejected');
+let s={id:'stroke-test',kind:'stroke',tool:'brush',points:[{x:0,y:40,p:.5},{x:50,y:40,p:.7},{x:100,y:40,p:1}],size:4,opacity:1,color:'#222222',pressure:false,response:1,stabilization:0,smoothness:0};
+const warped=projectiveStroke(s,h),path=polyline(warped),mid=projectPoint(s.points[1],h);assert(Math.hypot(path[1].x-mid.x,path[1].y-mid.y)<1e-6,'rendered stroke center warped');
+assert.equal(hitStroke({kind:'raster',operations:[warped]},mid,1)?.id,'stroke-test','click picks warped geometry');
+const moved=transformedStroke(warped,[1,0,0,1,12,5]);assert(Math.hypot(polyline(moved)[1].x-(mid.x+12),polyline(moved)[1].y-(mid.y+5))<1e-6,'move stacks on projective transform');
+const center=projectPoint({x:50,y:40},h);assert(center.x>0&&center.x<150,'center remains bounded');
+const v=createVector('vec',{x:5,y:30,p:.6},{x:94,y:50,p:.8},false,3,'#444444');const w=projectiveVector(v,h);assert.equal(w.nodes.length,v.nodes.length,'vector remains editable');const wp=projectPoint(v.nodes[0],h);assert(Math.hypot(w.nodes[0].x-wp.x,w.nodes[0].y-wp.y)<1e-6,'vector anchor maps');
+const project=newProject('Perspective Test',1920,1080);project.layers.find(l=>l.id===project.activeLayerId).operations=[warped];validateProject(JSON.parse(JSON.stringify(project)));
+const {DocumentStore}=require('../src/core/history.ts');const history=new DocumentStore(project);const changed={...project,layers:project.layers.map(l=>l.id===project.activeLayerId?{...l,operations:[moved]}:l)};history.commit(changed,'Perspective stroke move');assert.equal(polyline(history.getSnapshot().layers.find(l=>l.id===project.activeLayerId).operations[0])[1].x,polyline(moved)[1].x,'committed warp visible');history.undo();assert.equal(polyline(history.getSnapshot().layers.find(l=>l.id===project.activeLayerId).operations[0])[1].x,polyline(warped)[1].x,'undo preserves original projective stroke');history.redo();assert.equal(polyline(history.getSnapshot().layers.find(l=>l.id===project.activeLayerId).operations[0])[1].x,polyline(moved)[1].x,'redo restores transformed stroke');
+assert(boundsOf([warped]).w>0,'warped bounds are positive');
+const start=performance.now();for(let i=0;i<2000;i++){const hh=homography(src,dest);if(!hh)throw Error('unexpected invalid warp');}const elapsed=performance.now()-start;
+console.log('PASS: corners map exactly; shape validation; stroke hit-test; affine-after-warp; editable vector; save schema; timing. 2,000 homographies:',elapsed.toFixed(1),'ms');

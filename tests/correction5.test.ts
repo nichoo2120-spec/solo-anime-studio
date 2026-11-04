@@ -1,0 +1,15 @@
+import {describe,it,expect,vi,afterEach} from 'vitest';
+import {taperFactor,strokeGeometry} from '../src/engine/strokeGeometry';
+import {DrawingBugRecorder} from '../src/engine/DrawingBugRecorder';
+import {StrokeDiagnostics} from '../src/engine/StrokeDiagnostics';
+import {DrawingPerformance} from '../src/engine/DrawingPerformance';
+import {stockPresets} from '../src/core/brushes';
+import {newProject,appendOperation,validateProject,type Stroke} from '../src/core/model';
+import {noisyContours} from './fixtures/drawingSequences';
+afterEach(()=>vi.unstubAllGlobals());
+describe('Correction 5 retained quality and recorder lifetime',()=>{
+ it('keeps distance-based start taper invariant as a stroke grows, without changing saved taper semantics',()=>{expect(taperFactor(10,100,.1,.1,240)).toBe(taperFactor(10,1500,.1,.1,240));expect(taperFactor(10,1500,.1,.1)).toBeLessThan(taperFactor(10,100,.1,.1));expect(taperFactor(1499,1500,0,.1,240)).toBeLessThan(1);});
+ it('retains revision-5 geometry for every other pen and makes Mapping lag scale with nib size',()=>{for(const preset of stockPresets)for(const {points} of Object.values(noisyContours)){const s={...preset.settings,kind:'stroke',id:'quality',tool:'brush',points,engineVersion:6} as Stroke;if(s.brushKind!=='mapping')expect(strokeGeometry(s)).toEqual(strokeGeometry({...s,engineVersion:5}));}const p=Array.from({length:30},(_,i)=>({x:i*10,y:100,p:.5})),s={...stockPresets[5].settings,kind:'stroke',id:'mapping',tool:'brush',points:p,engineVersion:6,stabilization:1} as Stroke;expect(290-strokeGeometry(s,'live').points.at(-1)!.x).toBeCloseTo(s.size*1.2);expect(strokeGeometry(s).points.at(-1)).toEqual(p.at(-1));});
+ it('preserves a session through pause/resume, bounds activity and does not notify React per event',()=>{vi.stubGlobal('window',new EventTarget());const d=new StrokeDiagnostics(),p=new DrawingPerformance(),r=new DrawingBugRecorder(d,p);let updates=0;r.subscribe(()=>updates++);r.start();const id=r.getSnapshot().id;r.event('preset-change',{id:'mapping'});r.start();expect(r.getSnapshot().id).toBe(id);expect(updates).toBe(1);r.pause();const count=r.summary().events;r.event('excluded',{});expect(r.summary().events).toBe(count);r.resume();expect(r.getSnapshot().id).toBe(id);for(let i=0;i<1200;i++)r.event('sample-summary',{i});expect(r.summary().events).toBe(1000);expect(r.summary().omitted).toBeGreaterThan(0);expect(updates).toBe(3);r.stop();expect(d.enabled).toBe(false);expect(r.warnOnClose).toBe(true);r.saved();expect(r.warnOnClose).toBe(false);const copy=r.export();expect(copy.version).toBe(3);expect(copy.session.id).toBe(id);copy.events.length=0;expect(r.export().events).toHaveLength(1000);});
+ it('accepts renderer 6 editable source while retaining prior renderer revisions',()=>{for(const engineVersion of [2,3,4,5,6] as const){const stroke={...stockPresets[0].settings,id:'saved',kind:'stroke',tool:'brush',engineVersion,points:[{x:1,y:2,p:.5}]} as Stroke;const p=appendOperation(newProject(),stroke);expect(()=>validateProject(JSON.parse(JSON.stringify(p)))).not.toThrow();}});
+});

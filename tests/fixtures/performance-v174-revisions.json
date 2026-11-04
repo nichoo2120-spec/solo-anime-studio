@@ -1,0 +1,86 @@
+{
+ "package.json": {
+  "before": "3e60ac6b4eae5b57e53f2ec1e02c0cb6d7d3d5550fec48c3c08d056aa55377dc",
+  "after": "e635253bb2109a381df287313a0022a4b6e3505486208bd205e4d7f1faa23e58",
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix) + v0.5.174 scene camera / snapshot port / version"
+ },
+ "src/core/brushes.ts": {
+  "before": "4b13db07d90ca7d0358d08ff8bc87ada57524398cee2ffec25d68bc492fc5c3b",
+  "after": "4042ab8c029052fc6f14e8c124b10a8090a0923e08613c21a07ed9bb875b18ee",
+  "alsoBefore": [
+   "ab16182deb758223bb2ae8aec7cb756ed290a6c12d5c9d1fe3dbbeab48e644ba"
+  ],
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix)"
+ },
+ "src/core/buildInfo.ts": {
+  "before": "df95c34a70ba99a9224234e12be251dde6a24707f4f501fa8ab7f19c54fbd006",
+  "after": "dd9a812c879f6922507fea5d614179e2767dbe1823fa050ea46e08cd88a261dc",
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix) + v0.5.174 scene camera / snapshot port / version"
+ },
+ "src/core/model.ts": {
+  "before": "55cdb0111530a2bc869fa1acc37ff9848771084b7f9e5ef438fac099bb21dd4d",
+  "after": "09125505255b95272c2d4b57ef1486a4eb66cbe2754995f90386850d03bde319",
+  "alsoBefore": [
+   "9a8089940bebef746e64569f2d20b0f6d3010e46c49b71511b225e8526d9922c"
+  ],
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix) + v0.5.174 scene camera / snapshot port / version"
+ },
+ "src/core/smudge.ts": {
+  "before": "cc0230b1c7197cf8618f3825c71f589439f1bdd927333367dd936703222f4e7a",
+  "after": "6e9f393791e01010e034739b29af59e652fcecf5a7c0b674036fccc88909ebdf",
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix)"
+ },
+ "src/engine/InkDisplay.ts": {
+  "before": "e6f69ed0e817551f9046664d05c13dfe7b0cce3ed75a0e93b8662a63b47a4b6d",
+  "after": "5e4b7edea1f60ee101b585ee3351734bd82ff88fb9d254c01102ab8e864f43f1",
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix)"
+ },
+ "src/engine/LiveBlendWorker.ts": {
+  "before": "001a97ac8d2fb7e706a0f43a090ccc0121d42202704a7d8882ab93842919bc21",
+  "after": "589681d00ba947f09fe776e7c8bd97c0e73a71fc1f827d5e1c96d876fa388b83",
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix)"
+ },
+ "src/engine/StudioEngine.ts": {
+  "before": "b340ca6743752d080f2eb137f2b9a86189a90a6400b6b44eee751a63d3f30afb",
+  "after": "f07cefde578680578153b8e1a7730a770697441b9fc494ef241847b162c2b638",
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix) + v0.5.174 scene camera / snapshot port / version"
+ },
+ "src/engine/liveBlend.worker.ts": {
+  "before": "aeafd72cd85932e561680680e589f91fca2da7b0ea4e7e5068f33890b53ef0ce",
+  "after": "d9c92e83f7fc27e11cd7ca6d45db4984b4fd22b3820d6f1e3eca87d6a904da79",
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix)"
+ },
+ "src/engine/paintCompositing.ts": {
+  "before": "6dca9b60c72a1a65cf2fcd8ed0fd673ddfe8f74006aae9e4266b55aa20af3024",
+  "after": "2e9249e9c4a9bf7906ac1574b23f24360b98dfd7d6a1d2bc3d22ab09d093d023",
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix)"
+ },
+ "src/engine/renderer.ts": {
+  "before": "f75fc593b3596f4b37420ac22514f5c988b6fd84efa5bc3e69b41bd220182f5b",
+  "after": "fe0b1b4f04ca6f22558ad96b24263c6e906bffe03303018cd0cb12553c231079",
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix) + v0.5.174 scene camera / snapshot port / version"
+ },
+ "src/styles.css": {
+  "before": "cd14fef12bc6b8a83143f3d1fa175f8f4790dfc0e6be9260d7b68b1f2f416e4f",
+  "after": "f92af375f273da4468c08e06a9d56261a8f841cfc535e1ef8f087eab1e31ec23",
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix) + v0.5.174 scene camera / snapshot port / version"
+ },
+ "src/ui/App.tsx": {
+  "before": "17e6326cbc6162ced4e1dbbd0e70c0db784f6c03463bf5405eac8f95e0c25e04",
+  "after": "77dab30aa6488737b278f04acb06ac31b2118bbc0ee935858261177956240b52",
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix) + v0.5.174 scene camera / snapshot port / version"
+ },
+ "src/ui/BrushStudio.tsx": {
+  "before": "c219719984a1962f52b40c770606a920f6b48359c47eb1100eb611b8b802161c",
+  "after": "91e7c698c1a94eef18db03445ed9f4ea445097285bf37f63a9eef1a185789367",
+  "alsoBefore": [
+   "cf2b8327d203389cc0b88bd10f4149df61cd08a14558988b88dab16e7ce04fc1"
+  ],
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix)"
+ },
+ "src/ui/RadialToolbar.tsx": {
+  "before": "e2e310ec20d8311fa64579795856d3d858c1007dea53b8e2cbe6ef47bc30b415",
+  "after": "47f6a9af100e6754432d4faf86294aac60f5c6bf49f4f2a08a8837a0658b1d93",
+  "reason": "v0.5.167-173 author edits (Paint/Mix, fast start, offline, Ink Mix fix) + v0.5.174 scene camera / snapshot port / version"
+ }
+}

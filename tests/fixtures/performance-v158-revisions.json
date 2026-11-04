@@ -1,0 +1,22 @@
+{
+  "src/engine/renderer.ts": {
+    "before": "9b629a0b738680ad8190f8f53b3949dc89fa9ed09f970e9a5d9f84f35eaea93c",
+    "after": "f75fc593b3596f4b37420ac22514f5c988b6fd84efa5bc3e69b41bd220182f5b"
+  },
+  "src/engine/liveRaster.ts": {
+    "before": "2a01c0a160416a49cf068e5158e9621773d3d862ce65a7ad5a181e77310efe6b",
+    "after": "7ab355515956407330a753663fdf11ce91d67caaabcf0c777f21d83ec94e7476"
+  },
+  "src/engine/DrawingFrameCache.ts": {
+    "before": "f2775d4f1bcb36683ffbd1c673f70b564726e2fe441bfda2c1ba52bc9ac91bd9",
+    "after": "b2d4c3194872ceacef65fbd27f7202854ac1f59bee902c7226fee9dd872019a8"
+  },
+  "src/engine/dryBristleV3.ts": {
+    "before": "7433696cb5e82d822d3f4232026496952852206bf3e1a714159960f83334d539",
+    "after": "7d12e79157c7e258174aff6f07ab2cff1fab74b2767a6b6cf554ab3ed5acba1e"
+  },
+  "src/core/buildInfo.ts": {
+    "before": "ab643553d66c76adbd0564188d8edd12f0fe342765f97d7fad788cc7cf2c911c",
+    "after": "f8eb1cf99b663505a92f033ad90d7e203187b54d3f85b1ecc246b0096b058d48"
+  }
+}

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#11181d"/><title>Solo Anime Studio — Drawing Studio</title><meta name="description" content="A focused, local-first drawing studio for hand-drawn anime. Pencil, layers, selections and editable project backups."/>  <script type="module" crossorigin src="/assets/index-io_lcD5p.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BvTUWTj_.css">
+</head><body><div id="startup-status" style="position:fixed;inset:0;z-index:1000;background:#11171b;color:#dce8e9;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font:15px Segoe UI,sans-serif">Opening Solo Anime Studio v0.5.176...</div><div id="root"></div><script>
+(function(){
+ var status=document.getElementById('startup-status'),root=document.getElementById('root');
+ var obs=new MutationObserver(function(){if(root.childNodes.length){status.remove();obs.disconnect();}});
+ obs.observe(root,{childList:true});
+ window.addEventListener('error',function(event){if(root.childNodes.length)return;status.textContent='Studio failed to load: '+(event.message||'A required app module could not be opened. Please send a screenshot of this page.');},true);
+ window.setTimeout(function(){if(!root.childNodes.length&&status.textContent.indexOf('failed')<0)status.textContent='Studio did not finish loading. Check the black launcher window for errors. If it says READY, send a screenshot of this browser page.';},12000);
+})();
+</script></body></html>

@@ -1,0 +1,7 @@
+import {harness} from './hlib.mjs';import fs from 'fs';import crypto from 'crypto';
+const tag=process.argv[2],port=+process.argv[3];const h=await harness(process.env.PAGE||'exp/h.html',port);
+const sha=u=>crypto.createHash('sha256').update(u).digest('hex').slice(0,16);const out={};
+const base=[];for(let y=30;y<=270;y+=12){base.push({preset:'color-solid',ov:{size:40,color:'#d62828',opacity:1,colorNib:'round'},color:'#d62828',path:{kind:'line',x0:40,y0:y,x1:450,y1:y},speed:2});base.push({preset:'color-solid',ov:{size:40,color:'#1d4ed8',opacity:1,colorNib:'round'},color:'#1d4ed8',path:{kind:'line',x0:450,y0:y,x1:860,y1:y},speed:2});}
+const V=[['color-blender',{coloringAppearanceVersion:3}],['color-blender',{coloringAppearanceVersion:2}],['color-blender',{coloringAppearanceVersion:1}],['dry-ink-bristle',{dryBristleVersion:1}],['dry-ink-bristle',{dryBristleVersion:2}],['dry-ink-bristle',{dryBristleVersion:3}],['dry-paint',{dryBristleVersion:1}],['dry-paint',{dryBristleVersion:2}],['dry-paint',{dryBristleVersion:3}]];
+for(const [p,ov] of V)for(const sp of [.3,2.5])for(const b of [0,1]){const r=await h.render({W:900,H:300,paper:'#ffffff',base:b?base:undefined,ops:[{preset:p,ov:{size:70,color:'#22c55e',...ov},color:'#22c55e',id:'o_'+p,path:{kind:'sine',x0:150,y0:150,x1:750,y1:150,amp:40},speed:sp,pressure:'bell'}]});out[p+JSON.stringify(ov)+sp+b]=sha(r.white)+sha(r.layer);}
+fs.writeFileSync(`data/oldv_${tag}.json`,JSON.stringify(out,null,1));await h.b.close();

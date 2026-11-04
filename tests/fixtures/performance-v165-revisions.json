@@ -1,0 +1,18 @@
+{
+  "src/core/buildInfo.ts": {
+    "before": "320a17dd63a442c1d3b6dc71ab4a7d6b4ee0a43b6023ef002eb414ac08e63ec1",
+    "after": "299ca05557b484d18b4d98d4865b74a3270faf5a3ebb8bc7bd2b5e401d19d7bf"
+  },
+  "package.json": {
+    "before": "f9b711a6c3e5ad36a51a98b43689faa556e9b84aa4fbf63afe77ecdd45f5c1a3",
+    "after": "c20bf5bdac5a80a86610001d69070c8afd81cdde1a1d26ba65620fcb35a22ed9"
+  },
+  "src/core/persistence.ts": {
+    "before": "24264ea6eb67ca71635a34c5da62e8bcaa38f62592c923995e4db5ffa761386b",
+    "after": "7433919294dbcc671f1c4e7143ada6559392af1523c14837e56cfc42d3c13ad6"
+  },
+  "src/core/AutosaveWriter.ts": {
+    "before": "6b9fa58609197509ac9dbb42a105aaa0a57cc7a62411b5a022b901e807cc3177",
+    "after": "54d2dcf291c42aac41c3cb70619c859f0927e531aaf8a4f6304ad5d5f49eddbb"
+  }
+}

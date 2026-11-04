@@ -1,0 +1,1 @@
+export const buildInfo = { version: '0.5.176', correction: 176, renderer: 45, sourceDigest: typeof __STUDIO_SOURCE_DIGEST__ === 'string' ? __STUDIO_SOURCE_DIGEST__ : 'test', mode: false ? 'development' : 'production' };

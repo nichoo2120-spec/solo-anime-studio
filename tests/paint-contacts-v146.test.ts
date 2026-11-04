@@ -1,0 +1,15 @@
+import {describe,it,expect} from 'vitest';
+import {paintDabs} from '../src/engine/paintDabs';
+import {stockPresets,newBrushLibrary,restoreBrushLibrary} from '../src/core/brushes';
+import {brushStrokeMetadata} from '../src/core/paintTips';
+import {newProject,activeLayer,validateProject,type Stroke} from '../src/core/model';
+const settings=stockPresets.find(p=>p.id==='color-texture')!.settings;
+const stroke=(patch:Partial<Stroke>={}):Stroke=>({...settings,...brushStrokeMetadata(settings),id:'contact',kind:'stroke',tool:'brush',size:100,pressure:false,taperStart:0,taperEnd:0,points:[],...patch});
+const samples=(steps:number)=>({points:Array.from({length:steps+1},(_,i)=>({x:i*300/steps,y:40,p:.2+.8*i/steps,v:.65})),arc:Array.from({length:steps+1},(_,i)=>i*300/steps),ends:[steps+1],total:300});
+describe('physical paint contact path',()=>{
+ it('anchors contacts to distance instead of input event count',()=>{const a=paintDabs(stroke(),samples(1)),b=paintDabs(stroke(),samples(100));expect(a.length).toBe(b.length);for(let i=0;i<a.length;i++){expect(a[i].x).toBeCloseTo(b[i].x,8);expect(a[i].radius).toBe(b[i].radius);expect(a[i].arc).toBe(b[i].arc);expect(a[i].angle).toBe(b[i].angle);}});
+ it('keeps pressure-sensitive width and optional pigment channels',()=>{const q=samples(20),s=stroke({pressure:true,pressureFlow:true}),d=paintDabs(s,q);expect(d[0].radius).toBeLessThan(d.at(-1)!.radius);expect(d[0].level).toBeLessThan(d.at(-1)!.level);expect(paintDabs(s,q)).toEqual(d);});
+ it('keeps fixed angle and direction-following contacts distinct',()=>{const q=samples(1),a=paintDabs(stroke({colorNibFollow:false,tipAngle:27}),q),b=paintDabs(stroke({colorNibFollow:true,tipAngle:27}),q);expect(a[0].angle).toBeCloseTo(27*Math.PI/180);expect(b[0].angle-a[0].angle).toBeCloseTo(Math.PI/2);});
+ it('captures transparency choice only on new Blender strokes',()=>{const settings=stockPresets.find(p=>p.id==='color-blender')!.settings,p=newProject(),s:Stroke={...settings,...brushStrokeMetadata({...settings,blendPreserveAlpha:true}),id:'b',kind:'stroke',tool:'brush',points:[{x:20,y:30,p:.5}]};activeLayer(p).operations=[s];expect(validateProject(JSON.parse(JSON.stringify(p)))).toEqual(p);for(const patch of [{blendPreserveAlpha:1},{coloringAppearanceVersion:2},{brushTip:'color-texture'}]){activeLayer(p).operations=[{...s,...patch} as Stroke];expect(()=>validateProject(p)).toThrow();}});
+ it('upgrades untouched Blender defaults and preserves customized nibs',()=>{const old=newBrushLibrary(),b=old.presets.find(p=>p.id==='color-blender')!;b.defaults={...b.defaults,coloringAppearanceVersion:2,colorNib:'filbert',colorNibFollow:false,textureStrength:0};b.settings={...b.defaults,size:97.2};expect(restoreBrushLibrary(old).presets.find(p=>p.id===b.id)!.settings).toMatchObject({coloringAppearanceVersion:3,colorNib:'round',colorNibFollow:true,size:97.2,blendPreserveAlpha:true})/* v0.5.166 default Blender: round nib, keeps alpha */;b.settings.colorNib='flat';b.settings.colorNibFollow=true;expect(restoreBrushLibrary(old).presets.find(p=>p.id===b.id)!.settings).toMatchObject({colorNib:'flat',colorNibFollow:true});});
+});

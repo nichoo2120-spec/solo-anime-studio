@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict');const fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'../../src/tools/transform');
+const tool=fs.readFileSync(path.join(root,'TransformTool.ts'),'utf8');
+const bar=fs.readFileSync(path.join(root,'TransformOptionsBar.tsx'),'utf8');
+const overlay=fs.readFileSync(path.join(root,'TransformOverlay.tsx'),'utf8');
+assert.doesNotMatch(bar,/value="artwork"|Artwork only/,'Artwork-only option must be absent');
+assert.match(bar,/Scope: Whole current layer bounds/);
+assert.match(overlay,/meshScope:'layer'/);
+assert.match(tool,/if\(m==='mesh'.*this\.buildScopedMesh\(this\.session\.meshScope/,'Mesh initializes lazily when selected');
+assert.match(tool,/const previewSource=\{source:this\.source,box:this\.box\}/);
+assert.match(tool,/if\(meshWarp&&this\.meshIsUndeformed\(\)\)return \{changed:0,error:/);
+assert.match(tool,/if\(scope==='layer'\)return freeze\(makeGrid/);
+console.log('PASS mesh layer-only and original source guard');

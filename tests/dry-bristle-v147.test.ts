@@ -1,0 +1,20 @@
+import {describe,it,expect} from 'vitest';
+import {stockPresets,newBrushLibrary,restoreBrushLibrary,sanitizeBrush} from '../src/core/brushes';
+import {brushStrokeMetadata} from '../src/core/paintTips';
+import {newProject,activeLayer,validateProject,type Stroke} from '../src/core/model';
+import {rasterBristle,densityAlpha} from '../src/engine/dryTooth';
+import {dryRasterPadding} from '../src/core/dryBrush';
+const ids=['dry-ink-bristle','dry-paint'],newPresets=stockPresets.filter(p=>ids.includes(p.id));
+describe('opt-in dry bristle presets and saved projects',()=>{
+ it('adds the requested two presets and keeps classic Dry and Blender unflagged',()=>{expect(newPresets.map(p=>p.name)).toEqual(['Dry Ink Brush','Dry Paint Brush']);for(const id of ['dry','color-blender','color-texture']){const p=stockPresets.find(p=>p.id===id)!;expect(p.settings.dryBristleVersion).toBeUndefined();expect(brushStrokeMetadata(p.settings).dryBristleVersion).toBeUndefined();}expect(stockPresets.find(p=>p.id==='dry')!.name).toBe('Dry Brush (old)');});
+ it('captures all parameters and the additive renderer version',()=>{for(const p of newPresets){const metadata=brushStrokeMetadata({...p.settings,dryBristleSeed:357});expect(metadata).toMatchObject({dryBristleVersion:3,dryBristleSeed:357,dryLoad:p.settings.dryLoad,dryDepletion:p.settings.dryDepletion,dryHair:p.settings.dryHair,dryBlur:p.settings.dryBlur});const doc=newProject(),s:Stroke={...p.settings,...metadata,id:'new-dry',kind:'stroke',tool:'brush',points:[{x:30,y:40,p:.8,v:.65}]};activeLayer(doc).operations=[s];expect(validateProject(JSON.parse(JSON.stringify(doc)))).toEqual(doc);expect(doc.version).toBe(3);}});
+ it('rejects incompatible versions, corrupt seeds and controls outside their ranges',()=>{const settings=newPresets[0].settings,p=newProject(),s:Stroke={...settings,...brushStrokeMetadata(settings),id:'bad',kind:'stroke',tool:'brush',points:[{x:20,y:20,p:1}]};for(const patch of [{dryBristleVersion:4},{dryLoad:2},{dryDepletion:0},{drySpeedDry:-1},{dryBristleSeed:1.5},{dryBristleSeed:-1},{brushKind:'technical'},{dryBristleVersion:undefined}]){activeLayer(p).operations=[{...s,...patch}as Stroke];expect(()=>validateProject(p)).toThrow();}});
+ it('preserves artist settings and clamps only new-brush controls',()=>{const library=newBrushLibrary(),p=library.presets.find(p=>p.id==='dry-paint')!;p.settings={...p.settings,size:117,dryLoad:.61,dryDepletion:8.5,dryFray:.21};const next=restoreBrushLibrary(JSON.parse(JSON.stringify(library)));expect(next.presets).toHaveLength(library.presets.length);expect(next.presets.find(q=>q.id===p.id)!.settings).toMatchObject({size:117,dryLoad:.61,dryDepletion:8.5,dryFray:.21});expect(sanitizeBrush({...p.settings,dryLoad:8,drySpeedDry:-3},p.defaults)).toMatchObject({dryLoad:1,drySpeedDry:0});const classic=stockPresets.find(p=>p.id==='dry')!.settings;expect(sanitizeBrush({...classic,dryBristleVersion:1,dryLoad:.9},classic).dryBristleVersion).toBeUndefined();});
+ it('reserves enough space for flying hairs in dirty and history bounds',()=>{expect(dryRasterPadding({size:130})).toBeGreaterThan(130*2.2+12);});
+});
+describe('fixed-point pigment deposition',()=>{
+ const box={x:0,y:0,width:40,height:24},paint=(d:Uint16Array,n:number)=>n===0?rasterBristle(d,40,24,3,7,31,12,2,.6,box):rasterBristle(d,40,24,10,2,16,20,1,.4,box);
+ it('is exactly independent of deposition ordering',()=>{const a=new Uint16Array(960),b=new Uint16Array(960);paint(a,0);paint(a,1);paint(b,1);paint(b,0);expect(a).toEqual(b);expect(Math.max(...a)).toBeGreaterThan(0);});
+ it('leaves pixels outside the requested dirty box untouched',()=>{const d=new Uint16Array(960);rasterBristle(d,40,24,0,10,39,10,4,1,{x:12,y:8,width:8,height:5});for(let y=0;y<24;y++)for(let x=0;x<40;x++)if(x<12||x>=20||y<8||y>=13)expect(d[y*40+x]).toBe(0);});
+ it('preserves zero flow and bounded opacity',()=>{const d=new Uint16Array(960);rasterBristle(d,40,24,2,10,30,10,3,0,box);expect(d.every(v=>v===0)).toBe(true);expect(densityAlpha[0]).toBe(0);expect(densityAlpha[65535]).toBe(255);});
+});

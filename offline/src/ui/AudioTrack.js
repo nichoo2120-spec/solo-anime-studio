@@ -1,0 +1,23 @@
+import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "../../jsx-runtime.js";
+import { memo, useRef } from '../../react.js';
+import { Music2, Volume2, VolumeX, X, Upload } from '../../lucide.js';
+import { secondsAtExposure } from '../animation/audio.js';
+const WaveformPeaks = memo(function WaveformPeaks({ peaks }) { return _jsx("svg", { viewBox: "0 0 512 44", preserveAspectRatio: "none", "aria-hidden": "true", children: peaks.map((peak, i) => _jsx("line", { x1: i + .5, x2: i + .5, y1: 22 - Math.max(1, peak * 20), y2: 22 + Math.max(1, peak * 20) }, i)) }); });
+/** Audio waveform is derived from fixed import-time peaks; never traverses strokes. */
+export const AudioTrack = memo(function AudioTrack({ audio, expanded, shortcut, muted, busy, exposure, fps, total, onToggle, onImport, onRemove, onMute, onSeek }) {
+    const picker = useRef(null), wave = useRef(null), drag = useRef(false);
+    function seek(e) { if (!audio || !wave.current)
+        return; const rect = wave.current.getBoundingClientRect(); if (!rect.width)
+        return; const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)); onSeek(fraction * audio.duration); }
+    const position = audio ? Math.min(100, secondsAtExposure(exposure, fps) / audio.duration * 100) : 0;
+    return _jsxs("div", { className: "audio-track", "aria-label": "Animation audio track", children: [_jsxs("div", { className: "audio-track-header", children: [_jsxs("button", { type: "button", className: "audio-track-toggle", onClick: onToggle, title: 'Show or hide Audio track (' + shortcut.toUpperCase() + ')', "aria-expanded": expanded, children: [_jsx(Music2, { size: 13 }), " AUDIO ", _jsx("kbd", { children: shortcut.toUpperCase() })] }), audio && _jsx("span", { className: "audio-track-filename", title: audio.name, children: audio.name }), _jsxs("button", { type: "button", disabled: busy, onClick: () => picker.current?.click(), children: [_jsx(Upload, { size: 12 }), audio ? 'Replace' : 'Import'] }), audio && _jsxs(_Fragment, { children: [_jsx("button", { type: "button", title: muted ? 'Unmute audio' : 'Mute audio', "aria-label": muted ? 'Unmute audio' : 'Mute audio', onClick: () => onMute(!muted), children: muted ? _jsx(VolumeX, { size: 14 }) : _jsx(Volume2, { size: 14 }) }), _jsx("button", { type: "button", disabled: busy, "aria-label": "Remove scene audio", title: "Remove audio (Undo available)", onClick: onRemove, children: _jsx(X, { size: 14 }) })] }), _jsx("input", { ref: picker, hidden: true, type: "file", accept: "audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/aac,audio/webm,.mp3,.wav,.ogg,.m4a", "aria-label": "Choose animation audio file", onChange: e => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (file)
+                            onImport(file); } })] }), expanded && _jsx("div", { className: "audio-track-body", children: audio ? _jsxs(_Fragment, { children: [_jsxs("div", { ref: wave, className: "audio-waveform", role: "slider", tabIndex: 0, "aria-label": "Audio time scrubber", "aria-valuemin": 0, "aria-valuemax": Math.round(audio.duration * 100) / 100, "aria-valuenow": Math.min(audio.duration, secondsAtExposure(exposure, fps)), title: "Click or drag to seek audio and animation frames", onPointerDown: e => { if (e.button !== 0)
+                                return; drag.current = true; e.currentTarget.setPointerCapture(e.pointerId); seek(e); }, onPointerMove: e => { if (drag.current)
+                                seek(e); }, onPointerUp: e => { if (!drag.current)
+                                return; seek(e); drag.current = false; if (e.currentTarget.hasPointerCapture(e.pointerId))
+                                e.currentTarget.releasePointerCapture(e.pointerId); }, onPointerCancel: () => { drag.current = false; }, onKeyDown: e => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onSeek(Math.max(0, Math.min(audio.duration, secondsAtExposure(exposure, fps) + (e.key === 'ArrowRight' ? 1 : -1) / fps)));
+                            } }, children: [_jsx(WaveformPeaks, { peaks: audio.peaks }), _jsx("span", { className: "audio-playhead", style: { left: position + '%' } })] }), _jsxs("small", { children: [secondsAtExposure(exposure, fps).toFixed(2), "s / ", audio.duration.toFixed(2), "s \u00B7 animation ", total, " frames at ", fps, " FPS \u00B7 waveform follows frame selection"] })] }) : _jsx("span", { className: "audio-empty", children: "Import a short voice line, music cue or sound effect. MP3/WAV recommended; up to 50 MB / 20 min. Audio plays with the animation." }) })] });
+});

@@ -1,0 +1,80 @@
+import {test,expect} from '@playwright/test';
+
+test('incremental ink retains original fill pixels and bounds new path work',async({page})=>{
+ test.setTimeout(180000);await page.goto('/');const rows=await page.evaluate(async()=>{
+  const {SolidLiveRaster}=await import('/src/engine/SolidLiveRaster.ts'),{drawSolidInkV10}=await import('/src/engine/solidInkV10.ts'),{strokeGeometry}=await import('/src/engine/strokeGeometry.ts'),{stockPresets}=await import('/src/core/brushes.ts');const rows=[];
+  for(const id of ['g-pen','mapping','brush-pen','eraser-hard'])for(const size of [7,150])for(const pressure of [false,true])for(const rotation of [0,.23]){
+   const s:any={...stockPresets.find(p=>p.id===id)!.settings,id:id+'-long',kind:'stroke',tool:'brush',engineVersion:10,liveRefinementVersion:2,size,pressure,points:[],taperStart:.07,taperEnd:.17},live=new SolidLiveRaster(),b=document.createElement('canvas');b.width=1000;b.height=650;const ctx=b.getContext('2d')!,m=new DOMMatrix().translate(25,20).rotate(rotation*180/Math.PI).scale(1.1);let max=0,changed=0;const builds=[],reuse=[],fullBuilds=[];
+   const check=(phase:'live'|'final')=>{const g=strokeGeometry(s,phase),a=live.paint(s,g,m,1000,650);ctx.resetTransform();ctx.clearRect(0,0,1000,650);ctx.setTransform(m);const full:any={ends:[],states:[]};drawSolidInkV10(ctx,s,g,undefined,1.5,undefined,full);fullBuilds.push(full.builtDabs);const x=a.getContext('2d')!.getImageData(0,0,1000,650).data,y=ctx.getImageData(0,0,1000,650).data;for(let j=3;j<x.length;j+=4){const d=Math.abs(x[j]-y[j]);max=Math.max(max,d);if(d)changed++;}builds.push(live.lastBuiltDabs);reuse.push(live.lastReused);};
+   for(let i=0;i<=600;i++){s.points.push({x:410+290*Math.sin(i/600*Math.PI*5.7),y:250+145*Math.sin(i/600*Math.PI*26.3),p:.1+.9*(.5+.5*Math.sin(i/600*Math.PI*3))});if(i%60===0)check('live');}check('final');
+   rows.push({id,size,pressure,rotation,max,changed,builds,reuse,fullBuilds});live.clear();
+  }return rows;
+ });console.log('INK_BATCH_FIDELITY',JSON.stringify(rows));for(const r of rows){expect(r.max,JSON.stringify(r)).toBe(0);expect(Math.max(...r.reuse.slice(4,-1)),JSON.stringify(r)).toBeGreaterThan(0);for(let i=5;i<r.builds.length-1;i++)expect(r.builds[i]/r.fullBuilds[i],JSON.stringify(r)).toBeLessThan(.4);}
+});
+
+test('display ink skips duplicate document raster while mirrors and selections retain it',async({page})=>{
+ await page.goto('/');const rows=await page.evaluate(async()=>{
+  const m=await import('/src/core/model.ts'),{DocumentStore}=await import('/src/core/history.ts'),{StudioEngine}=await import('/src/engine/StudioEngine.ts'),{stockPresets}=await import('/src/core/brushes.ts');const rows=[];
+  for(const id of ['g-pen','mapping','technical','brush-pen','eraser-hard','flat','flat-original'])for(const mirror of [false,true]){
+   const c=document.createElement('canvas');c.style.cssText='position:fixed;left:0;top:0;width:700px;height:500px';document.body.append(c);c.setPointerCapture=()=>{};c.hasPointerCapture=()=>false;const e:any=new StudioEngine(c,new DocumentStore(m.newProject('Ink',700,500)),()=>{});e.setView({x:0,y:0,zoom:1,rotation:0});e.setInput(id==='eraser-hard'?'eraser':'brush',{...stockPresets.find(p=>p.id===(id==='flat-original'?'flat':id))!.settings,...(id==='flat-original'?{brushTip:'round'}:{}),size:150,pressure:true});e.mirrorDrawing.enabled=mirror;let calls=0;const fn=e.liveRaster.paint.bind(e.liveRaster);e.liveRaster.paint=(...args:any[])=>{calls++;return fn(...args);};e.diagnostics.start({perEventGeometry:false});
+   const send=(type:string,x:number,y:number)=>c.dispatchEvent(new PointerEvent(type,{pointerId:9,isPrimary:true,pointerType:'pen',buttons:type==='pointerup'?0:1,button:0,pressure:.65,clientX:x,clientY:y}));send('pointerdown',70,160);for(let i=1;i<=90;i++){send('pointermove',70+i*5,160+70*Math.sin(i/90*Math.PI*6));if(i%10===0)e.render();}send('pointerup',520,160);e.render();rows.push({id,mirror,calls,strokes:m.activeLayer(e.store.getSnapshot()).operations.length,liveTip:e.diagnostics.trace()?.events.some((event:any)=>!!event.liveTip)});e.dispose();c.remove();
+  }return rows;
+ });for(const r of rows){expect(r.strokes).toBe(r.mirror?2:1);expect(r.liveTip).toBe(true);if(r.mirror||r.id==='flat')expect(r.calls).toBeGreaterThan(0);else expect(r.calls).toBe(0);if(!r.mirror&&r.id==='flat')expect(r.calls).toBeLessThanOrEqual(11);}
+});
+
+test('every drawing preset keeps full-render coverage through sustained input',async({page})=>{
+ test.setTimeout(180000);await page.goto('/');const rows=await page.evaluate(async()=>{
+  const {LiveStrokeRaster}=await import('/src/engine/liveRaster.ts'),{drawModernStroke}=await import('/src/engine/brushRaster.ts'),{strokeGeometry}=await import('/src/engine/strokeGeometry.ts'),{stockPresets}=await import('/src/core/brushes.ts');const rows=[];
+  for(const preset of stockPresets)for(const size of [preset.settings.size,150])for(const pressure of [false,true]){
+   const kind=preset.settings.brushKind,s:any={...preset.settings,id:'all-'+preset.id,kind:'stroke',tool:'brush',liveRefinementVersion:preset.category==='Paint'||kind==='eraser-soft'?3:2,flatNibVersion:kind==='flat'?1:undefined,paintNibVersion:['paint','marker','eraser-soft','dry-round','dry-grain','watercolor'].includes(kind??'')?1:undefined,engineVersion:kind==='dry-round'||kind?.startsWith('graphite-')?9:['dry-grain','watercolor','airbrush'].includes(kind??'')?8:10,points:[],size,pressure},live=new LiveStrokeRaster(),a=document.createElement('canvas'),b=document.createElement('canvas');a.width=b.width=800;a.height=b.height=460;const ac=a.getContext('2d',{willReadFrequently:true})!,bc=b.getContext('2d',{willReadFrequently:true})!;let max=0,changed=0;
+   const check=()=>{const g=strokeGeometry(s,'live');live.paint(ac,s,g);bc.clearRect(0,0,800,460);drawModernStroke(bc,s,'live',g);const x=ac.getImageData(0,0,800,460).data,y=bc.getImageData(0,0,800,460).data;for(let j=3;j<x.length;j+=4){const d=Math.abs(x[j]-y[j]);max=Math.max(max,d);if(d)changed++;}};
+   for(let i=0;i<=360;i++){s.points.push({x:400+280*Math.sin(i/360*Math.PI*5.7),y:230+130*Math.sin(i/360*Math.PI*18.3),p:.12+.88*(.5+.5*Math.sin(i/360*Math.PI*3))});if(i%30===0){if(i%120===0)check();else live.paint(ac,s,strokeGeometry(s,'live'));}}
+   rows.push({id:preset.id,size,pressure,max,changed});live.reset();
+  }return rows;
+ // Cropped native pencil paths and blurred airbrush tiles may round one alpha
+ // level differently. Geometry, pressure and saved rasterizers are unchanged.
+ });console.log('ALL_PRESET_COVERAGE',JSON.stringify(rows));for(const r of rows)expect(r.max,JSON.stringify(r)).toBeLessThanOrEqual(r.id==='airbrush'||['hb','2b','mechanical','blue'].includes(r.id)?1:0);
+});
+
+test('ink cache matches complete layer rendering and invalidates after edits and view changes',async({page})=>{
+ test.setTimeout(120000);await page.goto('/');const rows=await page.evaluate(async()=>{
+  const m=await import('/src/core/model.ts'),{InkDisplay}=await import('/src/engine/InkDisplay.ts'),{strokeGeometry}=await import('/src/engine/strokeGeometry.ts'),{stockPresets}=await import('/src/core/brushes.ts');const rows=[];
+  for(const opacity of [1,.53])for(const erase of [false,true]){
+   const p=m.newProject('Layer',800,460),layer=m.activeLayer(p);layer.opacity=.64;layer.blend='multiply';const s:any={...stockPresets.find(p=>p.id==='mapping')!.settings,id:'layer-ink',kind:'stroke',tool:erase?'eraser':'brush',brushKind:erase?'eraser-hard':'mapping',engineVersion:10,liveRefinementVersion:2,points:[],size:150,pressure:true,opacity,smoothness:0,stabilization:0,taperStart:.04,taperEnd:.13,color:'#2459a3'};
+   const base:any={...s,id:'base',tool:'brush',brushKind:'technical',taperStart:0,taperEnd:0,points:[{x:60,y:260,p:1},{x:720,y:260,p:1}],pressure:false,color:'#e85635',size:180,opacity:.78};layer.operations=[base];const live=new InkDisplay(),a=document.createElement('canvas'),b=document.createElement('canvas');a.width=b.width=1050;a.height=b.height=750;let max=0,changed=0;const checks:any[]=[];
+   const check=(rotation:number,zoom:number)=>{const matrix=new DOMMatrix().translate(30,20).rotate(rotation*180/Math.PI).scale(zoom),g=strokeGeometry(s,'live'),ac=a.getContext('2d')!,bc=b.getContext('2d')!;for(const ctx of [ac,bc]){ctx.resetTransform();ctx.fillStyle='#ffffff';ctx.fillRect(0,0,1050,750);ctx.setTransform(matrix);}live.paint(ac,layer,p,s,g);const full=new InkDisplay();full.paint(bc,{...layer,operations:[...layer.operations,s]},p);full.clear();const x=ac.getImageData(0,0,1050,750).data,y=bc.getImageData(0,0,1050,750).data;let frameMax=0;for(let j=0;j<x.length;j++){const d=Math.abs(x[j]-y[j]);max=Math.max(max,d);frameMax=Math.max(frameMax,d);if(d)changed++;}checks.push({n:s.points.length,rotation,zoom,size:s.size,base:layer.operations.length,max:frameMax});};
+   for(let i=0;i<=240;i++){s.points.push({x:400+270*Math.sin(i/240*Math.PI*4.7),y:230+130*Math.sin(i/240*Math.PI*16.3),p:.15+.85*(.5+.5*Math.sin(i/240*Math.PI*3))});if(i%60===0)check(0,1.1);}check(.17,1.2);s.points=s.points.slice(0,80);check(.17,1.2);s.color='#587233';s.size=70;check(.17,1.2);layer.operations=[];check(.17,1.2);rows.push({opacity,erase,max,changed,checks});live.clear();
+  }return rows;
+ // Opaque brush fills are bit exact, including colored backgrounds. Grouped
+ // translucent ink uses a full-origin surface instead of the old cropped
+ // scratch: native antialiasing and 8-bit intermediate blends differ by <=3.
+ });console.log('INK_LAYER_FIDELITY',JSON.stringify(rows));for(const r of rows)expect(r.max,JSON.stringify(r)).toBeLessThanOrEqual(r.opacity===1&&!r.erase?0:3);
+});
+
+test('visible ink layers retain independent bounded surfaces during drawing and history changes',async({page})=>{
+ await page.goto('/');const r=await page.evaluate(async()=>{
+  const m=await import('/src/core/model.ts'),{DocumentStore}=await import('/src/core/history.ts'),{StudioEngine}=await import('/src/engine/StudioEngine.ts'),{stockPresets}=await import('/src/core/brushes.ts');const p=m.newProject('Two ink layers',800,460),top=m.newLayer('Top'),bottom=m.newLayer('Bottom');const base:any={...stockPresets.find(p=>p.id==='mapping')!.settings,id:'base',kind:'stroke',tool:'brush',engineVersion:10,liveRefinementVersion:2,size:150,pressure:false,points:Array.from({length:80},(_,i)=>({x:70+i*8,y:210+90*Math.sin(i/79*Math.PI*6),p:1}))};top.operations=[{...base,id:'top'}];bottom.operations=[{...base,id:'bottom',color:'#dd5243'}];p.layers=[top,bottom];p.activeLayerId=top.id;const store=new DocumentStore(p),c=document.createElement('canvas');c.style.cssText='position:fixed;left:0;top:0;width:900px;height:600px';document.body.append(c);c.setPointerCapture=()=>{};c.hasPointerCapture=()=>false;const e:any=new StudioEngine(c,store,()=>{});e.setView({x:0,y:0,zoom:1,rotation:0});e.setInput('brush',{...stockPresets.find(p=>p.id==='mapping')!.settings,size:150,pressure:false});e.render();const old=e.inkDisplay.layers.get(bottom.id),ctx=old.surface.getContext('2d'),fill=ctx.fill.bind(ctx);let fills=0;ctx.fill=(...args:any[])=>{fills++;return fill(...args);};
+  const send=(type:string,x:number,y:number)=>c.dispatchEvent(new PointerEvent(type,{pointerId:5,isPrimary:true,pointerType:'mouse',buttons:type==='pointerup'?0:1,button:0,clientX:x,clientY:y}));send('pointerdown',50,100);for(let i=1;i<=120;i++){send('pointermove',50+i*5,100+50*Math.sin(i/120*Math.PI*12));if(i%10===0)e.render();}send('pointerup',650,100);e.render();const after=e.inkDisplay.layers.get(bottom.id),undo=store.undo();e.render();const redo=store.redo();e.render();const same=old===after&&old===e.inkDisplay.layers.get(bottom.id);let bytes=0;for(const x of e.inkDisplay.layers.values())bytes+=x.surface.width*x.surface.height*4;const layers=e.inkDisplay.layers.size,ops=m.activeLayer(store.getSnapshot()).operations.length;e.dispose();c.remove();return {same,fills,bytes,layers,undo,redo,ops};
+ });expect(r.same).toBe(true);expect(r.fills).toBe(0);expect(r.bytes).toBeLessThanOrEqual(64*1024*1024);expect(r.layers).toBe(2);expect(r.ops).toBe(2);
+});
+
+test('long ink finalizes off the main thread, preserves following strokes and rejects obsolete results',async({page})=>{
+ test.setTimeout(120000);await page.goto('/');const rows=await page.evaluate(async()=>{
+  const m=await import('/src/core/model.ts'),{DocumentStore}=await import('/src/core/history.ts'),{StudioEngine}=await import('/src/engine/StudioEngine.ts'),{InkDisplay}=await import('/src/engine/InkDisplay.ts'),{stockPresets}=await import('/src/core/brushes.ts');const rows=[];
+  document.getElementById('root')!.style.display='none';
+  for(const action of ['next','camera','undo','failure'] as const){
+   const p=m.newProject('Background finish',960,540);p.settings.guides=false;const store=new DocumentStore(p),host=document.createElement('div'),c=document.createElement('canvas');host.style.cssText='position:fixed;left:0;top:0;width:1100px;height:700px';c.style.cssText='width:1100px;height:700px';host.append(c);document.body.append(host);c.setPointerCapture=()=>{};c.hasPointerCapture=()=>false;const e:any=new StudioEngine(c,store,()=>{});e.setView({x:20,y:20,zoom:1,rotation:0});e.setInput('brush',{...stockPresets.find(p=>p.id==='mapping')!.settings,size:150,pressure:true});let time=1000;
+   const send=(type:string,x:number,y:number)=>{const ev=new PointerEvent(type,{pointerId:7,isPrimary:true,pointerType:'pen',buttons:type==='pointerup'?0:1,button:0,pressure:.6,clientX:20+x,clientY:20+y});Object.defineProperty(ev,'timeStamp',{value:++time});c.dispatchEvent(ev);};send('pointerdown',450,250);for(let i=1;i<=600;i++){const t=i/600;e.stroke.points.push({x:450+320*Math.sin(t*Math.PI*5.7),y:250+140*Math.sin(t*Math.PI*28.3),p:.2+.8*Math.sin(t*Math.PI)**2});if(i%30)continue;e.geometryDirty=e.strokeDirty=true;e.render();}send('pointerup',450+320*Math.sin(Math.PI*5.7),250+140*Math.sin(Math.PI*28.3));cancelAnimationFrame(e.frame);e.frame=0;e.render();const deferred=!!e.inkDisplay.pending,committed=m.activeLayer(store.getSnapshot()).operations.length,token=e.inkDisplay.pending?.token;
+   if(action==='next'){send('pointerdown',100,120);send('pointermove',150,170);e.render();send('pointerup',200,120);e.render();}
+   if(action==='camera'){e.setView({x:35,y:30,zoom:1.1,rotation:.17});e.render();}
+   if(action==='undo'){store.undo();e.render();}
+   if(action==='failure'){e.inkDisplay.worker.dispatchEvent(new ErrorEvent('error'));e.render();}
+   const deadline=performance.now()+8000;while(e.inkDisplay.pending&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,20));e.render();const done=!e.inkDisplay.pending;
+   // Force a late obsolete delivery after history/camera/failure handling.
+   if(action!=='next'){const tiny=new OffscreenCanvas(1,1);tiny.getContext('2d');const bitmap=tiny.transferToImageBitmap();e.inkDisplay.finishPending({token,bitmap});e.render();}
+   const doc=store.getSnapshot(),layer=m.activeLayer(doc),view=e.view,canvas=document.createElement('canvas');canvas.width=c.width;canvas.height=c.height;const ctx=canvas.getContext('2d')!,dpr=window.devicePixelRatio||1;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.translate(view.x,view.y);ctx.rotate(view.rotation);ctx.scale(view.zoom,view.zoom);const cold=new InkDisplay();cold.paint(ctx,layer,doc,undefined,undefined,e.renderer);const cached=e.inkDisplay.layers.get(layer.id)?.surface;let max=0;
+   if(cached&&layer.operations.length){const x=cached.getContext('2d')!.getImageData(0,0,canvas.width,canvas.height).data,y=ctx.getImageData(0,0,canvas.width,canvas.height).data;for(let j=0;j<x.length;j++)max=Math.max(max,Math.abs(x[j]-y[j]));}
+   rows.push({action,deferred,committed,done,max,operations:layer.operations.length});cold.clear();e.dispose();host.remove();
+  }return rows;
+ });console.log('BACKGROUND_INK_FINAL',JSON.stringify(rows));for(const r of rows){expect(r.deferred,JSON.stringify(r)).toBe(true);expect(r.committed).toBe(1);expect(r.done).toBe(true);expect(r.max,JSON.stringify(r)).toBe(0);expect(r.operations).toBe(r.action==='undo'?0:r.action==='next'?2:1);}
+});

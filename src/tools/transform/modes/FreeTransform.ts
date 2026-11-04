@@ -1,0 +1,2 @@
+import type {ModeFunction} from './types';import {move} from './Move';import {scale} from './Scale';import {rotate} from './Rotate';import {skew} from './Skew';import {perspective} from './Perspective';import {distort} from './Distort';
+export const freeTransform:ModeFunction=(s,d,p,k)=>{if(d.handle.type==='rotate')rotate(s,d,p,k);else if(d.handle.type==='corner')(k.ctrl&&k.shift?perspective:k.ctrl?distort:scale)(s,d,p,k);else if(d.handle.type==='edge')(k.ctrl?skew:scale)(s,d,p,k);else move(s,d,p,k);};

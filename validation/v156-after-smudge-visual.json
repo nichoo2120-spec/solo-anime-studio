@@ -1,0 +1,642 @@
+[
+  {
+    "preset": "smudge-bristle",
+    "size": 12,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "df8c38d2e12d5c47901337e6771fe040b8580287f74f4f0734f811502eca8db3",
+    "repeat": "df8c38d2e12d5c47901337e6771fe040b8580287f74f4f0734f811502eca8db3",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 12,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "c33413d3925ac8da734b74450e0e4c6a933a4a64016e051e7f7e35401ae58e66",
+    "repeat": "c33413d3925ac8da734b74450e0e4c6a933a4a64016e051e7f7e35401ae58e66",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 12,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "586057ee170d76803933a3bf95120433be42da97446527d748d4f4dd333cb8e3",
+    "repeat": "586057ee170d76803933a3bf95120433be42da97446527d748d4f4dd333cb8e3",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 12,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "22064c5919d6fb2d9b297633049b0f9fbb02701ba3724e8bec525424336bb61a",
+    "repeat": "22064c5919d6fb2d9b297633049b0f9fbb02701ba3724e8bec525424336bb61a",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 30,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "65cd40cd9a113f9b19a4b56e3a7b33dced7dc48b07a628e94f409909a50dda6a",
+    "repeat": "65cd40cd9a113f9b19a4b56e3a7b33dced7dc48b07a628e94f409909a50dda6a",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 30,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "a39e380df9b7530a8ea5164102d4571ceb46bfa964150b7f24d5fcf255677aed",
+    "repeat": "a39e380df9b7530a8ea5164102d4571ceb46bfa964150b7f24d5fcf255677aed",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 30,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "a57c8271f1771c3fd511ba60ae8adc7b6787e242481184fdccff7273167dfda8",
+    "repeat": "a57c8271f1771c3fd511ba60ae8adc7b6787e242481184fdccff7273167dfda8",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 30,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "2a66a54dfb1ae3263c4788e920cd81ab99e7f0923207aba9fd07cd818be4292d",
+    "repeat": "2a66a54dfb1ae3263c4788e920cd81ab99e7f0923207aba9fd07cd818be4292d",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 130,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "d581bb3bed8d62fb3af09a9920204b964ee40d45912e3a230c108a3c0f0f200f",
+    "repeat": "d581bb3bed8d62fb3af09a9920204b964ee40d45912e3a230c108a3c0f0f200f",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 130,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "f051c5acd18865a363c60cb5af9f3f87b2f73dbe7a11adb4fe1dbce511dfe216",
+    "repeat": "f051c5acd18865a363c60cb5af9f3f87b2f73dbe7a11adb4fe1dbce511dfe216",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 130,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "b5c42ee91a444e1d652b3c65e327078e2dcb1a728cfeff1a36b556e79d2f719d",
+    "repeat": "b5c42ee91a444e1d652b3c65e327078e2dcb1a728cfeff1a36b556e79d2f719d",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 130,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "a6ad0116ca0b2c50341b3c95cb05ff2d6008783d52cbaa17382df705791e03c8",
+    "repeat": "a6ad0116ca0b2c50341b3c95cb05ff2d6008783d52cbaa17382df705791e03c8",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 500,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "bb2675b19b6de48cdf00a0da6274c56c1beafc817fde1fe12a2b8041a1246a57",
+    "repeat": "bb2675b19b6de48cdf00a0da6274c56c1beafc817fde1fe12a2b8041a1246a57",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 500,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "6a3e4bc454fce47e8a5a3ec9bbd80a1ed28c53adf0e367d9ceb400a7eacb79c0",
+    "repeat": "6a3e4bc454fce47e8a5a3ec9bbd80a1ed28c53adf0e367d9ceb400a7eacb79c0",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 500,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "694df771b623972ebca9ea398d3462c49318a77883f6653967a596fbb49bc9d9",
+    "repeat": "694df771b623972ebca9ea398d3462c49318a77883f6653967a596fbb49bc9d9",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "smudge-bristle",
+    "size": 500,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "b1bd06f9d447ae7b65c953904c73661515d3abf0d89f7643f3a3d0aca4f26f69",
+    "repeat": "b1bd06f9d447ae7b65c953904c73661515d3abf0d89f7643f3a3d0aca4f26f69",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 12,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "7618b5e0634e5ea155f8733ed58bac0a5b07b3c0870363e3001d609382ccf94e",
+    "repeat": "7618b5e0634e5ea155f8733ed58bac0a5b07b3c0870363e3001d609382ccf94e",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 12,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "22a2f0de8628db7230773c96704e3ac47d30eb9d8837f0d8fb8d519825dc8d26",
+    "repeat": "22a2f0de8628db7230773c96704e3ac47d30eb9d8837f0d8fb8d519825dc8d26",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 12,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "142095ff7e649365f5dcf27a16a312a2ab39e67334d4290fd7608d990a727dce",
+    "repeat": "142095ff7e649365f5dcf27a16a312a2ab39e67334d4290fd7608d990a727dce",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 12,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "3db3d16dd46ebbe7f6e9eccff6d7a896860ea83208f2f9df7460abe865b7a351",
+    "repeat": "3db3d16dd46ebbe7f6e9eccff6d7a896860ea83208f2f9df7460abe865b7a351",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 30,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "9beaac1cf545ee63988dfae2811fd753b8e311018998d96d91013f75a060d275",
+    "repeat": "9beaac1cf545ee63988dfae2811fd753b8e311018998d96d91013f75a060d275",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 30,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "26c5873ed08e1b4e532abbfea0fed90e3b3c8cee2300f9b442e9ed0175deaecd",
+    "repeat": "26c5873ed08e1b4e532abbfea0fed90e3b3c8cee2300f9b442e9ed0175deaecd",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 30,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "e65323c1981b0f73c8d4d8d25192a032c86a58b026642f42463ea52212c4808b",
+    "repeat": "e65323c1981b0f73c8d4d8d25192a032c86a58b026642f42463ea52212c4808b",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 30,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "c44d8e07e74734cb076d6b8030df3cf6218b6752e93f350423302d9d482c1d43",
+    "repeat": "c44d8e07e74734cb076d6b8030df3cf6218b6752e93f350423302d9d482c1d43",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 130,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "8f1b502cfc098aa05f616c3707aa73e05a44b1c6023dec35426d138e31c27417",
+    "repeat": "8f1b502cfc098aa05f616c3707aa73e05a44b1c6023dec35426d138e31c27417",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 130,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "3e13374ba7bb7735ab2c22bf56539c9e2a6fac527a3eeb65bfc5033530669541",
+    "repeat": "3e13374ba7bb7735ab2c22bf56539c9e2a6fac527a3eeb65bfc5033530669541",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 130,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "1a983ed1d7f60fbb83bb641fa9818a1b80b757783284e88461e2cacb76d74bee",
+    "repeat": "1a983ed1d7f60fbb83bb641fa9818a1b80b757783284e88461e2cacb76d74bee",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 130,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "ed7b7f97a2b6dc1a6106405bc285af7f0cb50973f857674d32034d1811c25471",
+    "repeat": "ed7b7f97a2b6dc1a6106405bc285af7f0cb50973f857674d32034d1811c25471",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 500,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "65717cecaec3dc2abc68e3a5788cbd2bb986b1d5daced58202ff8ec846e64d55",
+    "repeat": "65717cecaec3dc2abc68e3a5788cbd2bb986b1d5daced58202ff8ec846e64d55",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 500,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "74080e6b933ae9dbf88634c481a9d1c03b01a18c8bf81799b8b3d7667e9160bc",
+    "repeat": "74080e6b933ae9dbf88634c481a9d1c03b01a18c8bf81799b8b3d7667e9160bc",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 500,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "3d065a054843e568f5fc9590b6cf52225ee7331ae9456634ba7a52bf07122205",
+    "repeat": "3d065a054843e568f5fc9590b6cf52225ee7331ae9456634ba7a52bf07122205",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "blender-soft",
+    "size": 500,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "f459b929fb8ca525eab67f2e25de3381451ebbbd251c6ca8ecd6777100faf0da",
+    "repeat": "f459b929fb8ca525eab67f2e25de3381451ebbbd251c6ca8ecd6777100faf0da",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 12,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "9d9c4fa46ad010dd0da2c4f5a10dc2567a76e0f26e371d68e6495974f171e833",
+    "repeat": "9d9c4fa46ad010dd0da2c4f5a10dc2567a76e0f26e371d68e6495974f171e833",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 12,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "e283c07ae90fc7d96fd4e9319ea3d6f7ffd428afb1aaaae8ba9b088697aa5b1a",
+    "repeat": "e283c07ae90fc7d96fd4e9319ea3d6f7ffd428afb1aaaae8ba9b088697aa5b1a",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 12,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "8770d083c394f5fe19ac61c4755a77cf13cba85258a6e1b63bd56aba61736ebc",
+    "repeat": "8770d083c394f5fe19ac61c4755a77cf13cba85258a6e1b63bd56aba61736ebc",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 12,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "48accc06a85531c2d7be3a78493da6e731fc3319fe1db277c20fa759ba25a689",
+    "repeat": "48accc06a85531c2d7be3a78493da6e731fc3319fe1db277c20fa759ba25a689",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 30,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "dbf064d59738d23112f4c29bf9851c6c3dcaef5826e952932f1ac02a2a20bbf4",
+    "repeat": "dbf064d59738d23112f4c29bf9851c6c3dcaef5826e952932f1ac02a2a20bbf4",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 30,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "54e2ad23c1d00806088f060146f7fcc5454ab4081c2f1954d9a8174c515dd7e8",
+    "repeat": "54e2ad23c1d00806088f060146f7fcc5454ab4081c2f1954d9a8174c515dd7e8",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 30,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "851fde1de086c8ad98dd97efd893b19e9a104dfd5e17eca6527370a2e087df4f",
+    "repeat": "851fde1de086c8ad98dd97efd893b19e9a104dfd5e17eca6527370a2e087df4f",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 30,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "5dc80f3d594ab746f7a8214e82026f71ea552d7e34906fc7e42dc7a01e8c1684",
+    "repeat": "5dc80f3d594ab746f7a8214e82026f71ea552d7e34906fc7e42dc7a01e8c1684",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 130,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "6b311bb9046091a1218a750fa95aba8cbaa277f2d774a1a12319e90d872b6432",
+    "repeat": "6b311bb9046091a1218a750fa95aba8cbaa277f2d774a1a12319e90d872b6432",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 130,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "ec6f1896d0580bcbabda240f4a52c5b20a7e97abd01325668aa5af7b08edfb88",
+    "repeat": "ec6f1896d0580bcbabda240f4a52c5b20a7e97abd01325668aa5af7b08edfb88",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 130,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "2114eae36b2387f06f464cffdf64c5120dcf1e5b1e0bd2b96574bf81b387b39d",
+    "repeat": "2114eae36b2387f06f464cffdf64c5120dcf1e5b1e0bd2b96574bf81b387b39d",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 130,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "60349fd6f419f97e4d799b977ed08e8bbc50ac696d194ecea0d83f03da371e79",
+    "repeat": "60349fd6f419f97e4d799b977ed08e8bbc50ac696d194ecea0d83f03da371e79",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 500,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "40055d366977ccc0f3cade271a184e72fe8818daddfc3a49070ee1d8944a0678",
+    "repeat": "40055d366977ccc0f3cade271a184e72fe8818daddfc3a49070ee1d8944a0678",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 500,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "f1d0478b507f0d6c9092323da6acd5eefacc03d1aff44f2e504432b785697169",
+    "repeat": "f1d0478b507f0d6c9092323da6acd5eefacc03d1aff44f2e504432b785697169",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 500,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "7378536d99075b94a910b8a4a6b4f7e1913996de4792d9a6c1a1c801b2a506a0",
+    "repeat": "7378536d99075b94a910b8a4a6b4f7e1913996de4792d9a6c1a1c801b2a506a0",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "wet-mix",
+    "size": 500,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "1bca0cd749c725db3c58eca49ddf79e23597912e7b7b5f6d9577726bb06c2883",
+    "repeat": "1bca0cd749c725db3c58eca49ddf79e23597912e7b7b5f6d9577726bb06c2883",
+    "liveMax": 0,
+    "liveChanged": 0
+  },
+  {
+    "preset": "color-blender",
+    "size": 12,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "427eed12e2bdec471f9726cb482188608d7603f2a2f3a0b15c070280c3980911",
+    "repeat": "b9b618897a979378176073a0c656df47b2638460eaae2bc977a9997fa04570aa",
+    "liveMax": 61,
+    "liveChanged": 5798
+  },
+  {
+    "preset": "color-blender",
+    "size": 12,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "548a6594f73a2a44a4a7052d5013d6e68b2fc25fadf73696b22d4ddbabd41476",
+    "repeat": "b9b618897a979378176073a0c656df47b2638460eaae2bc977a9997fa04570aa",
+    "liveMax": 63,
+    "liveChanged": 6682
+  },
+  {
+    "preset": "color-blender",
+    "size": 12,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "6b60e5946a227cafc5cec6cd4b07c63622332f9672158fc6830635cb6f61f0fd",
+    "repeat": "7cd75bff877cb2795021c8303298ac0fcb43e01c0af5580f17e7102420bb75e7",
+    "liveMax": 35,
+    "liveChanged": 5772
+  },
+  {
+    "preset": "color-blender",
+    "size": 12,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "d7b022977f1f3540b89077f515d158575c208aad11f605cabe99a72cb10a792f",
+    "repeat": "7cd75bff877cb2795021c8303298ac0fcb43e01c0af5580f17e7102420bb75e7",
+    "liveMax": 37,
+    "liveChanged": 6664
+  },
+  {
+    "preset": "color-blender",
+    "size": 30,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "9762d237fad815ec8ea264861e8e7d787304854a5f2e34dc21424892a0ed322e",
+    "repeat": "b9b618897a979378176073a0c656df47b2638460eaae2bc977a9997fa04570aa",
+    "liveMax": 68,
+    "liveChanged": 14512
+  },
+  {
+    "preset": "color-blender",
+    "size": 30,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "5b66b8651a249a639f2d322eea3a29b2c43bc5e434f8058e6ed6fd454d776bb9",
+    "repeat": "b9b618897a979378176073a0c656df47b2638460eaae2bc977a9997fa04570aa",
+    "liveMax": 68,
+    "liveChanged": 16754
+  },
+  {
+    "preset": "color-blender",
+    "size": 30,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "8af4dcb0b5fd9181db3c2ccec6ed4d03639adae70391313c771dfc4245982286",
+    "repeat": "7cd75bff877cb2795021c8303298ac0fcb43e01c0af5580f17e7102420bb75e7",
+    "liveMax": 35,
+    "liveChanged": 14464
+  },
+  {
+    "preset": "color-blender",
+    "size": 30,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "c7b3cb178ff38e1d7013f45c630ae8c3a380556a363b5d866f4e412d4016c6c8",
+    "repeat": "7cd75bff877cb2795021c8303298ac0fcb43e01c0af5580f17e7102420bb75e7",
+    "liveMax": 37,
+    "liveChanged": 16702
+  },
+  {
+    "preset": "color-blender",
+    "size": 130,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "e0262ae0961c8a99bffeec21f01f4f8b12b5ea19aaf1a92c413729cfc730b543",
+    "repeat": "b9b618897a979378176073a0c656df47b2638460eaae2bc977a9997fa04570aa",
+    "liveMax": 73,
+    "liveChanged": 64574
+  },
+  {
+    "preset": "color-blender",
+    "size": 130,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "a08c08e7cdcf3e59ea8e8ab294ed09419778da329ff0cf4a2bda27186c9fbdf5",
+    "repeat": "b9b618897a979378176073a0c656df47b2638460eaae2bc977a9997fa04570aa",
+    "liveMax": 75,
+    "liveChanged": 74282
+  },
+  {
+    "preset": "color-blender",
+    "size": 130,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "16ae4d2160034d485ffe8ee2dc1c0869013fb387f2fec1d84b0a86b64042868e",
+    "repeat": "7cd75bff877cb2795021c8303298ac0fcb43e01c0af5580f17e7102420bb75e7",
+    "liveMax": 39,
+    "liveChanged": 64316
+  },
+  {
+    "preset": "color-blender",
+    "size": 130,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "0cf324b5fac233fca2a74fe962cb5aa55372b8a773ed720cfce0888d9cc7cd9f",
+    "repeat": "7cd75bff877cb2795021c8303298ac0fcb43e01c0af5580f17e7102420bb75e7",
+    "liveMax": 41,
+    "liveChanged": 74036
+  },
+  {
+    "preset": "color-blender",
+    "size": 500,
+    "mode": "opaque",
+    "shape": "straight",
+    "canonical": "39f7c2972e917b5e60987face12ab5376af830efc1699eeffe5752f74548edf9",
+    "repeat": "b9b618897a979378176073a0c656df47b2638460eaae2bc977a9997fa04570aa",
+    "liveMax": 60,
+    "liveChanged": 107620
+  },
+  {
+    "preset": "color-blender",
+    "size": 500,
+    "mode": "opaque",
+    "shape": "curve",
+    "canonical": "98957f5a7b4c1d16332543b04b331ed728b530c4107869cdae8cd7ac8f1dff54",
+    "repeat": "b9b618897a979378176073a0c656df47b2638460eaae2bc977a9997fa04570aa",
+    "liveMax": 65,
+    "liveChanged": 143078
+  },
+  {
+    "preset": "color-blender",
+    "size": 500,
+    "mode": "transparent",
+    "shape": "straight",
+    "canonical": "a353380e47e6ae06d4cdbab777cedc1f37ed04df50b0539a57b82d652850e32d",
+    "repeat": "7cd75bff877cb2795021c8303298ac0fcb43e01c0af5580f17e7102420bb75e7",
+    "liveMax": 25,
+    "liveChanged": 107196
+  },
+  {
+    "preset": "color-blender",
+    "size": 500,
+    "mode": "transparent",
+    "shape": "curve",
+    "canonical": "47f3b5316b7345f9f4d3c9a2d1c601e409aea0a63d106ffe2b2c229623fee7e6",
+    "repeat": "7cd75bff877cb2795021c8303298ac0fcb43e01c0af5580f17e7102420bb75e7",
+    "liveMax": 32,
+    "liveChanged": 142517
+  }
+]

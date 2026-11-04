@@ -1,0 +1,9 @@
+{
+  "source_files_identical": 183,
+  "source_files_changed": [
+    "src/engine/DrawingFrameCache.ts",
+    "src/engine/RasterSceneDisplay.ts",
+    "src/core/buildInfo.ts"
+  ],
+  "historical_fixture_files_modified": []
+}

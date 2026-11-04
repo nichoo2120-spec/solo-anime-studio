@@ -1,0 +1,10 @@
+import {describe,it,expect} from 'vitest';
+import {sampledEvents,fixtureStroke,blenderFixture,solidScene} from './dry-blend-fixtures';
+describe('dry/blend baseline input recipe',()=>{
+ it('uses exact 8ms timestamps and the requested straight slow/fast distances',()=>{for(const [speed,step]of [['slow',2],['fast',24]] as const){const e=sampledEvents('straight',speed,'none');expect(e[0]).toMatchObject({x:100,y:130,timeStamp:0});expect(e.at(-1)).toMatchObject({x:580,y:130});for(let i=1;i<e.length;i++){expect(e[i].timeStamp-e[i-1].timeStamp).toBe(8);expect(e[i].x-e[i-1].x).toBeCloseTo(step);}}});
+ it('retains bell pressure at both endpoints and records no legacy dry velocity',()=>{const f=fixtureStroke('dry','straight','slow','bell',130);expect(f.stroke.points[0].p).toBeCloseTo(.15);expect(f.stroke.points.at(-1)!.p).toBeCloseTo(.15);expect(Math.max(...f.stroke.points.map(p=>p.p))).toBe(1);expect(f.stroke.points.every(p=>p.v===undefined)).toBe(true);});
+ it('holds the saved texture seed constant while changing speed',()=>{const a=fixtureStroke('color-texture','straight','slow','none',70).stroke,b=fixtureStroke('color-texture','straight','fast','none',70).stroke;expect(a.colorSeed).toBe(b.colorSeed);expect(a.points[0].v).toBe(.65);expect(a.points[1].v).not.toBe(b.points[1].v);});
+ it('keeps five existing stroke flags and preset definitions unchanged',()=>{const d=fixtureStroke('dry','straight','slow','none',130).stroke,b=blenderFixture('slow').stroke;expect(d.engineVersion).toBe(9);expect(d.pressure).toBe(false);expect(d).not.toHaveProperty('dryBristleVersion');expect(b.coloringAppearanceVersion).toBe(3);expect(b.smudgeVersion).toBe(3);// v0.5.166: default Blender intentionally became smudgeVersion 3
+});
+ it('builds red and blue with Solid Paint and preserves direction/size probes',()=>{expect(solidScene().map(s=>s.color)).toEqual(['#d62828','#1d4ed8']);expect(solidScene().every(s=>s.brushTip==='color-solid'&&s.pressure===false)).toBe(true);expect(blenderFixture('right-to-left').stroke.points[0].x).toBe(720);expect(blenderFixture('size-30').stroke.size).toBe(30);});
+});

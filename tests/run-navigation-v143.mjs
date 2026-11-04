@@ -1,0 +1,6 @@
+import {createServer} from '../node_modules/vite/dist/node/index.js';
+import {spawn} from 'node:child_process';import fs from 'node:fs';
+const path='tests/navigation-v143.config.mjs';
+fs.writeFileSync(path,`import {defineConfig} from '@playwright/test';export default defineConfig({testDir:'browser',testMatch:['zoom-flat-v119.spec.ts','overlays-v135.spec.ts','paint-response-v121.spec.ts','camera-ui-v142.spec.ts'],grep:/new flat nib|clean raster ink|zoomed raster erasers|wheel notifications|maximum flat size|zero-pressure|cached page backdrop|blank layers|onion and flipbook|camera readouts|active transform/,workers:1,timeout:60000,use:{baseURL:'http://127.0.0.1:5475',headless:true,viewport:{width:1440,height:960},launchOptions:{executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']}},reporter:[['list'],['json',{outputFile:'validation/v143-navigation.json'}]]});`);
+const server=await createServer({root:process.cwd(),server:{host:'127.0.0.1',port:5475,strictPort:true}});await server.listen();
+try{const code=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['node_modules/@playwright/test/cli.js','test','--config',path],{stdio:'inherit'});child.on('error',reject);child.on('exit',resolve);});if(code)process.exitCode=Number(code);}finally{await server.close();fs.unlinkSync(path);}

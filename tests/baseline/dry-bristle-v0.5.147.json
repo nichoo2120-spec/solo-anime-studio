@@ -1,0 +1,312 @@
+{
+  "format": "solo-dry-bristle-implementation-checkpoint",
+  "version": "0.5.147",
+  "accepted": false,
+  "reason": "Some reference/dynamics targets and live-event/tooth budgets still fail. Hashes record current deterministic output, not quality acceptance.",
+  "sourceDigest": "4b85f657446a132f5c0a30789af43e5f69daf6f1f1442dd81c94c828fc03bf37",
+  "metricSourceSha256": "bca694ce831a227be994c6f4b4a7107c30c6979abf3ee3b31b5085206cafa460",
+  "width": 1250,
+  "height": 500,
+  "cases": [
+    {
+      "name": "dry-ink-bristle_straight_slow_none_38",
+      "rgbaSha256": "ec2547bd079cf58c00ab6bb657d62419164a86671552f7dcf7819a78b3c44035",
+      "pngSha256": "8d26d40f242c92ab613cf8283293619680037acb46575342733c414b694920da"
+    },
+    {
+      "name": "dry-ink-bristle_straight_fast_none_38",
+      "rgbaSha256": "2c4caed3c136b898c0f1753026e17fef1c73e03cc53ce92af77fc60bfa9a0d8f",
+      "pngSha256": "765e7014d4a6cd7c9b465f9dcd4c27565f080dcac34d024dff18ba4129bf6fc2"
+    },
+    {
+      "name": "dry-ink-bristle_sine_slow_none_38",
+      "rgbaSha256": "987bee34236a2423a6d71cec19fce418d786368951f2053f6c39786e81de3cdb",
+      "pngSha256": "7255d90c1063b4043a09a60769868e1acea58c89de9dc82255a731e37ab954b2"
+    },
+    {
+      "name": "dry-ink-bristle_sine_fast_none_38",
+      "rgbaSha256": "7eea1e95c9ca990d085437099d6d2ff423abbc70a5e63d94e7ccfddb623e7a58",
+      "pngSha256": "c259adefb9904937e51b452c7ac58e95123bb4bb31f80c46bcc9dcadefbb4ee5"
+    },
+    {
+      "name": "dry-ink-bristle_sine_slow_bell_38",
+      "rgbaSha256": "31cf857aa8aacc1325f45e14d4030512be00827d2bfe54dbd6a41144dbf69563",
+      "pngSha256": "290f3fb8d0a8b6c8ed8798b102da453768aa843e25dc0ad6a52f959087ff5f5c"
+    },
+    {
+      "name": "dry-ink-bristle_straight_slow_light_38",
+      "rgbaSha256": "a3e18107ba64efbfe8b5a017bb9ba2c49e0855d4f7d981a27085d116ebfb9de5",
+      "pngSha256": "0d10626e0b65f6d4d635ad45bc0768b27cf9d791d05122af87b380742771df38"
+    },
+    {
+      "name": "dry-ink-bristle_straight_slow_heavy_38",
+      "rgbaSha256": "fea89fad23dcf7d231a668edd443096b47a423578fddde9c2428962547522222",
+      "pngSha256": "e0e3b67b852c36afd7be4abd77d1a41de4c225e12524fc486de2b5baa5c2067a"
+    },
+    {
+      "name": "dry-ink-bristle_zigzag_fast_none_38",
+      "rgbaSha256": "05a863406a619f4c6f9c51d4d6169030da331f81b570e144392d3aeeff6397b2",
+      "pngSha256": "cf967279c80c739c65b872483c4415970c847f7223195770f40cca54c6c7cdd3"
+    },
+    {
+      "name": "dry-ink-bristle_short_slow_none_38",
+      "rgbaSha256": "959e1a028c691258b755215f0f0e092010eec9f48779bff0da6d0561efb40c63",
+      "pngSha256": "c7c66fdc28c7ec8b0159ccd61deb199750127082d16dcbfd9ec14d44634cfbaa"
+    },
+    {
+      "name": "dry-ink-bristle_long_slow_none_38",
+      "rgbaSha256": "a8950c8b2cb83182fd131957f6145b485005be62ba56973cdae049c23848aa8c",
+      "pngSha256": "2808c7b63b8799fe13eedfa1d1b7c192886bc4b187ce36b73186a14915e96857"
+    },
+    {
+      "name": "dry-ink-bristle_straight_slow_none_70",
+      "rgbaSha256": "1231808ecca86ef3f615553f787d54f7230804fa10e45000bc3854bbd75e183a",
+      "pngSha256": "7f148d648a32d0db24d37c22c1cf51b94dc425164089af1427418e58b323bb1c"
+    },
+    {
+      "name": "dry-ink-bristle_straight_fast_none_70",
+      "rgbaSha256": "3b3f816f53564e9018b940e50b585ff3513b1d2373c2f1484d870479993363b5",
+      "pngSha256": "3f2ce34bb0c5ee1766ba4242a36c9aca797886bea7912b7ada02ef3c425e63cb"
+    },
+    {
+      "name": "dry-ink-bristle_sine_slow_none_70",
+      "rgbaSha256": "73b46ca6d587706f97d6aa5acc7f7bae1d5c6ba2d846cecce840800761373466",
+      "pngSha256": "70fa7b595498a2a8d17943cdd3d0dfa5723f1989b816981b78093ce6f1940bd0"
+    },
+    {
+      "name": "dry-ink-bristle_sine_fast_none_70",
+      "rgbaSha256": "41f17ba7694302568116731fe5f521f0fc5f35548109bb8b62a22955a7e46dca",
+      "pngSha256": "2a5dd12ffc5dcb806bce40607119c65b39de2ef4aaa7904ec390e025a7cc2a88"
+    },
+    {
+      "name": "dry-ink-bristle_sine_slow_bell_70",
+      "rgbaSha256": "79fe57a059fa411708dacd5097680793cd8e54f4d3db7d4033f7e86b29de9290",
+      "pngSha256": "35affd70b21f640e5c37c33dca446fd598ef614060a98020cbb17f730a678bca"
+    },
+    {
+      "name": "dry-ink-bristle_straight_slow_light_70",
+      "rgbaSha256": "d1ce5333cdecb174cac3ace9db763352187e16b2c3b29710fda80d873fef9223",
+      "pngSha256": "9ad23ae84abb0281def53394871a3e855dbeaa02b11c4c4dca99e398f1edb95d"
+    },
+    {
+      "name": "dry-ink-bristle_straight_slow_heavy_70",
+      "rgbaSha256": "e3e2b513648922fd212d91b1b3fa98a68bc1939fa1f8f25f6727c377cf303a38",
+      "pngSha256": "d446443458593f049311e7c8651e0eef83e237f11ff678dbe6262e5f6e3b53d7"
+    },
+    {
+      "name": "dry-ink-bristle_zigzag_fast_none_70",
+      "rgbaSha256": "f42d6fdaabc2267d58d10d33bd7db2f3b906ea18db858808886629c9cf155f61",
+      "pngSha256": "50a9cab14ea2f900a20554f18727a156da310c508a328799b1f4fdf5d3cfb37e"
+    },
+    {
+      "name": "dry-ink-bristle_short_slow_none_70",
+      "rgbaSha256": "8ef758b704390b235d88170950a6b84c497b6256681631ad8e429e255cb2b062",
+      "pngSha256": "dd738d177707cd676c9d2ccb3476bfad30ec127f78c33a43c610eb9e8df1bde7"
+    },
+    {
+      "name": "dry-ink-bristle_long_slow_none_70",
+      "rgbaSha256": "0f68d1248102d50a1df644e21dcd05a615f2a69327c4a0883c4fa3bbbe3f13e8",
+      "pngSha256": "4dab7071360f4f115dca1f8fd3e937ab88675f3e84c9a49b096b4c629567bf9d"
+    },
+    {
+      "name": "dry-ink-bristle_straight_slow_none_130",
+      "rgbaSha256": "1e1160a80d98baad9e5677451c21927880741d77da325b066bce17dca0a336bd",
+      "pngSha256": "0ba719d07bc168067c823613b83a8bcd6362f3e36b80c37f8451ec5cfb38193c"
+    },
+    {
+      "name": "dry-ink-bristle_straight_fast_none_130",
+      "rgbaSha256": "ae12799a003c5e990047ad45e8c1f4e0a662f1e836b0b3dfb2f9754fd68b53c4",
+      "pngSha256": "00492268e530698f1f2c49c0658a8896c970ec71a1a3f515c57a0c715dd33fde"
+    },
+    {
+      "name": "dry-ink-bristle_sine_slow_none_130",
+      "rgbaSha256": "55945f88434117150ba0c3d6222a9e0e17fd0cc2c7af719997e9706f1ee9a043",
+      "pngSha256": "067e01cbc06424cf0a2efe210e9d5688387926406bd590b9c8952e026eca39cc"
+    },
+    {
+      "name": "dry-ink-bristle_sine_fast_none_130",
+      "rgbaSha256": "2d83f7e5e9300478e355fe2b51ba101a9b27f818bc57a7fdbbab532c6a334710",
+      "pngSha256": "59c1607d31435f3e59077b50f60e9d39f357aa2372214841fc6a547a35dbc0b3"
+    },
+    {
+      "name": "dry-ink-bristle_sine_slow_bell_130",
+      "rgbaSha256": "a7c85df976266b1676f4b5f53e9145e3a864fc72b42553fb08df248db1130140",
+      "pngSha256": "49bbb04099316b98200397faa236e03dfda192a811ecd9bb8e666d39244e70a6"
+    },
+    {
+      "name": "dry-ink-bristle_straight_slow_light_130",
+      "rgbaSha256": "43f4453735f1dc25cdd285e3d5a8ddac5151de208c3e5569834ce10ab2f73b4d",
+      "pngSha256": "71b0ca05bb5247bc6a7f2b11681f986c2987ccce9a6275cf4dfff7ee2cde3f0f"
+    },
+    {
+      "name": "dry-ink-bristle_straight_slow_heavy_130",
+      "rgbaSha256": "92b5367ed4e3629c9363b969678fb342b8163f62a54e17eecfba76393d62d82f",
+      "pngSha256": "2d4c28ba2e4a5695ddc15a670cbee3e45398db9fad6047402fd3354e383fd381"
+    },
+    {
+      "name": "dry-ink-bristle_zigzag_fast_none_130",
+      "rgbaSha256": "f60491fe8c5afd14d346511c19e8aecc5a8fd5bd5d5f09e7b7c88a353622da11",
+      "pngSha256": "b866f22028ef475cf7c17d0cb74968fc59dd628439c8d4ecf0a1a79e1ab5e315"
+    },
+    {
+      "name": "dry-ink-bristle_short_slow_none_130",
+      "rgbaSha256": "1ee11a104176a290bab0abec53087ac7cfb0515e42322fffd8fa52326384638f",
+      "pngSha256": "77a71ac71aa49c7ecc069c3f706046c043310d03af212493096b8bf692c13b89"
+    },
+    {
+      "name": "dry-ink-bristle_long_slow_none_130",
+      "rgbaSha256": "3b2320d1174381690f56804012e3906eeda67dce7d50d6743790534b91d341d4",
+      "pngSha256": "2ca0a2eca68eb5235d8b9368af3481d5571542f3e025cd829ae6325556e6ba2f"
+    },
+    {
+      "name": "dry-paint_straight_slow_none_38",
+      "rgbaSha256": "366422746a67de5dfcfd30aeb80e43caa61e159b0f3d0283b1363fe5266ae477",
+      "pngSha256": "9f02af958cceca4a47e6c303d75ee41a5e596cb4b1ea053b54ed39959f940ecc"
+    },
+    {
+      "name": "dry-paint_straight_fast_none_38",
+      "rgbaSha256": "1da02408eafea87f1adfda114bc3aeed9279484d863d88c57b3bc634f7fa0866",
+      "pngSha256": "e8b0a2ea4a01fd0bd5606bf43f6274d8a952f16887c6600f8e590c3957defb7e"
+    },
+    {
+      "name": "dry-paint_sine_slow_none_38",
+      "rgbaSha256": "f593a538bde25194e47dedaffb2e2f122bac2fd868d14896f53fce0881fa662e",
+      "pngSha256": "160b424daeea9b8bc4cb0675d0a5aa3e6beeaefb0b5abd9fd57fa226cb2a40a4"
+    },
+    {
+      "name": "dry-paint_sine_fast_none_38",
+      "rgbaSha256": "14aa0fba48f9ddcd9c6cc393718e14d268dd0f5f62c8fbdd9c29e4a6e5644139",
+      "pngSha256": "c3fca85fd9d0dfb56f4fc5690e5dcfc50b8135460cbdc5f05b38ca32e606881b"
+    },
+    {
+      "name": "dry-paint_sine_slow_bell_38",
+      "rgbaSha256": "1994dd1fb06912b1f6224e8f553269580df46f018867b2afb1e92ae448f803d9",
+      "pngSha256": "80d63956204aa6800177b1014cae7baca6ea38fd9edfd64963771551b8e54fe4"
+    },
+    {
+      "name": "dry-paint_straight_slow_light_38",
+      "rgbaSha256": "dffa95d57ce4efe797c24640423e83c44cf0e796e83b6d8c3f87aca59efed443",
+      "pngSha256": "ae85ed2cebeb832294ebb52e0435090a58e8e2828f4f9509ff618b7f9f6b17fa"
+    },
+    {
+      "name": "dry-paint_straight_slow_heavy_38",
+      "rgbaSha256": "0f1faa5029ee76e966fc693f9bf6d21193eec2e179aa8e8b8820e4fbd545cec3",
+      "pngSha256": "f4e6d3c4c4257357d655600a4856f9e27cfb2a469dd711ee8762420281260cb3"
+    },
+    {
+      "name": "dry-paint_zigzag_fast_none_38",
+      "rgbaSha256": "7c10e255c3ac683d8d73c4b442c3c83e6852fb7fc17af57bafc2a9ed60d8dcf6",
+      "pngSha256": "31ee6c821af57c49a6df70db932f1d6260ba89387b8cddcf84df22bc9eca1c2c"
+    },
+    {
+      "name": "dry-paint_short_slow_none_38",
+      "rgbaSha256": "79a2b4785426cdbdf22e290204e111fa0ca0e7d80c47aeb10615547813e66020",
+      "pngSha256": "bc901c20f4736b7b4e7e257e425ffd973f98ec99573b1fcdab555906349c7a06"
+    },
+    {
+      "name": "dry-paint_long_slow_none_38",
+      "rgbaSha256": "ef62d29014cfc85f3b6e9daea784eee4cb152fc07dbafc0c202c54b480b03549",
+      "pngSha256": "811598d8a533d9bda148f6ce21e8271973e3b65a19eb3248d72f4887608fc09b"
+    },
+    {
+      "name": "dry-paint_straight_slow_none_70",
+      "rgbaSha256": "7764b56551532792f56b4b1465c1d5e454b15e70a0606932add0a2ad929a0031",
+      "pngSha256": "9a4e5a7ad96b06195ed36facbaf5e4f4dca1b8820b403d8964a36036f241b42b"
+    },
+    {
+      "name": "dry-paint_straight_fast_none_70",
+      "rgbaSha256": "fdfdbbe7cbd71239fc6eb99894769743d01e29871df15fefe7289e38b18ad73d",
+      "pngSha256": "8fc88a35c53981faa82eb73a0578572bc6622999def2c742c79d5466f2be200a"
+    },
+    {
+      "name": "dry-paint_sine_slow_none_70",
+      "rgbaSha256": "4956dfec804a3b86d9b9f12f586f48ef3da2f5d792638b8e260176a6ca255aa0",
+      "pngSha256": "0aac5ca5b971a15ebf0c3b16f4cad12f3b4a1b09fb159a3b0c6b5e2e5e7386da"
+    },
+    {
+      "name": "dry-paint_sine_fast_none_70",
+      "rgbaSha256": "c7df75b9c840d99932b3215699606827ad9f507b362a07b47f51610a36f4e67a",
+      "pngSha256": "28e88e0bafbf01504025262c401ef2534393a1e55ec702b5a51762699f91bd76"
+    },
+    {
+      "name": "dry-paint_sine_slow_bell_70",
+      "rgbaSha256": "6f3f5eac40701a76fb8219c8d3268b373ca8afab5e11e90a153d7d7f8728e797",
+      "pngSha256": "da6cb88ae7560144669d79cbd28f68ea958a11bb2e84bc70728133ec1a28b32b"
+    },
+    {
+      "name": "dry-paint_straight_slow_light_70",
+      "rgbaSha256": "8fd6d2a282e2a5902397e8f854bfb7dd98a2dfac0038822cc6ee82e78856ea33",
+      "pngSha256": "093220f6270dc70182863a56b16a92a22321fa3db0115cc1b338e52735221c86"
+    },
+    {
+      "name": "dry-paint_straight_slow_heavy_70",
+      "rgbaSha256": "a38ad58bac0cf259d2424ca16348df527aa4994be7a0f953eb0c65e679e27e12",
+      "pngSha256": "e67e38c36c35c00aedb74f33235f0bd4bd843cbddaf6bf4c3c5fa8f1e7967dcb"
+    },
+    {
+      "name": "dry-paint_zigzag_fast_none_70",
+      "rgbaSha256": "1d0289e8d51103512c1ff22daa631a23f781e3c5fdd33905aee16ce870420d12",
+      "pngSha256": "37746cd194383c72b6af069e960de9790ec16d0b79ddb0858c023ac84c87575a"
+    },
+    {
+      "name": "dry-paint_short_slow_none_70",
+      "rgbaSha256": "a0922d41ea3b4c29be10bdc7133fb6d5e989feeb6df3a8bce1b5455763573d4e",
+      "pngSha256": "04ad6b2a1f8f184efc56b350ac15b89b09bd797f4c2c30bb1a0291ec494d6d15"
+    },
+    {
+      "name": "dry-paint_long_slow_none_70",
+      "rgbaSha256": "218a715f725442addadcd447942ec6a3eebbcb07f5f2952bc5210d9a50355df5",
+      "pngSha256": "a83f95e183341d84cfbc45b37e0edf68068a00cb0946f112d5ca7fff83c3ffbf"
+    },
+    {
+      "name": "dry-paint_straight_slow_none_130",
+      "rgbaSha256": "8cfce6d13a5c4a9c50fcd9afd14e6b46d3acbcf8e708ebd0e680fcd7f2d9c31c",
+      "pngSha256": "0176cc42c3106b03ac2e17fd8430c1a199ee6652005b2705547ab0917de72fb7"
+    },
+    {
+      "name": "dry-paint_straight_fast_none_130",
+      "rgbaSha256": "c8ecb2fd97f8883e2469fb8a31d803f85717d4cb5ba84b243a660f38b2f5b78c",
+      "pngSha256": "8c0b68ba81b2c2b7ab2885ec3ac4c592e5d37cee98cbcdd59f9bccc1a80e1fa3"
+    },
+    {
+      "name": "dry-paint_sine_slow_none_130",
+      "rgbaSha256": "18785be03af016b8f2abdd7e8868aae844c94868bf05af16a07c7d6b6de75c0d",
+      "pngSha256": "cefeba0599ef566a99c8e59ffe2b34d77d224d2e52a6369d6f95d8f1cd04d2cb"
+    },
+    {
+      "name": "dry-paint_sine_fast_none_130",
+      "rgbaSha256": "7141af22ae2d59316a6d7314d4b5901e72cea48fde246aec3c4bcb896e277ed0",
+      "pngSha256": "f49307504d1093219b53da57f929367d887ac053c44c419e07af8e2ea6a7bf07"
+    },
+    {
+      "name": "dry-paint_sine_slow_bell_130",
+      "rgbaSha256": "c84817202c31274a6a330d348d4a4dec91adc9f7b87220e8cc4bf5c2b9b3de21",
+      "pngSha256": "b86c3cf877be79fe4405bdaa0126698158db0cf0ac16422dd56a7479ba87e567"
+    },
+    {
+      "name": "dry-paint_straight_slow_light_130",
+      "rgbaSha256": "04f454019cf9678416fca15ec34c5068d654e739985e601e91921aaf9c20e974",
+      "pngSha256": "2db792d92f5afe335882489287422cb6732bf079f6c6b5f4f9469026f35621c2"
+    },
+    {
+      "name": "dry-paint_straight_slow_heavy_130",
+      "rgbaSha256": "0026828003251f6fd8ad70b064b995670c810ef0ec14e95f4e19586be3602339",
+      "pngSha256": "f78faca531c20526a288da0410a48fc13c77c3d8a2c91cbbb2780784ef68f5ac"
+    },
+    {
+      "name": "dry-paint_zigzag_fast_none_130",
+      "rgbaSha256": "416f3cd77ac8c339126c426aa1dcacdf06f3adf2f975a2acbeb63f9175e3079c",
+      "pngSha256": "49d561e231511e017f78967b5775e3d7b8cd2b3585c6a673358c23ac2709af20"
+    },
+    {
+      "name": "dry-paint_short_slow_none_130",
+      "rgbaSha256": "cb020869c5c0c4622e15994f508b6f6bfed756f5708b6b9d6bff76e23ab18b04",
+      "pngSha256": "5146e06536d2e230c55759742f6fc3174d4097787497b37a7645dc308c5ae7fe"
+    },
+    {
+      "name": "dry-paint_long_slow_none_130",
+      "rgbaSha256": "11cc0138b8d96654e8f5077c3f7fcd46ed3165c532402eeb6ca0fa6ac1970b65",
+      "pngSha256": "627bdaf160b08833b371d80f87479dc21eaaf1618bab0a8b059dd1959617239c"
+    }
+  ]
+}

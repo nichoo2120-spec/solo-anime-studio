@@ -1,0 +1,17 @@
+{
+ "src/core/buildInfo.ts": {
+  "before": "dd9a812c879f6922507fea5d614179e2767dbe1823fa050ea46e08cd88a261dc",
+  "after": "80353023669f72706f56f372961dea3db7e878fd6d0668f23bc12f7d58e63175",
+  "why": "v0.5.175 version bump"
+ },
+ "src/engine/StudioEngine.ts": {
+  "before": "f07cefde578680578153b8e1a7730a770697441b9fc494ef241847b162c2b638",
+  "after": "c2229979f63ca3894d2f0fc5890302b6d80e0b0d0c8f00d2672d8d3a74cfd825",
+  "why": "v0.5.175 exact commit/undo/redo band redraw (commitBand.ts)"
+ },
+ "package.json": {
+  "before": "e635253bb2109a381df287313a0022a4b6e3505486208bd205e4d7f1faa23e58",
+  "after": "0b7798f0743a000d4b7497edb0def496e372bcbc527cb83a679feb5b4e24e0ec",
+  "why": "v0.5.175 version bump"
+ }
+}

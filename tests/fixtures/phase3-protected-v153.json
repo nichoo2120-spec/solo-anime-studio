@@ -1,0 +1,17 @@
+{
+  "src/engine/bristleSmudge.ts": "c35a10b382663b43d61f171ba3e4b063857e3c87425b9fd8f2c3ecbd51b125ca",
+  "src/engine/colorSmudge.ts": "0a74e0901b96a24145152a0fdcd4e1bece74373cf0915e72bc2cbf616c054509",
+  "src/engine/colorBlend.ts": "f646741527d46cbd518879eba3d43a9ec708dd64f9d11e15745b7448e40d0ba7",
+  "src/engine/dryBristle.ts": "f6cf6016f80cfb6000000f34c1bc2fecfd972acb89f2fa3d9d82a17bf25edfe0",
+  "src/engine/dryBristleV2.ts": "40fcf259f7b0a87603172b792e9ef7e17aaba3e94ec10af17f2605bf0b978c1e",
+  "src/engine/dryBristleV3.ts": "7433696cb5e82d822d3f4232026496952852206bf3e1a714159960f83334d539",
+  "src/engine/dryTooth.ts": "826447878643acd488b421d81eae95c391267f0b9c39f139d614027093c74e2b",
+  "src/ui/App.tsx": "17e6326cbc6162ced4e1dbbd0e70c0db784f6c03463bf5405eac8f95e0c25e04",
+  "src/ui/RadialToolbar.tsx": "e2e310ec20d8311fa64579795856d3d858c1007dea53b8e2cbe6ef47bc30b415",
+  "src/ui/icons.tsx": "cf0d5b03f338524fbe559b94c2233bdcf765d32d87e1b3334231f1ea749afbc1",
+  "src/styles.css": "cd14fef12bc6b8a83143f3d1fa175f8f4790dfc0e6be9260d7b68b1f2f416e4f",
+  "src/engine/paintingTips.ts": "f082ec0da80aec52a6e02158bc57152906c3ac3d01276c69fb765c7edff3a158",
+  "tests/fixtures/blender-v154-legacy-goldens.json": "6c5989b88104237af70bf16a2486179c41cf4e942fd35e9508bd35e37fc874a7",
+  "tests/fixtures/stock-v153.json": "d9f4f52a262daccd55c6452f56ca5687471dcf38582c1f97484f2a0146b96fb8",
+  "tests/blender_phase3/blender_metrics.py": "f222f37c3bd9ef75ef1179694277fe3c13577823df34aead04df13d751743997"
+}

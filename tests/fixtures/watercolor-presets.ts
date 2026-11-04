@@ -1,0 +1,16 @@
+import type {BrushSettings} from '../../src/engine/StudioEngine';
+import type {BrushPreset} from '../../src/core/brushes';
+import {linearPressure} from '../../src/engine/strokeGeometry';
+const common:BrushSettings={size:4,opacity:.85,color:'#30343a',stabilization:.25,smoothness:25,pressure:true,pressureWidth:true,pressureOpacity:false,response:1,pressureCurve:linearPressure,taperStart:0,taperEnd:0,tolerance:24,textureStrength:.12};
+function preset(id:string,name:string,category:'Paint',patch:Partial<BrushSettings>):BrushPreset{const defaults={...common,brushKind:id,...patch};return {id,name,category,defaults,settings:{...defaults}};}
+/** Retired v131 presets: test fixtures only, never imported by the application. */
+export const watercolorPresets=[
+ preset('watercolor','Watercolor Wash','Paint',{brushKind:'watercolor',brushTip:'wash-flat',tipAngle:0,tipSpacing:.06,flow:.1,hardness:.15,pressureFlow:true,size:85,opacity:.6,pressureOpacity:false,pressureWidth:true,minSize:.12,textureStrength:.18,stabilization:.12,smoothness:18}),
+ preset('watercolor-round','Watercolor Round','Paint',{brushKind:'watercolor',brushTip:'wash',tipAngle:0,tipSpacing:.06,flow:.2,hardness:.65,pressureFlow:true,size:32,opacity:.75,pressureOpacity:false,pressureWidth:true,minSize:.025,response:.85,taperStart:.025,taperEnd:.08,textureStrength:.16,stabilization:.12,smoothness:18}),
+ preset('watercolor-dagger','Watercolor Dagger','Paint',{brushKind:'watercolor',brushTip:'wash-dagger',tipAngle:-35,tipSpacing:.06,flow:.18,hardness:.6,pressureFlow:true,size:55,opacity:.7,pressureOpacity:false,pressureWidth:true,minSize:.03,response:.85,taperEnd:.06,textureStrength:.15,stabilization:.12,smoothness:18}),
+ preset('watercolor-cats-tongue',"Watercolor Cat’s Tongue",'Paint',{brushKind:'watercolor',brushTip:'wash-cats-tongue',tipAngle:-30,tipSpacing:.06,flow:.16,hardness:.45,pressureFlow:true,size:50,opacity:.65,pressureOpacity:false,pressureWidth:true,minSize:.04,taperStart:.02,taperEnd:.06,textureStrength:.15,stabilization:.12,smoothness:18}),
+ preset('watercolor-liner','Watercolor Liner','Paint',{brushKind:'watercolor',brushTip:'wash-liner',tipAngle:0,tipSpacing:.06,flow:.3,hardness:.85,pressureFlow:true,size:6,opacity:.85,pressureOpacity:false,pressureWidth:true,minSize:.025,taperStart:.04,taperEnd:.14,textureStrength:.08,stabilization:.1,smoothness:25}),
+ preset('watercolor-paper','Watercolor Paper Wash','Paint',{brushKind:'watercolor',brushTip:'wash',watercolorStyle:'paper',tipSpacing:.04,flow:.24,hardness:.6,pressureFlow:true,size:75,opacity:.72,pressureWidth:true,pressureOpacity:false,minSize:.12,textureStrength:.45,stabilization:.1,smoothness:18}),
+ preset('watercolor-dry-wash','Watercolor Dry Wash','Paint',{brushKind:'watercolor',brushTip:'wash-flat',watercolorStyle:'dry',tipAngle:0,tipSpacing:.04,flow:.23,hardness:.55,pressureFlow:true,size:85,opacity:.7,pressureWidth:true,pressureOpacity:false,minSize:.12,textureStrength:.65,stabilization:.1,smoothness:18}),
+ preset('watercolor-soft-bloom','Watercolor Soft Bloom','Paint',{brushKind:'watercolor',brushTip:'wash',watercolorStyle:'bloom',mixColors:true,mixAmount:.55,tipSpacing:.04,flow:.16,hardness:.12,pressureFlow:true,size:85,opacity:.64,pressureWidth:true,pressureOpacity:false,minSize:.12,textureStrength:.24,stabilization:.1,smoothness:18}),
+];

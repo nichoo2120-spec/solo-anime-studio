@@ -1,0 +1,1 @@
+v161 harness. guards.sh: repo guards + parity x10 at DPR1 and DPR2 (fixed DPR2 env bug). matrix.mjs: perf. mixtest.mjs: Mix brush stripe test (1280x720 DPR1). ui.mjs: brush panel + tool wheel check. Exp pages: copy exp/harness.ts, mine.html, dryBristle.ts into the app exp/ folder; compat/oldcmp/oldv need PAGE=exp/mine.html.

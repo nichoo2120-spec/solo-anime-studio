@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const helper=fs.readFileSync('src/tools/transform/math/meshWarp.ts','utf8');
+const tool=fs.readFileSync('src/tools/transform/TransformTool.ts','utf8');
+const overlay=fs.readFileSync('src/tools/transform/TransformOverlay.tsx','utf8');
+assert.match(tool,/meshPinBehavior:'neighbor'/);assert.match(overlay,/meshPinBehavior:'neighbor'/);
+assert.match(helper,/export function dragFreePin/);
+assert.match(helper,/next\.nodes\[k\]/);
+assert.match(helper,/pins\[i\]\.dx/);
+assert.match(tool,/dragFreePin\(g\.grid/);
+console.log('PASS neighbor coupling wired into mesh control nodes and free pins');

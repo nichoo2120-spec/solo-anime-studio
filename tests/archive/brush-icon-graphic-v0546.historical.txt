@@ -1,0 +1,19 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const ts=require('/opt/nvm/versions/node/v22.16.0/lib/node_modules/typescript');
+const icon=fs.readFileSync('src/ui/StudioBrushIcon.tsx','utf8');
+const catalog=fs.readFileSync('src/ui/icons.tsx','utf8');
+const wheel=fs.readFileSync('src/ui/RadialToolbar.tsx','utf8');
+for(const file of ['src/ui/StudioBrushIcon.tsx','src/ui/icons.tsx','src/ui/RadialToolbar.tsx']){
+ const src=ts.createSourceFile(file,fs.readFileSync(file,'utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+ assert.equal(src.parseDiagnostics.length,0,file+' TSX syntax invalid');
+}
+assert.match(icon,/useId\(\)/,'SVG gradient IDs should be unique for many instances');
+assert.match(icon,/linearGradient/);
+assert.match(icon,/ink\)`\}/,'Teal stroke must be present');
+assert.match(catalog,/id:'brush',name:'Pencil \/ Brush',icon:StudioBrushIcon,key:'B'/,'Only Brush icon and not its shortcut should change');
+assert.match(catalog,/id:'eraser',name:'Eraser',icon:Eraser/,'Eraser icon must remain unchanged');
+assert.match(catalog,/id:'transform',name:'Move \/ Transform',icon:Move/,'Transform icon must remain unchanged');
+assert.match(wheel,/const Icon=allTools\.find\(t=>t\.id===active\)!\.icon/,'Collapsed wheel must receive same icon');
+assert.match(wheel,/<Icon size=\{placement.size<200\?21:25\}/,'Expanded wheel must receive same icon');
+console.log('PASS v0.5.46 Brush graphic: unique silver/cyan SVG; wheel and compact rail use catalog; shortcut and other tool graphics preserved.');

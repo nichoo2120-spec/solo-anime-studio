@@ -1,0 +1,5 @@
+// Frozen unmodified v157 capsule integrator; used only by regression tests.
+function deposit(v:Surface,x0:number,y0:number,x1:number,y1:number,radius:number,alpha:number,tone:number,clip:RasterRegion){
+ const level=Math.round(clamp(alpha)*255);if(!level||radius<=0)return;const margin=radius+.5,outside=margin*margin,inside=margin>=1?(margin-1)**2:-1,l=Math.max(0,clip.x,Math.floor(Math.min(x0,x1)-margin)),r=Math.min(v.w,clip.x+clip.width,Math.ceil(Math.max(x0,x1)+margin)),top=Math.max(0,clip.y,Math.floor(Math.min(y0,y1)-margin)),bottom=Math.min(v.h,clip.y+clip.height,Math.ceil(Math.max(y0,y1)+margin)),dx=x1-x0,dy=y1-y0,inv=1/(dx*dx+dy*dy||1),base=level*256;
+ for(let y=top;y<bottom;y++)for(let x=l;x<r;x++){const i=y*v.w+x;if(v.mass[i]>=COVERED_MASS&&tone<=v.tone[i])continue;const t=clamp(((x+.5-x0)*dx+(y+.5-y0)*dy)*inv),vx=x+.5-x0-t*dx,vy=y+.5-y0-t*dy,distance2=vx*vx+vy*vy;if(distance2>=outside)continue;const cov=distance2<=inside?255:Math.round(clamp(margin-Math.sqrt(distance2))*255);if(cov){v.mass[i]=Math.min(COVERED_MASS,v.mass[i]+inkMass[base+cov]);v.tone[i]=Math.max(v.tone[i],cov>=64?tone:Math.round(tone*cov/64));}}
+}

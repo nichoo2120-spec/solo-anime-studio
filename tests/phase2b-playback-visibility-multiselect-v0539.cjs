@@ -1,0 +1,77 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path');
+const ts=require('typescript');
+const {pathToFileURL}=require('node:url');
+require.extensions['.ts']=(mod,file)=>mod._compile(ts.transpileModule(fs.readFileSync(file,'utf8').replaceAll('import.meta.url',JSON.stringify(pathToFileURL(file).href)),{fileName:file,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,file);
+const {pickItems}=require('../src/ui/multiSelection.ts');
+const frames=['f1','f2','f3','f4','f5'];
+let chosen={ids:[],anchor:null};
+chosen=pickItems(frames,chosen,'f1');
+chosen=pickItems(frames,chosen,'f5',true,false);
+assert.deepEqual(chosen.ids,frames,'Shift-click selects inclusive frame range');
+chosen=pickItems(frames,chosen,'f3',false,true);
+assert.deepEqual(chosen.ids,['f1','f2','f4','f5'],'Option-click toggles any frame');
+chosen=pickItems(frames,chosen,'f3');
+assert.deepEqual(chosen.ids,['f3'],'normal click resets to single selection');
+const layers=['rough','line','color','shadow'];
+let selection=pickItems(layers,{ids:[],anchor:null},'rough');
+selection=pickItems(layers,selection,'color',false,true);
+selection=pickItems(layers,selection,'shadow',false,true);
+assert.deepEqual(selection.ids,['rough','color','shadow'],'Option picks separate layers');
+selection=pickItems(layers,selection,'line',true,false);
+assert.deepEqual(selection.ids,['rough','line'],'Shift replaces non-contiguous selection with range');
+selection=pickItems(['rough','shadow'],selection,'shadow',false,true);
+assert.deepEqual(selection.ids,['rough','shadow'],'removed layers are not kept in later selections');
+const app=fs.readFileSync(path.join(__dirname,'../src/ui/App.tsx'),'utf8');
+const panel=fs.readFileSync(path.join(__dirname,'../src/ui/MotionPlanningPanel.tsx'),'utf8');
+const overlay=fs.readFileSync(path.join(__dirname,'../src/ui/MotionArcOverlay.tsx'),'utf8');
+const playback=fs.readFileSync(path.join(__dirname,'../src/engine/PlaybackOverlay.ts'),'utf8');
+const xsheet=fs.readFileSync(path.join(__dirname,'../src/ui/XsheetView.tsx'),'utf8');
+assert.match(panel,/Show motion path during playback/);
+assert.match(panel,/Edit motion path while playing/);
+assert.match(app,/pathVisible&&<MotionArcOverlay/);
+assert.match(app,/editing=\{pathEditable\}/);
+assert.match(app,/playback\.current\.refreshMotionEdit\(result\.project\)/);
+assert.match(playback,/refreshMotionEdit\(project:Project\)/);
+assert.match(playback,/this\.startExposure=this\.exposure;this\.clockStart=performance\.now\(\)/);
+assert.match(overlay,/onMovePoint\(drag\.arcId,drag\.id,point\.x,point\.y\)/);
+assert.match(app,/selectFrameWithModifier\(id,e\.shiftKey,e\.altKey\)/);
+assert.match(app,/selectLayerWithModifier\(layerId,e\.shiftKey,e\.altKey\)/);
+assert.match(xsheet,/e\.shiftKey,e\.altKey/);
+assert.match(app,/e\.shiftKey\|\|e\.altKey\|\|.*busy/);
+assert.match(app,/readPreference<boolean>\('motion-path-playback-show',false\)/);
+assert.match(app,/readPreference<boolean>\('motion-path-live-edit',false\)/);
+for(const f of ['src/ui/App.tsx','src/ui/MotionPlanningPanel.tsx','src/ui/MotionArcOverlay.tsx','src/ui/XsheetView.tsx','src/engine/PlaybackOverlay.ts','src/ui/multiSelection.ts']){
+ const file=path.join(__dirname,'..',f),r=ts.transpileModule(fs.readFileSync(file,'utf8'),{fileName:f,reportDiagnostics:true,compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}});
+ assert(!r.diagnostics.some(d=>d.category===ts.DiagnosticCategory.Error),'Invalid syntax in '+f);
+}
+
+// Live motion edits must continue from the same exposure, not restart the clip.
+const {PlaybackOverlay}=require('../src/engine/PlaybackOverlay.ts');
+const {newProject}=require('../src/core/model.ts');
+const {exposurePlan}=require('../src/animation/playback.ts');
+async function testLive(){
+ const project=newProject('Motion editing test',320,240),preview=Object.create(PlaybackOverlay.prototype);
+ preview.state='playing';preview.project=project;preview.plan=exposurePlan(project);
+ preview.generation=0;preview.exposure=1;preview.celIndex=0;preview.startExposure=1;
+ preview.clockStart=performance.now()-20;preview.fps=24;preview.loop=true;
+ preview.frameRequest=0;preview.cache=new Map();preview.renderedFrameId='';preview.disposed=false;
+ preview.pauseAudio=()=>{};preview.playAudioFrom=()=>{};preview.paint=()=>{};
+ preview.emit=()=>{};preview.prefetch=()=>{};preview.ensure=async()=>true;
+ global.cancelAnimationFrame=()=>{};
+ global.requestAnimationFrame=()=>42;
+ preview.refreshMotionEdit({...project,motionPlanning:{notes:[],arcs:[]}});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(preview.state,'playing','live path edit should resume playback');
+ assert.equal(preview.exposure,1,'keeps current frame');
+ assert.equal(preview.frameRequest,42,'schedules next playback tick');
+ const paused=Object.create(PlaybackOverlay.prototype);
+ Object.assign(paused,{state:'paused',project,plan:exposurePlan(project),generation:0,exposure:1,celIndex:0,cache:new Map(),renderedFrameId:'',disposed:false});
+ paused.pauseAudio=()=>{};paused.paint=()=>{};paused.emit=()=>{};paused.ensure=async()=>true;
+ paused.refreshMotionEdit({...project,motionPlanning:{notes:[],arcs:[]}});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(paused.state,'paused','editing a paused animation should not start playback');
+ console.log('PASS live path preview: on-pen-up picture refresh, no restart, paused preview stays paused');
+}
+testLive().catch(e=>{console.error(e);process.exitCode=1;});
+console.log('PASS v0.5.39: Shift range and Option toggles, motion playback visibility/edit gates, safe per-release refresh, Xsheet, TS/TSX syntax');

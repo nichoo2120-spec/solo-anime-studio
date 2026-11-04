@@ -1,0 +1,341 @@
+import { smudgeLimits } from './smudge.js';
+import { dryControlLimits } from './dryBrush.js';
+import { isPaintTip, isWatercolorTip, isNewWatercolorTip, isMixTip } from './paintTips.js';
+import { isColoringTip, isColorNib, coloringNibs } from './coloring.js';
+import { validateSceneAudio } from '../animation/audio.js';
+import { validateMotionPlanning } from '../animation/motionPlanning.js';
+import { validateSceneCamera, pruneCameraDepth } from '../animation/sceneCamera.js';
+export const uid = () => crypto.randomUUID();
+export function newLayer(name, kind = 'raster') { return { id: uid(), name, visible: true, locked: false, opacity: 1, operations: [], kind }; }
+export function newProject(name = 'Untitled scene', width = 1920, height = 1080) {
+    const layers = ['Rough', 'Line', 'Color', 'Background'].map(name => newLayer(name));
+    return { format: 'solo-anime-studio', version: 3, id: uid(), name, width, height, activeLayerId: layers[1].id, layers, settings: { guides: true }, createdAt: new Date().toISOString() };
+}
+export const activeLayer = (p) => p.layers.find(l => l.id === p.activeLayerId);
+export function editLayer(p, id, patch) { return { ...p, version: 3, layers: p.layers.map(l => l.id === id ? { ...l, ...patch } : l) }; }
+export function appendOperation(p, op) {
+    const layer = activeLayer(p);
+    if (layer.locked || !layer.visible)
+        return p;
+    return editLayer(p, layer.id, { operations: [...layer.operations, op] });
+}
+export function removeLayer(p, id) {
+    if (p.layers.length === 1)
+        return p;
+    const layers = p.layers.filter(l => l.id !== id);
+    return { ...p, layers, activeLayerId: p.activeLayerId === id ? layers[0].id : p.activeLayerId, ...(p.camera ? { camera: pruneCameraDepth(p.camera, new Set(layers.map(l => l.id))) } : {}), ...(p.motionPlanning ? { motionPlanning: { ...p.motionPlanning, arcs: p.motionPlanning.arcs.filter(arc => arc.layerId !== id) } } : {}) };
+}
+export function duplicateLayer(p, id) {
+    if (p.layers.length >= 100)
+        return p;
+    const index = p.layers.findIndex(l => l.id === id);
+    if (index < 0)
+        return p;
+    const copy = { ...p.layers[index], id: uid(), name: p.layers[index].name + ' copy', operations: p.layers[index].operations.map(o => ({ ...o, id: uid() })) };
+    const layers = [...p.layers];
+    layers.splice(index, 0, copy);
+    return { ...p, layers, activeLayerId: copy.id };
+}
+export function reorderLayer(p, id, delta) {
+    const index = p.layers.findIndex(l => l.id === id), next = index + delta;
+    if (index < 0 || next < 0 || next >= p.layers.length)
+        return p;
+    const layers = [...p.layers];
+    [layers[index], layers[next]] = [layers[next], layers[index]];
+    return { ...p, layers };
+}
+const finite = (n) => typeof n === 'number' && Number.isFinite(n);
+const bounded = (n, min, max) => finite(n) && n >= min && n <= max;
+const point = (p) => p && finite(p.x) && finite(p.y) && Math.abs(p.x) <= 1e6 && Math.abs(p.y) <= 1e6 && bounded(p.p, 0, 1) && (p.v === undefined || bounded(p.v, 0, 1));
+export function validateProject(value) {
+    const p = value;
+    if (!p || p.format !== 'solo-anime-studio' || ![1, 2, 3].includes(p.version))
+        throw Error('Unsupported project format or version.');
+    if (typeof p.id !== 'string' || typeof p.name !== 'string' || p.name.length > 200 || typeof p.createdAt !== 'string' || !Number.isInteger(p.width) || !Number.isInteger(p.height) || !bounded(p.width, 64, 4096) || !bounded(p.height, 64, 4096) || p.width * p.height > 8388608)
+        throw Error('Invalid project dimensions or metadata.');
+    if (!Array.isArray(p.layers) || p.layers.length < 1 || p.layers.length > 100)
+        throw Error('Projects require 1–100 layers.');
+    const ids = new Set();
+    let count = 0;
+    for (const l of p.layers) {
+        if (!l || typeof l.id !== 'string' || ids.has(l.id) || typeof l.name !== 'string' || l.name.length > 200 || typeof l.visible !== 'boolean' || typeof l.locked !== 'boolean' || !bounded(l.opacity, 0, 1) || !Array.isArray(l.operations))
+            throw Error('Invalid layer data.');
+        ids.add(l.id);
+        if (l.kind !== undefined && !['raster', 'vector'].includes(l.kind))
+            throw Error('Invalid layer type.');
+        if (l.blend !== undefined && !['normal', 'multiply', 'screen', 'overlay', 'add'].includes(l.blend))
+            throw Error('Invalid blend mode.');
+        if (['reference', 'exportReference'].some(k => l[k] !== undefined && typeof l[k] !== 'boolean'))
+            throw Error('Invalid reference settings.');
+        if (l.kind === 'vector' && l.operations.some((o) => o.kind !== 'vector'))
+            throw Error('Vector layers contain only editable vector lines.');
+        if (l.kind !== 'vector' && l.operations.some((o) => o.kind === 'vector'))
+            throw Error('Vector lines require a vector layer.');
+        for (const o of l.operations) {
+            if (!o || typeof o.id !== 'string' || ++count > 100000)
+                throw Error('Invalid drawing operation.');
+            if (o.kind === 'stroke') {
+                if (!['brush', 'eraser'].includes(o.tool) || !bounded(o.size, .1, 500) || !bounded(o.opacity, 0, 1) || !/^#[\da-f]{6}$/i.test(o.color) || typeof o.pressure !== 'boolean' || !bounded(o.response, .2, 3) || !Array.isArray(o.points) || !o.points.length || o.points.length > 200000 || !o.points.every(point))
+                    throw Error('Invalid stroke data.');
+                if (o.engineVersion !== undefined && o.engineVersion !== 2 && o.engineVersion !== 3 && o.engineVersion !== 4 && o.engineVersion !== 5 && o.engineVersion !== 6 && o.engineVersion !== 7 && o.engineVersion !== 8 && o.engineVersion !== 9 && o.engineVersion !== 10)
+                    throw Error('Unsupported stroke renderer.');
+                if (o.mixVersion !== undefined && o.mixVersion !== 2)
+                    throw Error('Invalid color mixing version.');
+                if (o.nativeMixVersion !== undefined && (![1, 2].includes(o.nativeMixVersion) || o.tool !== 'brush' || o.brushTip === 'color-blender' || !bounded(o.nativeMixAmount, 0, 1) || (o.nativeMixRadius !== undefined && !bounded(o.nativeMixRadius, .02, 1))))
+                    throw Error('Invalid native brush mixing version or settings.');
+                if ((o.mixTipA !== undefined && !isMixTip(o.mixTipA)) || (o.mixTipB !== undefined && !isMixTip(o.mixTipB)) || (o.mixBlend !== undefined && !bounded(o.mixBlend, 0, 1)))
+                    throw Error('Invalid mixed paint tip.');
+                if (o.rasterSourceId !== undefined && (typeof o.rasterSourceId !== 'string' || o.rasterSourceId.length > 1000))
+                    throw Error('Invalid reflection source.');
+                if (o.rasterTransformVersion !== undefined && (o.rasterTransformVersion !== 1 || !(o.transform || o.perspective)))
+                    throw Error('Invalid reflected stroke.');
+                if (o.coloringEngine !== undefined && (o.coloringEngine !== 1 || o.paintTipVersion !== 2 || !isColoringTip(o.brushTip)))
+                    throw Error('Invalid coloring engine.');
+                if (isColoringTip(o.brushTip) && o.coloringEngine !== 1)
+                    throw Error('Coloring style requires its renderer.');
+                if (o.dryBristleVersion !== undefined && ((o.dryBristleVersion !== 1 && o.dryBristleVersion !== 2 && o.dryBristleVersion !== 3) || o.brushKind !== 'dry-bristle'))
+                    throw Error('Invalid dry bristle renderer.');
+                if (o.dryMaterial !== undefined && ((o.dryBristleVersion !== 2 && o.dryBristleVersion !== 3) || !['ink', 'paint'].includes(o.dryMaterial)))
+                    throw Error('Invalid dry bristle material.');
+                for (const [key, min, max] of dryControlLimits)
+                    if (o[key] !== undefined && ((o.dryBristleVersion !== 1 && o.dryBristleVersion !== 2 && o.dryBristleVersion !== 3) || !bounded(o[key], min, max)))
+                        throw Error('Invalid dry bristle control.');
+                if (o.dryBristleSeed !== undefined && ((o.dryBristleVersion !== 1 && o.dryBristleVersion !== 2 && o.dryBristleVersion !== 3) || !Number.isInteger(o.dryBristleSeed) || !bounded(o.dryBristleSeed, 0, 4294967295)))
+                    throw Error('Invalid dry bristle seed.');
+                if (o.smudgeVersion !== undefined && ((o.smudgeVersion !== 2 && o.smudgeVersion !== 3) || o.coloringEngine !== 1 || o.brushTip !== 'color-blender'))
+                    throw Error('Invalid wet smudge renderer.');
+                for (const [key, min, max] of smudgeLimits)
+                    if (o[key] !== undefined && ((o.smudgeVersion === 2 || o.smudgeVersion === 3) ? !bounded(o[key], min, max) : key !== 'mixAmount'))
+                        throw Error('Invalid wet smudge control.');
+                if (o.coloringAppearanceVersion !== undefined && (![2, 3].includes(o.coloringAppearanceVersion) || o.coloringEngine !== 1 || !['color-texture', 'color-blender'].includes(o.brushTip ?? '')))
+                    throw Error('Invalid coloring appearance.');
+                if (o.blendPreserveAlpha !== undefined && (typeof o.blendPreserveAlpha !== 'boolean' || o.coloringAppearanceVersion !== 3 || o.brushTip !== 'color-blender'))
+                    throw Error('Invalid Blender transparency control.');
+                if (o.colorNib !== undefined && (!isColorNib(o.colorNib) || o.coloringEngine !== 1 || !coloringNibs(o.brushTip).includes(o.colorNib)))
+                    throw Error('Invalid coloring nib.');
+                if (o.colorNibFollow !== undefined && (typeof o.colorNibFollow !== 'boolean' || o.coloringEngine !== 1))
+                    throw Error('Invalid nib orientation.');
+                if (o.colorSeed !== undefined && (o.coloringEngine !== 1 || !Number.isInteger(o.colorSeed) || !bounded(o.colorSeed, 0, 4294967295)))
+                    throw Error('Invalid coloring seed.');
+                if (o.watercolorAppearanceVersion !== undefined && (o.watercolorAppearanceVersion !== 1 || o.watercolorEngine !== 1))
+                    throw Error('Invalid watercolor appearance version.');
+                if (o.watercolorShape !== undefined && (!['round', 'filbert', 'angular', 'liner', 'mop'].includes(o.watercolorShape) || o.watercolorEngine !== 1))
+                    throw Error('Invalid watercolor brush shape.');
+                if (o.watercolorMode !== undefined && (!['wet', 'glaze', 'even'].includes(o.watercolorMode) || o.watercolorEngine !== 1))
+                    throw Error('Invalid watercolor painting mode.');
+                if (o.flatNibVersion !== undefined && o.flatNibVersion !== 1)
+                    throw Error('Unsupported flat nib.');
+                if (o.paintNibVersion !== undefined && o.paintNibVersion !== 1)
+                    throw Error('Unsupported paint nib.');
+                if (o.paintTipVersion !== undefined && (![1, 2].includes(o.paintTipVersion) || !isPaintTip(o.brushTip) || o.brushTip === 'round'))
+                    throw Error('Invalid textured paint tip.');
+                if (o.paintTipVersion === 1 && o.brushTip === 'soft-round')
+                    throw Error('Invalid legacy paint tip.');
+                if (o.watercolorVersion !== undefined && (![1, 2, 3].includes(o.watercolorVersion) || o.paintTipVersion !== 2 || !isWatercolorTip(o.brushTip)))
+                    throw Error('Invalid watercolor version.');
+                if (o.brushTip?.startsWith('wash-') && ![1, 2, 3].includes(o.watercolorVersion))
+                    throw Error('Watercolor shape requires its renderer version.');
+                for (const key of ['flow', 'hardness'])
+                    if (o[key] !== undefined && !bounded(o[key], 0, 1))
+                        throw Error('Invalid paint dynamics.');
+                if (o.watercolorMaterialVersion !== undefined && (![1, 2].includes(o.watercolorMaterialVersion) || o.watercolorVersion !== 3))
+                    throw Error('Invalid watercolor material.');
+                if (o.watercolorEngine !== undefined && (o.watercolorEngine !== 1 || o.paintTipVersion !== 2 || !isNewWatercolorTip(o.brushTip) || o.watercolorVersion !== undefined))
+                    throw Error('Invalid natural watercolor engine.');
+                if (isNewWatercolorTip(o.brushTip) && o.watercolorEngine !== 1)
+                    throw Error('Natural watercolor tip requires its renderer.');
+                for (const key of ['pigmentAmount', 'waterAmount', 'edgeSoftness', 'dryness', 'pigmentBuildup', 'pigmentDepletion', 'wetDiffusion', 'edgeBleeding'])
+                    if (o[key] !== undefined && !bounded(o[key], 0, 1))
+                        throw Error('Invalid natural watercolor control.');
+                if (o.pigmentReload !== undefined && typeof o.pigmentReload !== 'boolean')
+                    throw Error('Invalid pigment reload.');
+                if (o.watercolorSeed !== undefined && (!(o.watercolorEngine === 1 || [1, 2].includes(o.watercolorMaterialVersion)) || !Number.isInteger(o.watercolorSeed) || !bounded(o.watercolorSeed, 0, 4294967295)))
+                    throw Error('Invalid watercolor seed.');
+                if (o.watercolorStyle !== undefined && !['paper', 'dry', 'bloom'].includes(o.watercolorStyle))
+                    throw Error('Invalid wash style.');
+                if (o.pigmentPooling !== undefined && !bounded(o.pigmentPooling, 0, 1))
+                    throw Error('Invalid pigment pooling.');
+                if (o.mixStops !== undefined && (!Array.isArray(o.mixStops) || o.mixStops.length > 200000 || !o.mixStops.every((v) => v && bounded(v.x, -1e6, 1e6) && bounded(v.y, -1e6, 1e6) && /^#[\da-f]{6}$/i.test(v.color))))
+                    throw Error('Invalid pigment samples.');
+                if (o.pressureFlow !== undefined && typeof o.pressureFlow !== 'boolean')
+                    throw Error('Invalid pressure flow.');
+                if (o.brushTip !== undefined && !isPaintTip(o.brushTip))
+                    throw Error('Unknown brush tip.');
+                if (o.tipAngle !== undefined && (!Number.isFinite(o.tipAngle) || o.tipAngle < -180 || o.tipAngle > 180))
+                    throw Error('Invalid tip angle.');
+                if (o.tipSpacing !== undefined && (!Number.isFinite(o.tipSpacing) || o.tipSpacing < .02 || o.tipSpacing > .5))
+                    throw Error('Invalid tip spacing.');
+                if (o.liveRefinementVersion !== undefined && o.liveRefinementVersion !== 1 && o.liveRefinementVersion !== 2 && o.liveRefinementVersion !== 3)
+                    throw Error('Unsupported live stroke refinement.');
+                if (o.transform !== undefined && (!Array.isArray(o.transform) || o.transform.length !== 6 || !o.transform.every((v) => bounded(v, -1e6, 1e6))))
+                    throw Error('Invalid stroke transform.');
+                if (o.perspective !== undefined && (!Array.isArray(o.perspective) || o.perspective.length !== 9 || !o.perspective.every((v) => bounded(v, -1e6, 1e6))))
+                    throw Error('Invalid perspective stroke transform.');
+                if (o.captureZoom !== undefined && !bounded(o.captureZoom, .25, 8))
+                    throw Error('Invalid captured zoom for stroke.');
+                for (const [key, min, max] of [['stabilization', 0, 1], ['smoothness', 0, 100], ['taperStart', 0, 1], ['taperEnd', 0, 1], ['textureStrength', 0, 1], ['minSize', 0, 1], ['maxSize', 0, 1], ['minOpacity', 0, 1], ['maxOpacity', 0, 1]])
+                    if (o[key] !== undefined && !bounded(o[key], min, max))
+                        throw Error('Invalid stroke setting.');
+                if ((o.minSize ?? 0) > (o.maxSize ?? 1) || (o.minOpacity ?? 0) > (o.maxOpacity ?? 1))
+                    throw Error('Minimum pressure response exceeds maximum.');
+                if (o.pressureCurve !== undefined && (!Array.isArray(o.pressureCurve) || o.pressureCurve.length !== 5 || o.pressureCurve.some((n, i) => !n || n.x !== i / 4 || !bounded(n.y, 0, 1) || (i > 0 && n.y < o.pressureCurve[i - 1].y))))
+                    throw Error('Invalid pressure curve.');
+                if (['pressureWidth', 'pressureOpacity', 'velocityTaper'].some(key => o[key] !== undefined && typeof o[key] !== 'boolean'))
+                    throw Error('Invalid pressure control.');
+            }
+            else if (o.kind === 'fill') {
+                if (typeof o.png !== 'string' || !o.png.startsWith('data:image/png;base64,') || o.png.length > 50000000)
+                    throw Error('Invalid fill data.');
+                if (o.under !== undefined && typeof o.under !== 'boolean')
+                    throw Error('Invalid fill placement.');
+            }
+            else if (o.kind === 'image') {
+                if (p.version < 3 || typeof o.png !== 'string' || !o.png.startsWith('data:image/png;base64,') || o.png.length > 50000000 || ![o.x, o.y].every((n) => bounded(n, -1e6, 1e6)) || ![o.width, o.height].every((n) => bounded(n, .1, 8192)))
+                    throw Error('Invalid placed image.');
+            }
+            else if (o.kind === 'clear') {
+                if (p.version < 3 || !Array.isArray(o.polygon) || o.polygon.length < 3 || o.polygon.length > 200000 || !o.polygon.every(point))
+                    throw Error('Invalid cleared selection.');
+            }
+            else if (o.kind === 'transform') {
+                if (!Array.isArray(o.polygon) || o.polygon.length < 3 || o.polygon.length > 200000 || !o.polygon.every(point) || !Array.isArray(o.matrix) || o.matrix.length !== 6 || !o.matrix.every((n) => bounded(n, -1e6, 1e6)))
+                    throw Error('Invalid transform data.');
+            }
+            else if (o.kind === 'vector') {
+                if (p.version < 2 || !Array.isArray(o.nodes) || o.nodes.length < 2 || o.nodes.length > 10000 || !o.nodes.every((n) => point(n) && n.in && n.out && finite(n.in.x) && finite(n.in.y) && finite(n.out.x) && finite(n.out.y) && [n.in.x, n.in.y, n.out.x, n.out.y].every(v => Math.abs(v) <= 1e6)) || !bounded(o.width, .1, 500) || !bounded(o.opacity, 0, 1) || !/^#[\da-f]{6}$/i.test(o.color) || typeof o.pressure !== 'boolean' || !bounded(o.smoothness, 0, 100))
+                    throw Error('Invalid vector line.');
+                if (o.profileVersion !== undefined && o.profileVersion !== 1 && o.profileVersion !== 2 && o.profileVersion !== 3 && o.profileVersion !== 4 && o.profileVersion !== 5 && o.profileVersion !== 6)
+                    throw Error('Unsupported vector width renderer.');
+                if (o.widthProfile !== undefined && (!Array.isArray(o.widthProfile) || o.widthProfile.length < 2 || o.widthProfile.length > 256 || o.widthProfile.some((pt, i) => !pt || !bounded(pt.t, 0, 1) || !bounded(pt.p, 0, 1) || (i > 0 && pt.t <= o.widthProfile[i - 1].t)) || o.widthProfile[0].t !== 0 || o.widthProfile.at(-1).t !== 1))
+                    throw Error('Invalid vector pressure profile.');
+                if (o.profileVersion === 6 || o.inkSections !== undefined) {
+                    if (o.profileVersion !== 6 || !Array.isArray(o.inkSections) || !o.inkSections.length || o.inkSections.length >= o.nodes.length || o.inkSections.some((s, i) => !s || !Number.isInteger(s.end) || s.end < 1 || s.end >= o.nodes.length || (i > 0 && s.end <= o.inkSections[i - 1].end) || !Array.isArray(s.widthProfile) || s.widthProfile.length < 2 || s.widthProfile.length > 256 || s.widthProfile.some((pt, j) => !pt || !bounded(pt.t, 0, 1) || !bounded(pt.p, 0, 1) || (j > 0 && pt.t <= s.widthProfile[j - 1].t)) || s.widthProfile[0].t !== 0 || s.widthProfile.at(-1).t !== 1) || o.inkSections.at(-1).end !== o.nodes.length - 1)
+                        throw Error('Invalid streaming vector sections.');
+                }
+                for (const key of ['minWidthPercent', 'maxWidthPercent'])
+                    if (o[key] !== undefined && !bounded(o[key], 1, 300))
+                        throw Error('Invalid vector width level.');
+                for (const key of ['taperStart', 'taperEnd'])
+                    if (o[key] !== undefined && !bounded(o[key], 0, 1))
+                        throw Error('Invalid vector taper.');
+                if (o.minWidthPercent !== undefined && o.maxWidthPercent !== undefined && o.minWidthPercent > o.maxWidthPercent)
+                    throw Error('Vector width minimum exceeds maximum.');
+                if (o.sourceNodes !== undefined && (!Array.isArray(o.sourceNodes) || o.sourceNodes.length !== o.nodes.length || !o.sourceNodes.every((n) => point(n) && n.in && n.out && [n.in.x, n.in.y, n.out.x, n.out.y].every(finite))))
+                    throw Error('Invalid vector source nodes.');
+                if (o.pressureCurve !== undefined && (!Array.isArray(o.pressureCurve) || o.pressureCurve.length !== 5 || o.pressureCurve.some((n, i) => !n || n.x !== i / 4 || !bounded(n.y, 0, 1) || (i > 0 && n.y < o.pressureCurve[i - 1].y))))
+                    throw Error('Invalid vector pressure curve.');
+            }
+            else
+                throw Error('Unknown drawing operation.');
+        }
+    }
+    if (p.substitutionShelf !== undefined) {
+        const shelf = p.substitutionShelf;
+        if (p.version !== 3 || !shelf || shelf.version !== 1 || !Array.isArray(shelf.items) || shelf.items.length > 32)
+            throw Error('Invalid drawing substitution shelf.');
+        const seen = new Set();
+        for (const item of shelf.items) {
+            if (!item || typeof item.id !== 'string' || !item.id || seen.has(item.id) || typeof item.name !== 'string' || !item.name.trim() || item.name.length > 60 || !['mouth', 'eyes', 'hands', 'pose', 'fx', 'other'].includes(item.category) || !['raster', 'vector'].includes(item.layerKind) || !Array.isArray(item.operations) || item.operations.length < 1 || item.operations.length > 1500)
+                throw Error('Invalid drawing substitution.');
+            seen.add(item.id);
+            const source = p.layers[0], validationLayer = { ...source, kind: item.layerKind, operations: item.operations };
+            validateProject({ ...p, motionPlanning: undefined, animation: undefined, substitutionShelf: undefined, cycleShelf: undefined, audio: undefined, activeLayerId: source.id, layers: [validationLayer] });
+        }
+    }
+    if (p.cycleShelf !== undefined) {
+        const shelf = p.cycleShelf;
+        if (p.version !== 3 || !shelf || shelf.version !== 1 || !Array.isArray(shelf.items) || shelf.items.length > 16)
+            throw Error('Invalid animation cycle shelf.');
+        const seenCycles = new Set();
+        for (const item of shelf.items) {
+            if (!item || typeof item.id !== 'string' || !item.id || seenCycles.has(item.id) || typeof item.name !== 'string' || !item.name.trim() || item.name.length > 60 || !['raster', 'vector'].includes(item.kind) || !Array.isArray(item.frames) || item.frames.length < 2 || item.frames.length > 16)
+                throw Error('Invalid reusable cycle.');
+            seenCycles.add(item.id);
+            for (const ops of item.frames) {
+                if (!Array.isArray(ops) || ops.length > 1500)
+                    throw Error('Invalid cycle artwork.');
+                const layer = { ...p.layers[0], kind: item.kind, operations: ops };
+                validateProject({ ...p, motionPlanning: undefined, animation: undefined, substitutionShelf: undefined, cycleShelf: undefined, audio: undefined, activeLayerId: layer.id, layers: [layer] });
+            }
+        }
+    }
+    if (p.animation !== undefined) {
+        const a = p.animation;
+        if (p.version !== 3 || !a || a.version !== 1 || !Array.isArray(a.frames) || a.frames.length < 1 || a.frames.length > 240 || typeof a.activeFrameId !== 'string')
+            throw Error('Invalid animation timeline.');
+        const frameIds = new Set();
+        let operationsCount = 0;
+        for (const frame of a.frames) {
+            if (!frame || typeof frame.id !== 'string' || !frame.id || frameIds.has(frame.id) || !frame.drawings || typeof frame.drawings !== 'object' || Array.isArray(frame.drawings))
+                throw Error('Invalid drawing frame.');
+            if (frame.hold !== undefined && (!Number.isInteger(frame.hold) || frame.hold < 1 || frame.hold > 24))
+                throw Error('Invalid frame hold duration (1–24 frames).');
+            frameIds.add(frame.id);
+            const keys = Object.keys(frame.drawings);
+            if (keys.length !== p.layers.length || keys.some(k => !ids.has(k)))
+                throw Error('Frame layer IDs do not match project layers.');
+            const layers = p.layers.map((l) => ({ ...l, operations: frame.drawings[l.id] }));
+            if (layers.some((l) => !Array.isArray(l.operations)))
+                throw Error('Invalid frame drawing operations.');
+            operationsCount += layers.reduce((sum, l) => sum + l.operations.length, 0);
+            if (operationsCount > 100000)
+                throw Error('Animation has too many drawing operations.');
+            // Reuse all existing stroke/vector/fill validation for every saved frame.
+            validateProject({ ...p, motionPlanning: undefined, animation: undefined, substitutionShelf: undefined, cycleShelf: undefined, audio: undefined, layers });
+        }
+        if (a.layerHolds !== undefined) {
+            if (!a.layerHolds || typeof a.layerHolds !== 'object' || Array.isArray(a.layerHolds) || Object.keys(a.layerHolds).some(id => !ids.has(id)))
+                throw Error('Invalid animation layer tracks.');
+            for (const [id, track] of Object.entries(a.layerHolds)) {
+                if (!track || !Array.isArray(track.held) || track.held.length > 240 || new Set(track.held).size !== track.held.length || track.held.some((fid) => typeof fid !== 'string' || !frameIds.has(fid) || fid === a.frames[0].id) || !track.stash || typeof track.stash !== 'object' || Array.isArray(track.stash))
+                    throw Error('Invalid layer exposure holds.');
+                if (Object.keys(track.stash).some(fid => !track.held.includes(fid)))
+                    throw Error('Stashed drawing has no matching layer hold.');
+                for (const ops of Object.values(track.stash)) {
+                    if (!Array.isArray(ops))
+                        throw Error('Invalid stashed animation cel.');
+                    const layer = p.layers.find((l) => l.id === id);
+                    validateProject({ ...p, motionPlanning: undefined, animation: undefined, substitutionShelf: undefined, cycleShelf: undefined, audio: undefined, activeLayerId: id, layers: [{ ...layer, operations: ops }] });
+                }
+            }
+        }
+        if (a.celLinks !== undefined) {
+            if (!a.celLinks || typeof a.celLinks !== 'object' || Array.isArray(a.celLinks))
+                throw Error('Invalid linked cel metadata.');
+            for (const [layerId, groups] of Object.entries(a.celLinks)) {
+                if (!ids.has(layerId) || !groups || typeof groups !== 'object' || Array.isArray(groups))
+                    throw Error('Invalid linked cel layer.');
+                const counts = new Map();
+                for (const [fid, group] of Object.entries(groups)) {
+                    if (!frameIds.has(fid) || a.layerHolds?.[layerId]?.held.includes(fid) || typeof group !== 'string' || !group || group.length > 120)
+                        throw Error('Invalid linked key reference.');
+                    counts.set(group, (counts.get(group) ?? 0) + 1);
+                }
+                if ([...counts.values()].some(n => n < 2))
+                    throw Error('Orphan linked drawing.');
+                for (const group of counts.keys()) {
+                    const members = Object.entries(groups).filter(([, v]) => v === group).map(([id]) => a.frames.find((f) => f.id === id).drawings[layerId]);
+                    if (members.some((ops) => JSON.stringify(ops) !== JSON.stringify(members[0])))
+                        throw Error('Linked drawing members disagree.');
+                }
+            }
+        }
+        if (!frameIds.has(a.activeFrameId))
+            throw Error('Missing active drawing frame.');
+        const active = a.frames.find((f) => f.id === a.activeFrameId);
+        if (p.layers.some((l) => l.operations.length !== active.drawings[l.id].length || l.operations.some((o, i) => o.id !== active.drawings[l.id][i].id)))
+            throw Error('Active frame and canvas drawings disagree.');
+    }
+    if (p.audio !== undefined && !validateSceneAudio(p.audio))
+        throw Error('Invalid scene audio.');
+    if (!validateMotionPlanning(p))
+        throw Error('Invalid motion/timing notes.');
+    if (p.camera !== undefined) {
+        if (!validateSceneCamera(p.camera))
+            throw Error('Invalid scene camera.');
+        p.camera = pruneCameraDepth(p.camera, ids);
+    }
+    if (!ids.has(p.activeLayerId) || !p.settings || typeof p.settings.guides !== 'boolean')
+        throw Error('Invalid document settings.');
+    return p;
+}

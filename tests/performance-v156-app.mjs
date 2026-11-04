@@ -1,0 +1,33 @@
+// Production UI, dense scene, coalesced 200 Hz pen samples; run alone.
+import {createServer,preview} from 'vite';import {chromium} from '@playwright/test';
+import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import {sourceDigest} from '../build/sourceDigest.mjs';
+const work=process.cwd(),root=path.resolve(process.env.PERF_ROOT??work),tag=process.env.PERF_TAG??'after',fixtureFile=path.join(work,'tests/fixtures/performance-v155-281.json');
+if(!fs.existsSync(fixtureFile)){const dev=await createServer({root:work,server:{middlewareMode:true}});try{const {performanceScene}=await dev.ssrLoadModule('/tests/performance-v155-fixture.ts');fs.writeFileSync(fixtureFile,JSON.stringify(performanceScene()));}finally{await dev.close();}}
+const fixture=JSON.parse(fs.readFileSync(fixtureFile,'utf8'));process.chdir(root);
+const server=await preview({root,preview:{host:'127.0.0.1',port:5550,strictPort:true}}),browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']});
+const stats=a=>{if(!a?.length)return{n:0};const sorted=[...a].sort((a,b)=>a-b);return{n:a.length,mean:a.reduce((a,b)=>a+b,0)/a.length,p50:sorted[Math.floor(sorted.length*.5)],p95:sorted[Math.min(sorted.length-1,Math.floor(sorted.length*.95))],max:sorted.at(-1)};};
+try{
+ const rows=[],cases=JSON.parse(process.env.PERF_CASES??'null')??[['hb','Pencil',70],['technical','Ink',70],['dry-ink-bristle','Paint',150],['color-solid','Paint',70],['smudge-bristle','Paint',30],['blender-soft','Paint',30],['wet-mix','Paint',30],['color-blender','Paint',30],['eraser-hard','Eraser',70]];
+ for(const cpu of JSON.parse(process.env.PERF_CPUS??'[1,4]')){
+  const page=await browser.newPage({viewport:{width:2048,height:1152},deviceScaleFactor:2}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.addInitScript(()=>{window.__readbacks=0;window.__measureReads=false;const original=CanvasRenderingContext2D.prototype.getImageData;CanvasRenderingContext2D.prototype.getImageData=function(...args){if(window.__measureReads)window.__readbacks++;return original.apply(this,args);};});
+  await page.goto('http://127.0.0.1:5550');await page.waitForFunction(()=>window.soloStrokeDiagnostics);await page.evaluate(()=>document.fonts.ready);assert.equal(await page.evaluate(()=>window.soloStrokeDiagnostics.build.sourceDigest),sourceDigest(),'stale production build');
+  const session=await page.context().newCDPSession(page);await session.send('Emulation.setCPUThrottlingRate',{rate:cpu});
+  for(let rep=0;rep<Number(process.env.PERF_REPEATS??2);rep++)for(const [preset,category,size]of cases){
+   await page.locator('input[type=file][accept=".json,.solo.json"]').setInputFiles({name:'performance.solo.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fixture))});await page.waitForFunction(()=>document.querySelector('.document-tab')?.textContent.includes('Performance 281 strokes'));
+   await page.keyboard.press(category==='Eraser'?'e':'b');if(category!=='Eraser')await page.getByLabel('Brush category',{exact:true}).selectOption(category);
+   if(category==='Paint')await page.getByLabel('Brush family',{exact:true}).selectOption('all');await page.getByLabel(category==='Eraser'?'Eraser preset':'Brush preset',{exact:true}).selectOption(preset);
+   for(const [name,value]of [['Size',size],['Stabilization',0],['Smoothness',18]]){const f=page.getByLabel(name+' exact value',{exact:true});await f.fill(String(value));await f.press('Enter');}
+   await page.evaluate(()=>new Promise(r=>setTimeout(r,600)));await page.evaluate(()=>{window.soloStrokeDiagnostics.performance.start();window.__readbacks=0;window.__measureReads=true;});
+   const observed=await page.getByLabel('Drawing canvas',{exact:true}).evaluate(async c=>{
+    c.setPointerCapture=()=>{};c.hasPointerCapture=()=>false;const r=c.getBoundingClientRect(),start=performance.now(),frames=[],raw=[],samples=200;let sent=0,last=start;
+    const event=(i,type)=>new PointerEvent(type,{pointerId:77,isPrimary:true,pointerType:'pen',button:0,buttons:type==='pointerup'?0:1,pressure:.25+.7*Math.sin(i/samples*Math.PI)**2,clientX:r.left+r.width*(.2+.6*i/samples),clientY:r.top+r.height*(.5+.07*Math.sin(i/samples*Math.PI*4))});
+    const down=event(0,'pointerdown');Object.defineProperty(down,'timeStamp',{value:start});c.dispatchEvent(down);
+    while(sent<samples){const now=await new Promise(requestAnimationFrame);frames.push(now-last);last=now;const due=Math.min(samples,Math.max(sent+1,Math.floor((now-start)/5))),batch=[];for(let i=sent+1;i<=due;i++){const e=event(i,'pointermove');Object.defineProperty(e,'timeStamp',{value:start+i*5});batch.push(e);}const move=batch.at(-1);Object.defineProperty(move,'getCoalescedEvents',{value:()=>batch});const t=performance.now();c.dispatchEvent(move);raw.push(performance.now()-t);sent=due;}
+    await new Promise(requestAnimationFrame);const beforeUp=performance.now(),up=event(samples,'pointerup');Object.defineProperty(up,'timeStamp',{value:start+samples*5+1});c.dispatchEvent(up);const dispatchUpMs=performance.now()-beforeUp;await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);const penUpMs=performance.now()-beforeUp;window.__measureReads=false;return{frames,raw,dispatchUpMs,penUpMs,readbacks:window.__readbacks,elapsed:performance.now()-start};
+   });
+   const timings=await page.evaluate(()=>{window.soloStrokeDiagnostics.performance.stop();return window.soloStrokeDiagnostics.performance.export();});const t=Date.now();await page.getByRole('button',{name:'Undo',exact:true}).click();await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+   const row={preset,size,cpu,rep,dpr:2,project:[fixture.width,fixture.height],sceneStrokes:281,frame:stats(observed.frames.slice(1)),render:stats(timings.renderMs),composition:stats(timings.compositionAndOverlaysMs),raster:stats(timings.liveRasterMs),geometry:stats(timings.liveGeometryMs),dirtyPixels:stats(timings.displayDirtyPixels),viewportPixels:stats(timings.displayViewportPixels),input:stats(timings.latestInputToCanvasMs),raw:stats(observed.raw),readbacks:observed.readbacks,dispatchUpMs:observed.dispatchUpMs,penUpMs:observed.penUpMs,undoWallMs:Date.now()-t,elapsed:observed.elapsed};rows.push(row);console.log(JSON.stringify(row));fs.writeFileSync(path.join(work,`validation/v156-${tag}-app-performance.json`),JSON.stringify({method:'Production UI, 2048x1152 DPR2, software canvas, 281 strokes on six layers; 200 samples over one second, delivered coalesced per RAF',rows,errors},null,2));
+  }await session.detach();await page.close();
+ }
+}finally{await browser.close();await server.close();}

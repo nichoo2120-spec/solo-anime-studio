@@ -1,0 +1,7 @@
+const assert=require('assert');const fs=require('fs'),ts=require('typescript'),path=require('path');
+const dir=path.resolve(__dirname,'../../src/tools/transform/math');let cache=new Map();function load(f){f=path.resolve(f);if(cache.has(f))return cache.get(f).exports;let m={exports:{}};cache.set(f,m);let code=ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;new Function('module','exports','require',code)(m,m.exports,id=>id.startsWith('.')?load(path.resolve(path.dirname(f),id+'.ts')):require(id));return m.exports;}
+const {makeGrid,gridPoint}=load(path.join(dir,'meshWarp.ts'));const quad=[{x:0,y:0},{x:400,y:0},{x:400,y:400},{x:0,y:400}];const g=makeGrid(quad,4,4);g.nodes[12].x+=75;g.nodes[12].y-=40;
+for(let j=0;j<=4;j++)for(let i=0;i<=4;i++){let pt=gridPoint(g,i/4,j/4,false),node=g.nodes[j*5+i];assert(Math.hypot(pt.x-node.x,pt.y-node.y)<1e-7,'mesh must pass exactly through editable nodes');}
+const x1=gridPoint(g,.5-1e-5,.55,false),x2=gridPoint(g,.5,.55,false),x3=gridPoint(g,.5+1e-5,.55,false);assert(Math.abs((x2.x-x1.x)-(x3.x-x2.x))<.02,'mesh needs continuous tangent');
+g.pins=[{u:.43,v:.52,dx:35,dy:25,radius:.27}];for(let u=0;u<=1;u+=.025){let pt=gridPoint(g,u,.52);assert(Number.isFinite(pt.x)&&Number.isFinite(pt.y));}
+assert.deepStrictEqual(gridPoint(g,0,.52),gridPoint(g,0,.52,false),'border fixed');console.log('PASS curved mesh interpolates through nodes with continuous slope');console.log('PASS pin field is smooth and border anchored');

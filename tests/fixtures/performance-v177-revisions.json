@@ -1,0 +1,22 @@
+{
+ "src/core/buildInfo.ts": {
+  "before": "e98c910af93d27e247ea2e0bff48b0ca910b53aeaa4bb1d200c658fd677d51f9",
+  "after": "243d7110f9255f8cc1e2650f2c0f7628159a71eb7ea5a0483cceb07e1a95f3c6",
+  "why": "v0.5.177 version bump (desktop installer build)"
+ },
+ "package.json": {
+  "before": "eab8722eb64310f2b08acff26817f670376d03cd3daa6761bbf4235bc737dbc6",
+  "after": "98b461aaa6af724d9fb8cde8255ba6990aba8dc51956063fd4eb7494314828b6",
+  "why": "v0.5.177 version, Electron main entry, dist:win/release scripts, electron/electron-builder/electron-updater deps (react moved to devDependencies: bundled by Vite)"
+ },
+ "src/engine/FlipbookOverlay.ts": {
+  "before": "a8a0a2d59162086c64cd81a5005cac47d74af9a5b43078f228f3d915c4498219",
+  "after": "da78051651b33db394ab668465f309057829297cb3f8279a8c7b236b0153e0a4",
+  "why": "v0.5.177 type-only cast of setTimeout id (Electron brings @types/node); no runtime change"
+ },
+ "src/engine/OnionSkinOverlay.ts": {
+  "before": "868f5e9136e52bd0cd476936480ec067c9d71cfc80b24923418407234ef922dc",
+  "after": "2073ae12a367c5f8a14d0ce35fd1eb4d217ef1d530c0d211251b4020a11b5a74",
+  "why": "v0.5.177 type-only cast of setTimeout id (Electron brings @types/node); no runtime change"
+ }
+}

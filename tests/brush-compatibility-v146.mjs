@@ -1,0 +1,23 @@
+import {createServer} from '../node_modules/vite/dist/node/index.js';
+import {chromium} from '../node_modules/playwright/index.mjs';
+import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';
+const root=process.cwd(),baseline=path.resolve(process.argv[2]??'../baseline145');
+if(!fs.existsSync(baseline+'/src/engine/brushRaster.ts'))throw Error('Pass the extracted v0.5.145 project directory as the first argument.');
+const server=await createServer({root,server:{host:'127.0.0.1',port:5414,strictPort:true,fs:{allow:[root,baseline]}}});await server.listen();
+const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']});
+try{const page=await browser.newPage();await page.goto('http://127.0.0.1:5414');const rows=await page.evaluate(async baseline=>{
+ const {stockPresets,legacyAirbrushPreset}=await import('/@fs/'+baseline+'/src/core/brushes.ts'),{brushStrokeMetadata}=await import('/@fs/'+baseline+'/src/core/paintTips.ts'),old=await import('/@fs/'+baseline+'/src/engine/brushRaster.ts'),now=await import('/src/engine/brushRaster.ts'),oldComposite=await import('/@fs/'+baseline+'/src/engine/paintCompositing.ts'),newComposite=await import('/src/engine/paintCompositing.ts'),rows=[];
+ const {watercolorPresets}=await import('/tests/fixtures/watercolor-presets.ts');for(const p of [...stockPresets,legacyAirbrushPreset,...watercolorPresets])for(const pressure of [false,true]){
+  const a=document.createElement('canvas'),b=document.createElement('canvas');a.width=b.width=700;a.height=b.height=320;
+  const s={...p.settings,...brushStrokeMetadata(p.settings),id:p.id,kind:'stroke',tool:p.category==='Eraser'?'eraser':'brush',size:95,pressure,points:Array.from({length:151},(_,i)=>({x:60+i*3.8,y:160+80*Math.sin(i/150*Math.PI*3),p:.1+.9*Math.sin(i/150*Math.PI)**2}))};
+  old.drawModernStroke(a.getContext('2d'),s);now.drawModernStroke(b.getContext('2d'),JSON.parse(JSON.stringify(s)));const x=a.getContext('2d').getImageData(0,0,700,320).data,y=b.getContext('2d').getImageData(0,0,700,320).data;let max=0;for(let i=0;i<x.length;i++)max=Math.max(max,Math.abs(x[i]-y[i]));rows.push({id:p.id,pressure,max});
+  if(p.category!=='Eraser'){const mixed={...s,mixVersion:undefined,mixStops:s.points.filter((_,i)=>i%15===0).map((q,i)=>({...q,color:i%2?'#246faa':'#55a778'}))};const ac=a.getContext('2d'),bc=b.getContext('2d');ac.clearRect(0,0,700,320);bc.clearRect(0,0,700,320);old.drawModernStroke(ac,mixed);now.drawModernStroke(bc,JSON.parse(JSON.stringify(mixed)));const x=ac.getImageData(0,0,700,320).data,y=bc.getImageData(0,0,700,320).data;let max=0;for(let i=0;i<x.length;i++)max=Math.max(max,Math.abs(x[i]-y[i]));rows.push({id:p.id,pressure,mixed:true,max});}
+
+  if(p.id==='color-blender')for(const version of [undefined,2]){
+   const q={...s,coloringAppearanceVersion:version},mask=document.createElement('canvas');mask.width=700;mask.height=320;old.drawModernStroke(mask.getContext('2d'),q);
+   for(const c of [a,b]){const ctx=c.getContext('2d');ctx.clearRect(0,0,700,320);ctx.fillStyle='#216bd5';ctx.fillRect(50,60,300,200);ctx.fillStyle='#9853ce';ctx.fillRect(350,60,300,200);}
+   oldComposite.compositePaintStroke(a.getContext('2d'),mask,q);newComposite.compositePaintStroke(b.getContext('2d'),mask,JSON.parse(JSON.stringify(q)));const x=a.getContext('2d').getImageData(0,0,700,320).data,y=b.getContext('2d').getImageData(0,0,700,320).data;let max=0;for(let i=0;i<x.length;i++)max=Math.max(max,Math.abs(x[i]-y[i]));rows.push({id:p.id,pressure,composite:true,version:version??1,max});
+  }
+ }return rows;
+},baseline);fs.writeFileSync('validation/v146-compatibility.json',JSON.stringify(rows,null,2));assert(rows.every(v=>v.max===0));console.log(rows.length+' historical watercolor/other brush/eraser fixtures: exact RGBA equality');
+}finally{await browser.close();await server.close();}

@@ -1,0 +1,46 @@
+import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "../../jsx-runtime.js";
+import { memo, useEffect, useRef, useState, useSyncExternalStore } from '../../react.js';
+import { toScreen, toProject } from '../core/geometry.js';
+import { CAMERA_EASES, cameraAt, cameraFrame, clampDepth, clampZoom, deleteCameraKey, homeCamera, layerDepth, newSceneCamera, setCameraKey, sortedKeys } from '../animation/sceneCamera.js';
+/** v0.5.174 Scene Camera: frame overlay on the canvas (drag = truck), safe areas and field guide. */
+export const SceneCameraOverlay = memo(function SceneCameraOverlay({ project, frame, view, onMove }) {
+    const v = useSyncExternalStore(view.subscribe, view.getSnapshot);
+    const [drag, setDrag] = useState(null);
+    const c = project.camera;
+    if (!c?.enabled)
+        return null;
+    const base = cameraAt(c, frame, project.width, project.height), state = drag ? { ...base, x: drag.x, y: drag.y } : base;
+    const poly = (scale) => cameraFrame(state, project.width, project.height, scale).map(p => toScreen(p, v)).map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+    const centre = toScreen({ x: state.x, y: state.y }, v);
+    const local = (e) => { const r = e.currentTarget.ownerSVGElement.getBoundingClientRect(); return toProject({ x: e.clientX - r.left, y: e.clientY - r.top }, v); };
+    const guides = [];
+    if (c.fieldGuide)
+        for (const s of [1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6])
+            guides.push(poly(s));
+    return _jsxs("svg", { className: "scene-camera-overlay", "aria-label": "Scene camera frame", children: [_jsx("polygon", { className: "camera-frame-hit", points: poly(1), onPointerDown: e => { e.preventDefault(); e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); const p = local(e); setDrag({ id: e.pointerId, sx: p.x, sy: p.y, ox: base.x, oy: base.y, x: base.x, y: base.y }); }, onPointerMove: e => { if (!drag || drag.id !== e.pointerId)
+                    return; const p = local(e); setDrag({ ...drag, x: drag.ox + p.x - drag.sx, y: drag.oy + p.y - drag.sy }); }, onPointerUp: e => { if (!drag || drag.id !== e.pointerId)
+                    return; const d = drag; setDrag(null); if (d.x !== d.ox || d.y !== d.oy)
+                    onMove(Math.round(d.x * 10) / 10, Math.round(d.y * 10) / 10); }, onPointerCancel: () => setDrag(null), children: _jsx("title", { children: "Drag to move (truck) the camera" }) }), _jsx("polygon", { className: "camera-frame", points: poly(1) }), c.safeArea && _jsxs(_Fragment, { children: [_jsx("polygon", { className: "camera-safe action", points: poly(.9) }), _jsx("polygon", { className: "camera-safe title", points: poly(.8) })] }), guides.map((g, i) => _jsx("polygon", { className: "camera-field", points: g }, i)), _jsx("path", { className: "camera-centre", d: `M ${centre.x - 9} ${centre.y} H ${centre.x + 9} M ${centre.x} ${centre.y - 9} V ${centre.y + 9}` }), _jsxs("text", { className: "camera-label", x: toScreen(cameraFrame(state, project.width, project.height)[0], v).x + 6, y: toScreen(cameraFrame(state, project.width, project.height)[0], v).y + 16, children: ["CAMERA \u00B7 frame ", frame, c.keys.some(k => k.frame === frame) ? ' · KEY' : ''] })] });
+});
+const num = (s, f) => { const n = parseFloat(s); return Number.isFinite(n) ? n : f; };
+export function SceneCameraPanel({ project, frame, frameCount, renderer, activeLayerId, onCommit, onGoToFrame }) {
+    const c = project.camera, state = cameraAt(c, frame, project.width, project.height), key = c?.keys.find(k => k.frame === frame);
+    const preview = useRef(null);
+    const update = (cam, label) => onCommit({ ...project, camera: cam }, label);
+    /** Editing any value at a frame without a key makes a key there (auto-key, like pro tools). */
+    const edit = (patch) => { const cam = c ?? newSceneCamera(); update(setCameraKey(cam, { frame, ...state, ease: key?.ease ?? 'ease-in-out', ...patch }), 'Camera key'); };
+    useEffect(() => { const el = preview.current; if (!el || !renderer || !c?.enabled)
+        return; let stop = false; const id = requestAnimationFrame(() => { if (stop)
+        return; try {
+        const w = el.width, h = el.height, out = renderer.compositeCamera(project, frame, { width: w, height: h });
+        const x = el.getContext('2d');
+        x.clearRect(0, 0, w, h);
+        x.drawImage(out, 0, 0);
+    }
+    catch { /* preview only */ } }); return () => { stop = true; cancelAnimationFrame(id); }; }, [project, frame, renderer, c?.enabled]);
+    if (!c)
+        return _jsxs("div", { className: "scene-camera-panel", children: [_jsx("div", { className: "section-caption", children: "SCENE CAMERA" }), _jsx("p", { className: "camera-help", children: "A camera you can move over the drawing: truck, push in/out, roll, multiplane depth, keys with easing. Export can go through the camera." }), _jsx("button", { className: "primary-button", onClick: () => update(newSceneCamera(), 'Add scene camera'), children: "Add scene camera" })] });
+    const keys = sortedKeys(c), prev = [...keys].reverse().find(k => k.frame < frame), next = keys.find(k => k.frame > frame), depth = layerDepth(c, activeLayerId);
+    const field = (label, value, step, apply, unit = '') => _jsxs("label", { className: "camera-field-row", children: [label, _jsx("input", { "aria-label": 'Camera ' + label, type: "number", step: step, value: Math.round(value * 100) / 100, onChange: e => apply(num(e.target.value, value)) }), unit] });
+    return _jsxs("div", { className: "scene-camera-panel", children: [_jsxs("div", { className: "section-caption", children: ["SCENE CAMERA \u00B7 FRAME ", frame, "/", frameCount, key ? ' · KEY' : ''] }), _jsxs("label", { className: "camera-check", children: [_jsx("input", { type: "checkbox", checked: c.enabled, onChange: e => update({ ...c, enabled: e.target.checked }, e.target.checked ? 'Show camera' : 'Hide camera') }), "Camera on (frame + preview + export option)"] }), c.enabled && _jsx("canvas", { ref: preview, className: "camera-preview", width: 320, height: Math.max(1, Math.round(320 * project.height / project.width)), "aria-label": "Camera preview" }), _jsxs("div", { className: "camera-grid", children: [field('X (truck)', state.x, 10, x => edit({ x }), 'px'), field('Y (pedestal)', state.y, 10, y => edit({ y }), 'px'), field('Zoom', state.zoom * 100, 5, z => edit({ zoom: clampZoom(z / 100) }), '%'), field('Roll', state.rotation, 1, rotation => edit({ rotation }), '°')] }), _jsxs("div", { className: "camera-buttons", children: [_jsx("button", { onClick: () => edit({}), title: "Save the camera at this frame", children: key ? 'Update key' : 'Set key' }), _jsx("button", { disabled: !key, onClick: () => update(deleteCameraKey(c, frame), 'Delete camera key'), children: "Delete key" }), _jsx("button", { onClick: () => edit({ ...homeCamera(project.width, project.height) }), title: "Full page, no zoom, no roll", children: "Reset view" })] }), _jsxs("label", { className: "camera-field-row camera-scrub", children: ["Frame", _jsx("input", { "aria-label": "Camera frame", type: "range", min: 1, max: Math.max(1, frameCount), value: frame, onChange: e => onGoToFrame(+e.target.value) }), _jsx("span", { children: frame })] }), _jsxs("div", { className: "camera-buttons", children: [_jsx("button", { disabled: !prev, onClick: () => prev && onGoToFrame(prev.frame), children: "\u25C0 Prev key" }), _jsx("button", { disabled: !next, onClick: () => next && onGoToFrame(next.frame), children: "Next key \u25B6" })] }), _jsxs("label", { className: "camera-field-row", children: ["Ease to next key", _jsx("select", { "aria-label": "Camera ease", disabled: !key, value: key?.ease ?? 'ease-in-out', onChange: e => edit({ ease: e.target.value }), children: CAMERA_EASES.map(x => _jsx("option", { value: x, children: x }, x)) })] }), _jsx("div", { className: "section-caption", children: "MULTIPLANE (ACTIVE LAYER)" }), _jsxs("label", { className: "camera-field-row", children: ["Depth (Z)", _jsx("input", { "aria-label": "Layer camera depth", type: "number", step: .1, min: -.9, max: 50, value: depth, onChange: e => update({ ...c, depth: { ...c.depth, [activeLayerId]: clampDepth(num(e.target.value, depth)) } }, 'Layer depth') })] }), _jsx("p", { className: "camera-help", children: "0 = moves with the camera. Bigger = farther away (moves less, like a background). Negative = nearer (moves more)." }), _jsxs("label", { className: "camera-check", children: [_jsx("input", { type: "checkbox", checked: c.safeArea, onChange: e => update({ ...c, safeArea: e.target.checked }, 'Camera safe area') }), "Safe areas (action 90%, title 80%)"] }), _jsxs("label", { className: "camera-check", children: [_jsx("input", { type: "checkbox", checked: c.fieldGuide, onChange: e => update({ ...c, fieldGuide: e.target.checked }, 'Camera field guide') }), "Field guide"] }), _jsxs("div", { className: "section-caption", children: ["KEYS (", keys.length, ")"] }), _jsxs("div", { className: "camera-keys", children: [keys.map(k => _jsxs("button", { className: k.frame === frame ? 'active' : '', onClick: () => onGoToFrame(k.frame), children: ["F", k.frame, " \u00B7 ", Math.round(k.zoom * 100), "% \u00B7 ", k.ease] }, k.frame)), !keys.length && _jsx("span", { className: "camera-help", children: "No keys yet. Change a value or press Set key." })] })] });
+}

@@ -1,0 +1,44 @@
+[
+  {
+    "name": "blender-v1",
+    "expected": "1cea8e8c69b924b51730676fb1aaa12ef595871d1fc828f3e9900620a4481187",
+    "actual": "1cea8e8c69b924b51730676fb1aaa12ef595871d1fc828f3e9900620a4481187",
+    "reload": "1cea8e8c69b924b51730676fb1aaa12ef595871d1fc828f3e9900620a4481187",
+    "exact": true
+  },
+  {
+    "name": "blender-v2",
+    "expected": "551f9ad151a2f1f4ab761133eeabf746ab4d611af9c638b8129fae02928b6878",
+    "actual": "551f9ad151a2f1f4ab761133eeabf746ab4d611af9c638b8129fae02928b6878",
+    "reload": "551f9ad151a2f1f4ab761133eeabf746ab4d611af9c638b8129fae02928b6878",
+    "exact": true
+  },
+  {
+    "name": "blender-v3",
+    "expected": "fd99e64c127689ce1b8d53ab2669cc6db3669917410616460035353cf8360102",
+    "actual": "fd99e64c127689ce1b8d53ab2669cc6db3669917410616460035353cf8360102",
+    "reload": "fd99e64c127689ce1b8d53ab2669cc6db3669917410616460035353cf8360102",
+    "exact": true
+  },
+  {
+    "name": "dry",
+    "expected": "373feb8a2ffab58f9c894dc0391ee8fc072dcc26eaa7aeeabaaea513105ef8dc",
+    "actual": "373feb8a2ffab58f9c894dc0391ee8fc072dcc26eaa7aeeabaaea513105ef8dc",
+    "reload": "373feb8a2ffab58f9c894dc0391ee8fc072dcc26eaa7aeeabaaea513105ef8dc",
+    "exact": true
+  },
+  {
+    "name": "dry-ink-bristle",
+    "expected": "3016258c597b1adb8a6bcbaf4ca0d15170a8905d10352f84bef711783caec63e",
+    "actual": "9a8a327ebc1a28e09de9f9367436c1adbc821fe886e8cc31f58800f492a1429c",
+    "reload": "9a8a327ebc1a28e09de9f9367436c1adbc821fe886e8cc31f58800f492a1429c",
+    "exact": false
+  },
+  {
+    "name": "dry-paint",
+    "expected": "0c3b239869e8dc6fa8c0b3552acad8182bf1e71be63824da6936e15f52d8a69e",
+    "actual": "f27f69e10a20b4e3e60799f1db6acbe39bb48b6780ece5eaf41fccd8e978e781",
+    "reload": "f27f69e10a20b4e3e60799f1db6acbe39bb48b6780ece5eaf41fccd8e978e781",
+    "exact": false
+  }
+]

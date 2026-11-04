@@ -1,0 +1,10 @@
+const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..');const src=f=>fs.readFileSync(path.join(root,f),'utf8');
+for(const name of ['FreeTransform','Move','Scale','Rotate','Perspective','Skew','Distort','MeshWarp','Flip','PivotPoint'])assert(fs.existsSync(path.join(root,'src/tools/transform/modes',name+'.ts')),name+' implementation missing');
+const controller=src('src/tools/transform/TransformTool.ts'),app=src('src/ui/App.tsx'),overlay=src('src/tools/transform/TransformOverlay.tsx');
+assert(controller.includes('OffscreenCanvas'));assert(controller.includes('requestAnimationFrame'));assert(controller.includes('this.engine.store.commit('));assert(controller.includes("kind:'image'"));assert(controller.includes("kind:'clear'"));
+assert(controller.includes('setPointerCapture'));assert(controller.includes('this.engine.store.getSnapshot()!==p'));
+assert(app.includes('<TransformOverlay'));assert(app.includes('transformHotkeyRef.current?.(e)'));
+assert(overlay.includes('onPointerCancel'));assert(overlay.includes('onPointerDown'));assert(overlay.includes('onPointerUp'));
+assert(src('src/tools/transform/TransformOptionsBar.tsx').includes('onCommit'));
+console.log('PASS: full transform module structure, overlay, undo and keyboard integration');

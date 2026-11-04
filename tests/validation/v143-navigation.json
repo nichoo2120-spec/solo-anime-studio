@@ -1,0 +1,534 @@
+{
+  "config": {
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "/workspace/scratch/e841b2ae644b/studio143/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "tests/navigation-v143.config.mjs"
+    ],
+    "configFile": "/workspace/scratch/e841b2ae644b/studio143/tests/navigation-v143.config.mjs",
+    "rootDir": "/workspace/scratch/e841b2ae644b/studio143/tests/browser",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/workspace/scratch/e841b2ae644b/studio143/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/workspace/scratch/e841b2ae644b/studio143/tests/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "zoom-flat-v119.spec.ts",
+          "overlays-v135.spec.ts",
+          "paint-response-v121.spec.ts",
+          "camera-ui-v142.spec.ts"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "/workspace/scratch/e841b2ae644b/studio143/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "",
+        "testDir": "/workspace/scratch/e841b2ae644b/studio143/tests/browser",
+        "snapshotDir": "/workspace/scratch/e841b2ae644b/studio143/tests/browser",
+        "testIgnore": [],
+        "testMatch": [
+          "zoom-flat-v119.spec.ts",
+          "overlays-v135.spec.ts",
+          "paint-response-v121.spec.ts",
+          "camera-ui-v142.spec.ts"
+        ],
+        "timeout": 60000,
+        "use": {
+          "baseURL": "http://127.0.0.1:5475",
+          "headless": true,
+          "viewport": {
+            "width": 1440,
+            "height": 960
+          },
+          "launchOptions": {
+            "executablePath": "/workspace/scratch/e841b2ae644b/qa-tools/runtime/chromium",
+            "args": [
+              "--no-sandbox",
+              "--disable-dev-shm-usage",
+              "--disable-gpu"
+            ]
+          }
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": ""
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "validation/v143-navigation.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.64.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "camera-ui-v142.spec.ts",
+      "file": "camera-ui-v142.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "camera readouts update independently and retain current brush settings",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2973,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-27T18:38:40.891Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "eee2161e8590a7c5dc40-a26e7225debbea67f4fb",
+          "file": "camera-ui-v142.spec.ts",
+          "line": 2,
+          "column": 1
+        },
+        {
+          "title": "active transform receives the latest camera after normal drawing navigation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1386,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-27T18:38:43.971Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "eee2161e8590a7c5dc40-89424a75abab62c814b8",
+          "file": "camera-ui-v142.spec.ts",
+          "line": 7,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "overlays-v135.spec.ts",
+      "file": "overlays-v135.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "onion and flipbook zoom paints coalesce, remain aligned and clear when disabled",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 732,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-27T18:38:45.389Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "df3e8b7832e1aef27eb2-56e41fc1cdb337c49efb",
+          "file": "overlays-v135.spec.ts",
+          "line": 3,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "paint-response-v121.spec.ts",
+      "file": "paint-response-v121.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "blank layers do not repeatedly allocate or resample bitmaps during paint input",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 789,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-27T18:38:46.144Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2da824d384cec9381869-b4f113cbfb995e577859",
+          "file": "paint-response-v121.spec.ts",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "title": "cached page backdrop matches direct rendering and follows camera and document changes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1523,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-27T18:38:46.944Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "2da824d384cec9381869-0f38b6dd1c9e7a0d9a32",
+          "file": "paint-response-v121.spec.ts",
+          "line": 11,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "zoom-flat-v119.spec.ts",
+      "file": "zoom-flat-v119.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "new flat nib preserves live/final pixels, pressure and legacy data",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1001,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "FLAT_FIDELITY [{\"size\":22,\"pressure\":false,\"taper\":0,\"max\":0,\"ink\":20940},{\"size\":22,\"pressure\":false,\"taper\":0.3,\"max\":0,\"ink\":19385},{\"size\":22,\"pressure\":true,\"taper\":0,\"max\":0,\"ink\":14910},{\"size\":22,\"pressure\":true,\"taper\":0.3,\"max\":0,\"ink\":14381},{\"size\":150,\"pressure\":false,\"taper\":0,\"max\":0,\"ink\":135963},{\"size\":150,\"pressure\":false,\"taper\":0.3,\"max\":0,\"ink\":124104},{\"size\":150,\"pressure\":true,\"taper\":0,\"max\":0,\"ink\":93226},{\"size\":150,\"pressure\":true,\"taper\":0.3,\"max\":0,\"ink\":89490}]\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-27T18:38:48.489Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "043495c108fb911d2da4-1e0c594992040ae476ec",
+          "file": "zoom-flat-v119.spec.ts",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "title": "clean raster ink gains display detail without changing exported pixels",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 677,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-27T18:38:49.515Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "043495c108fb911d2da4-4dfefa813320a609355b",
+          "file": "zoom-flat-v119.spec.ts",
+          "line": 16,
+          "column": 1
+        },
+        {
+          "title": "zoomed raster erasers stay inside their layer and cache follows undo, pan and opacity",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 803,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-27T18:38:50.209Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "043495c108fb911d2da4-1b3d623a35ed5e01ab5f",
+          "file": "zoom-flat-v119.spec.ts",
+          "line": 23,
+          "column": 1
+        },
+        {
+          "title": "wheel notifications coalesce while cursor position stays anchored",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 669,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-27T18:38:51.042Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "043495c108fb911d2da4-d1f200df6111ff2338a3",
+          "file": "zoom-flat-v119.spec.ts",
+          "line": 29,
+          "column": 1
+        },
+        {
+          "title": "maximum flat size remains responsive through the real inspector",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3059,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-27T18:38:51.723Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "043495c108fb911d2da4-7c70884878b1ecd68e7a",
+          "file": "zoom-flat-v119.spec.ts",
+          "line": 33,
+          "column": 1
+        },
+        {
+          "title": "a zero-pressure pen contact stays blank while zoomed in",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 620,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-27T18:38:54.792Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "043495c108fb911d2da4-d6f02c344df24d966be9",
+          "file": "zoom-flat-v119.spec.ts",
+          "line": 38,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-27T18:38:40.115Z",
+    "duration": 15341.163,
+    "expected": 11,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

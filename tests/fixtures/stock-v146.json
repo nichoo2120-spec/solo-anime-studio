@@ -1,0 +1,2436 @@
+[
+  {
+    "id": "hb",
+    "name": "HB Pencil",
+    "category": "Pencil",
+    "defaults": {
+      "size": 4,
+      "opacity": 0.78,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": true,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.66,
+      "brushKind": "graphite-hb"
+    },
+    "settings": {
+      "size": 4,
+      "opacity": 0.78,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": true,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.66,
+      "brushKind": "graphite-hb"
+    }
+  },
+  {
+    "id": "2b",
+    "name": "2B Pencil",
+    "category": "Pencil",
+    "defaults": {
+      "size": 6,
+      "opacity": 0.76,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": true,
+      "response": 0.85,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.82,
+      "brushKind": "graphite-2b"
+    },
+    "settings": {
+      "size": 6,
+      "opacity": 0.76,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": true,
+      "response": 0.85,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.82,
+      "brushKind": "graphite-2b"
+    }
+  },
+  {
+    "id": "mechanical",
+    "name": "Mechanical Pencil",
+    "category": "Pencil",
+    "defaults": {
+      "size": 2,
+      "opacity": 0.9,
+      "color": "#30343a",
+      "stabilization": 0.15,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": true,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.4,
+      "brushKind": "graphite-mechanical"
+    },
+    "settings": {
+      "size": 2,
+      "opacity": 0.9,
+      "color": "#30343a",
+      "stabilization": 0.15,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": true,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.4,
+      "brushKind": "graphite-mechanical"
+    }
+  },
+  {
+    "id": "blue",
+    "name": "Blue Animation Pencil",
+    "category": "Pencil",
+    "defaults": {
+      "size": 4,
+      "opacity": 0.68,
+      "color": "#649bd1",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": true,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.62,
+      "brushKind": "graphite-blue"
+    },
+    "settings": {
+      "size": 4,
+      "opacity": 0.68,
+      "color": "#649bd1",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": true,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.62,
+      "brushKind": "graphite-blue"
+    }
+  },
+  {
+    "id": "g-pen",
+    "name": "G-Pen",
+    "category": "Ink",
+    "defaults": {
+      "size": 7,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 0.7,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0.025,
+      "taperEnd": 0.09,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "g-pen"
+    },
+    "settings": {
+      "size": 7,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 0.7,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0.025,
+      "taperEnd": 0.09,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "g-pen"
+    }
+  },
+  {
+    "id": "mapping",
+    "name": "Mapping Pen",
+    "category": "Ink",
+    "defaults": {
+      "size": 4,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1.6,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0.04,
+      "taperEnd": 0.13,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "mapping"
+    },
+    "settings": {
+      "size": 4,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1.6,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0.04,
+      "taperEnd": 0.13,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "mapping"
+    }
+  },
+  {
+    "id": "technical",
+    "name": "Technical Pen",
+    "category": "Ink",
+    "defaults": {
+      "size": 4,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 40,
+      "pressure": true,
+      "pressureWidth": false,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "technical"
+    },
+    "settings": {
+      "size": 4,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 40,
+      "pressure": true,
+      "pressureWidth": false,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "technical"
+    }
+  },
+  {
+    "id": "brush-pen",
+    "name": "Brush Pen",
+    "category": "Ink",
+    "defaults": {
+      "size": 14,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 0.65,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0.06,
+      "taperEnd": 0.15,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "brush-pen"
+    },
+    "settings": {
+      "size": 14,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 0.65,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0.06,
+      "taperEnd": 0.15,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "brush-pen"
+    }
+  },
+  {
+    "id": "color-solid",
+    "name": "Solid Paint",
+    "category": "Paint",
+    "family": "coloring",
+    "defaults": {
+      "size": 45,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.08,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "coloring-solid",
+      "brushTip": "color-solid",
+      "coloringEngine": 1,
+      "colorNib": "chisel",
+      "colorNibFollow": false,
+      "tipAngle": -25,
+      "flow": 1,
+      "hardness": 1,
+      "pressureFlow": false,
+      "minSize": 0.08
+    },
+    "settings": {
+      "size": 45,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.08,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "coloring-solid",
+      "brushTip": "color-solid",
+      "coloringEngine": 1,
+      "colorNib": "chisel",
+      "colorNibFollow": false,
+      "tipAngle": -25,
+      "flow": 1,
+      "hardness": 1,
+      "pressureFlow": false,
+      "minSize": 0.08
+    }
+  },
+  {
+    "id": "color-soft",
+    "name": "Soft Paint",
+    "category": "Paint",
+    "family": "coloring",
+    "defaults": {
+      "size": 65,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.08,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "coloring-soft",
+      "brushTip": "color-soft",
+      "coloringEngine": 1,
+      "colorNib": "filbert",
+      "colorNibFollow": false,
+      "tipAngle": -20,
+      "flow": 0.8,
+      "hardness": 0.4,
+      "pressureFlow": true,
+      "minSize": 0.15
+    },
+    "settings": {
+      "size": 65,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.08,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "coloring-soft",
+      "brushTip": "color-soft",
+      "coloringEngine": 1,
+      "colorNib": "filbert",
+      "colorNibFollow": false,
+      "tipAngle": -20,
+      "flow": 0.8,
+      "hardness": 0.4,
+      "pressureFlow": true,
+      "minSize": 0.15
+    }
+  },
+  {
+    "id": "color-air",
+    "name": "Airbrush",
+    "category": "Paint",
+    "family": "coloring",
+    "defaults": {
+      "size": 90,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.06,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "coloring-air",
+      "brushTip": "color-air",
+      "coloringEngine": 1,
+      "colorNib": "oval",
+      "colorNibFollow": false,
+      "tipAngle": -15,
+      "flow": 0.55,
+      "hardness": 0,
+      "pressureFlow": true,
+      "minSize": 0.25
+    },
+    "settings": {
+      "size": 90,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.06,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "coloring-air",
+      "brushTip": "color-air",
+      "coloringEngine": 1,
+      "colorNib": "oval",
+      "colorNibFollow": false,
+      "tipAngle": -15,
+      "flow": 0.55,
+      "hardness": 0,
+      "pressureFlow": true,
+      "minSize": 0.25
+    }
+  },
+  {
+    "id": "color-texture",
+    "name": "Textured Paint",
+    "category": "Paint",
+    "family": "coloring",
+    "defaults": {
+      "size": 60,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.08,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.7,
+      "brushKind": "coloring-texture",
+      "brushTip": "color-texture",
+      "coloringEngine": 1,
+      "coloringAppearanceVersion": 3,
+      "colorNib": "bristle",
+      "colorNibFollow": true,
+      "tipAngle": 0,
+      "flow": 0.95,
+      "hardness": 0.85,
+      "pressureFlow": false,
+      "minSize": 0.1
+    },
+    "settings": {
+      "size": 60,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.08,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.7,
+      "brushKind": "coloring-texture",
+      "brushTip": "color-texture",
+      "coloringEngine": 1,
+      "coloringAppearanceVersion": 3,
+      "colorNib": "bristle",
+      "colorNibFollow": true,
+      "tipAngle": 0,
+      "flow": 0.95,
+      "hardness": 0.85,
+      "pressureFlow": false,
+      "minSize": 0.1
+    }
+  },
+  {
+    "id": "color-blender",
+    "name": "Blender",
+    "category": "Paint",
+    "family": "coloring",
+    "defaults": {
+      "size": 60,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.08,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.55,
+      "brushKind": "coloring-blender",
+      "brushTip": "color-blender",
+      "coloringEngine": 1,
+      "coloringAppearanceVersion": 3,
+      "blendPreserveAlpha": false,
+      "colorNib": "bristle",
+      "colorNibFollow": true,
+      "tipAngle": 0,
+      "flow": 0.85,
+      "hardness": 0.8,
+      "pressureFlow": false,
+      "minSize": 0.2,
+      "mixColors": false
+    },
+    "settings": {
+      "size": 60,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.08,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.55,
+      "brushKind": "coloring-blender",
+      "brushTip": "color-blender",
+      "coloringEngine": 1,
+      "coloringAppearanceVersion": 3,
+      "blendPreserveAlpha": false,
+      "colorNib": "bristle",
+      "colorNibFollow": true,
+      "tipAngle": 0,
+      "flow": 0.85,
+      "hardness": 0.8,
+      "pressureFlow": false,
+      "minSize": 0.2,
+      "mixColors": false
+    }
+  },
+  {
+    "id": "soft-paint",
+    "name": "Soft Paint",
+    "category": "Paint",
+    "family": "paint",
+    "defaults": {
+      "size": 65,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.08,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": false,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "paint",
+      "brushTip": "soft-round",
+      "tipAngle": 0,
+      "tipSpacing": 0.06,
+      "flow": 0.18,
+      "hardness": 0,
+      "pressureFlow": true
+    },
+    "settings": {
+      "size": 65,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.08,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": false,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "paint",
+      "brushTip": "soft-round",
+      "tipAngle": 0,
+      "tipSpacing": 0.06,
+      "flow": 0.18,
+      "hardness": 0,
+      "pressureFlow": true
+    }
+  },
+  {
+    "id": "marker",
+    "name": "Soft Marker",
+    "category": "Paint",
+    "family": "media",
+    "defaults": {
+      "size": 28,
+      "opacity": 0.45,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": true,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "marker",
+      "brushTip": "felt",
+      "tipAngle": -35,
+      "tipSpacing": 0.06,
+      "flow": 0.75,
+      "hardness": 0.85,
+      "pressureFlow": true
+    },
+    "settings": {
+      "size": 28,
+      "opacity": 0.45,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": true,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "marker",
+      "brushTip": "felt",
+      "tipAngle": -35,
+      "tipSpacing": 0.06,
+      "flow": 0.75,
+      "hardness": 0.85,
+      "pressureFlow": true
+    }
+  },
+  {
+    "id": "flat",
+    "name": "Flat Brush",
+    "category": "Paint",
+    "family": "paint",
+    "defaults": {
+      "size": 22,
+      "opacity": 0.95,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 0.8,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "flat",
+      "brushTip": "flat-bristle",
+      "tipAngle": -30,
+      "tipSpacing": 0.05,
+      "flow": 0.7,
+      "hardness": 0.8,
+      "pressureFlow": true,
+      "minSize": 0.25
+    },
+    "settings": {
+      "size": 22,
+      "opacity": 0.95,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 0.8,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "flat",
+      "brushTip": "flat-bristle",
+      "tipAngle": -30,
+      "tipSpacing": 0.05,
+      "flow": 0.7,
+      "hardness": 0.8,
+      "pressureFlow": true,
+      "minSize": 0.25
+    }
+  },
+  {
+    "id": "paint",
+    "name": "Simple Paint Brush",
+    "category": "Paint",
+    "family": "paint",
+    "defaults": {
+      "size": 20,
+      "opacity": 0.9,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.18,
+      "brushKind": "paint",
+      "brushTip": "bristle",
+      "tipAngle": 0,
+      "tipSpacing": 0.05,
+      "flow": 0.6,
+      "hardness": 0.7,
+      "pressureFlow": true,
+      "minSize": 0.2
+    },
+    "settings": {
+      "size": 20,
+      "opacity": 0.9,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.18,
+      "brushKind": "paint",
+      "brushTip": "bristle",
+      "tipAngle": 0,
+      "tipSpacing": 0.05,
+      "flow": 0.6,
+      "hardness": 0.7,
+      "pressureFlow": true,
+      "minSize": 0.2
+    }
+  },
+  {
+    "id": "dry",
+    "name": "Dry Brush",
+    "category": "Paint",
+    "family": "media",
+    "defaults": {
+      "size": 38,
+      "opacity": 0.88,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.98,
+      "brushKind": "dry-round",
+      "brushTip": "chalk",
+      "tipAngle": -12,
+      "tipSpacing": 0.08,
+      "flow": 0.5,
+      "hardness": 0.8,
+      "pressureFlow": true,
+      "minSize": 0.2
+    },
+    "settings": {
+      "size": 38,
+      "opacity": 0.88,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.98,
+      "brushKind": "dry-round",
+      "brushTip": "chalk",
+      "tipAngle": -12,
+      "tipSpacing": 0.08,
+      "flow": 0.5,
+      "hardness": 0.8,
+      "pressureFlow": true,
+      "minSize": 0.2
+    }
+  },
+  {
+    "id": "water-smooth",
+    "name": "Smooth Watercolor",
+    "category": "Paint",
+    "family": "watercolor",
+    "defaults": {
+      "size": 85,
+      "opacity": 0.85,
+      "color": "#30343a",
+      "stabilization": 0.1,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.2,
+      "brushKind": "watercolor-new",
+      "watercolorAppearanceVersion": 1,
+      "brushTip": "water-smooth",
+      "watercolorShape": "round",
+      "watercolorMode": "even",
+      "flow": 0.65,
+      "pressureFlow": true,
+      "minSize": 0.08,
+      "pigmentAmount": 0.76,
+      "waterAmount": 0.38,
+      "edgeSoftness": 0.18,
+      "dryness": 0.03,
+      "pigmentBuildup": 0.4
+    },
+    "settings": {
+      "size": 85,
+      "opacity": 0.85,
+      "color": "#30343a",
+      "stabilization": 0.1,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.2,
+      "brushKind": "watercolor-new",
+      "watercolorAppearanceVersion": 1,
+      "brushTip": "water-smooth",
+      "watercolorShape": "round",
+      "watercolorMode": "even",
+      "flow": 0.65,
+      "pressureFlow": true,
+      "minSize": 0.08,
+      "pigmentAmount": 0.76,
+      "waterAmount": 0.38,
+      "edgeSoftness": 0.18,
+      "dryness": 0.03,
+      "pigmentBuildup": 0.4
+    }
+  },
+  {
+    "id": "water-rough",
+    "name": "Rough Watercolor",
+    "category": "Paint",
+    "family": "watercolor",
+    "defaults": {
+      "size": 85,
+      "opacity": 0.82,
+      "color": "#30343a",
+      "stabilization": 0.1,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.4,
+      "brushKind": "watercolor-new",
+      "watercolorAppearanceVersion": 1,
+      "brushTip": "water-rough",
+      "watercolorShape": "round",
+      "watercolorMode": "even",
+      "flow": 0.65,
+      "pressureFlow": true,
+      "minSize": 0.08,
+      "pigmentAmount": 0.76,
+      "waterAmount": 0.23,
+      "edgeSoftness": 0.12,
+      "dryness": 0.72,
+      "pigmentBuildup": 0.45
+    },
+    "settings": {
+      "size": 85,
+      "opacity": 0.82,
+      "color": "#30343a",
+      "stabilization": 0.1,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.4,
+      "brushKind": "watercolor-new",
+      "watercolorAppearanceVersion": 1,
+      "brushTip": "water-rough",
+      "watercolorShape": "round",
+      "watercolorMode": "even",
+      "flow": 0.65,
+      "pressureFlow": true,
+      "minSize": 0.08,
+      "pigmentAmount": 0.76,
+      "waterAmount": 0.23,
+      "edgeSoftness": 0.12,
+      "dryness": 0.72,
+      "pigmentBuildup": 0.45
+    }
+  },
+  {
+    "id": "water-wet",
+    "name": "Soft Wet Watercolor",
+    "category": "Paint",
+    "family": "watercolor",
+    "defaults": {
+      "size": 85,
+      "opacity": 0.8,
+      "color": "#30343a",
+      "stabilization": 0.1,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.18,
+      "brushKind": "watercolor-new",
+      "watercolorAppearanceVersion": 1,
+      "brushTip": "water-wet",
+      "watercolorShape": "mop",
+      "watercolorMode": "wet",
+      "flow": 0.7,
+      "pressureFlow": true,
+      "minSize": 0.1,
+      "pigmentAmount": 0.78,
+      "waterAmount": 0.85,
+      "edgeSoftness": 0.75,
+      "dryness": 0,
+      "pigmentBuildup": 0.4,
+      "wetDiffusion": 0.75,
+      "edgeBleeding": 0.7,
+      "mixColors": true,
+      "mixAmount": 0.6
+    },
+    "settings": {
+      "size": 85,
+      "opacity": 0.8,
+      "color": "#30343a",
+      "stabilization": 0.1,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.18,
+      "brushKind": "watercolor-new",
+      "watercolorAppearanceVersion": 1,
+      "brushTip": "water-wet",
+      "watercolorShape": "mop",
+      "watercolorMode": "wet",
+      "flow": 0.7,
+      "pressureFlow": true,
+      "minSize": 0.1,
+      "pigmentAmount": 0.78,
+      "waterAmount": 0.85,
+      "edgeSoftness": 0.75,
+      "dryness": 0,
+      "pigmentBuildup": 0.4,
+      "wetDiffusion": 0.75,
+      "edgeBleeding": 0.7,
+      "mixColors": true,
+      "mixAmount": 0.6
+    }
+  },
+  {
+    "id": "water-flat",
+    "name": "Flat Watercolor",
+    "category": "Paint",
+    "family": "watercolor",
+    "defaults": {
+      "size": 85,
+      "opacity": 0.88,
+      "color": "#30343a",
+      "stabilization": 0.1,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.23,
+      "brushKind": "watercolor-new",
+      "watercolorAppearanceVersion": 1,
+      "brushTip": "water-flat",
+      "watercolorShape": "angular",
+      "watercolorMode": "even",
+      "flow": 0.75,
+      "pressureFlow": true,
+      "minSize": 0.1,
+      "pigmentAmount": 0.84,
+      "waterAmount": 0.28,
+      "edgeSoftness": 0.12,
+      "dryness": 0.08,
+      "pigmentBuildup": 0.5,
+      "tipAngle": 0
+    },
+    "settings": {
+      "size": 85,
+      "opacity": 0.88,
+      "color": "#30343a",
+      "stabilization": 0.1,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.23,
+      "brushKind": "watercolor-new",
+      "watercolorAppearanceVersion": 1,
+      "brushTip": "water-flat",
+      "watercolorShape": "angular",
+      "watercolorMode": "even",
+      "flow": 0.75,
+      "pressureFlow": true,
+      "minSize": 0.1,
+      "pigmentAmount": 0.84,
+      "waterAmount": 0.28,
+      "edgeSoftness": 0.12,
+      "dryness": 0.08,
+      "pigmentBuildup": 0.5,
+      "tipAngle": 0
+    }
+  },
+  {
+    "id": "water-gradient",
+    "name": "Gradient Watercolor",
+    "category": "Paint",
+    "family": "watercolor",
+    "defaults": {
+      "size": 85,
+      "opacity": 0.88,
+      "color": "#30343a",
+      "stabilization": 0.1,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.23,
+      "brushKind": "watercolor-new",
+      "watercolorAppearanceVersion": 1,
+      "brushTip": "water-gradient",
+      "watercolorShape": "angular",
+      "watercolorMode": "even",
+      "flow": 0.75,
+      "pressureFlow": true,
+      "minSize": 0.1,
+      "pigmentAmount": 0.92,
+      "waterAmount": 0.4,
+      "edgeSoftness": 0.17,
+      "dryness": 0.08,
+      "pigmentBuildup": 0.4,
+      "pigmentDepletion": 0.9,
+      "pigmentReload": false,
+      "tipAngle": 0
+    },
+    "settings": {
+      "size": 85,
+      "opacity": 0.88,
+      "color": "#30343a",
+      "stabilization": 0.1,
+      "smoothness": 18,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0.23,
+      "brushKind": "watercolor-new",
+      "watercolorAppearanceVersion": 1,
+      "brushTip": "water-gradient",
+      "watercolorShape": "angular",
+      "watercolorMode": "even",
+      "flow": 0.75,
+      "pressureFlow": true,
+      "minSize": 0.1,
+      "pigmentAmount": 0.92,
+      "waterAmount": 0.4,
+      "edgeSoftness": 0.17,
+      "dryness": 0.08,
+      "pigmentBuildup": 0.4,
+      "pigmentDepletion": 0.9,
+      "pigmentReload": false,
+      "tipAngle": 0
+    }
+  },
+  {
+    "id": "eraser-hard",
+    "name": "Hard Eraser",
+    "category": "Eraser",
+    "defaults": {
+      "size": 24,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 0,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "eraser-hard"
+    },
+    "settings": {
+      "size": 24,
+      "opacity": 1,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 0,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "eraser-hard"
+    }
+  },
+  {
+    "id": "eraser-soft",
+    "name": "Soft Eraser",
+    "category": "Eraser",
+    "defaults": {
+      "size": 45,
+      "opacity": 0.6,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 0,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "eraser-soft"
+    },
+    "settings": {
+      "size": 45,
+      "opacity": 0.6,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 0,
+      "pressure": true,
+      "pressureWidth": true,
+      "pressureOpacity": false,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "eraser-soft"
+    }
+  },
+  {
+    "id": "airbrush",
+    "name": "Airbrush",
+    "category": "Paint",
+    "family": "media",
+    "defaults": {
+      "size": 65,
+      "opacity": 0.3,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": false,
+      "pressureOpacity": true,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "airbrush",
+      "brushTip": "soft-round",
+      "tipAngle": 0,
+      "tipSpacing": 0.08,
+      "flow": 0.08,
+      "hardness": 0,
+      "pressureFlow": true
+    },
+    "settings": {
+      "size": 65,
+      "opacity": 0.3,
+      "color": "#30343a",
+      "stabilization": 0.25,
+      "smoothness": 25,
+      "pressure": true,
+      "pressureWidth": false,
+      "pressureOpacity": true,
+      "response": 1,
+      "pressureCurve": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 0.5,
+          "y": 0.5
+        },
+        {
+          "x": 0.75,
+          "y": 0.75
+        },
+        {
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "taperStart": 0,
+      "taperEnd": 0,
+      "tolerance": 24,
+      "textureStrength": 0,
+      "brushKind": "airbrush",
+      "brushTip": "soft-round",
+      "tipAngle": 0,
+      "tipSpacing": 0.08,
+      "flow": 0.08,
+      "hardness": 0,
+      "pressureFlow": true
+    }
+  }
+]

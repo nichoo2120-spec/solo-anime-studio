@@ -1,0 +1,1 @@
+export const move = (s, d, p) => { const x = p.x - d.point.x, y = p.y - d.point.y; s.quad = d.quad.map(v => ({ x: v.x + x, y: v.y + y })); s.pivot = { x: d.pivot.x + x, y: d.pivot.y + y }; s.grid = { rows: d.grid.rows, cols: d.grid.cols, mode: d.grid.mode, nodes: d.grid.nodes.map(v => ({ x: v.x + x, y: v.y + y })) }; };

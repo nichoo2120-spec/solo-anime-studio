@@ -1,0 +1,21 @@
+import {test,expect} from '@playwright/test';
+test('all five watercolor profiles retain exact growing-preview and saved pixels',async({page})=>{
+ test.setTimeout(180000);await page.goto('/');const rows=await page.evaluate(async()=>{
+  const {stockPresets}=await import('/src/core/brushes.ts'),{brushStrokeMetadata}=await import('/src/core/paintTips.ts'),{strokeGeometry}=await import('/src/engine/strokeGeometry.ts'),{drawModernStroke}=await import('/src/engine/brushRaster.ts'),{LiveStrokeRaster}=await import('/src/engine/liveRaster.ts');const rows=[];
+  for(const preset of stockPresets.filter(p=>p.settings.brushKind==='watercolor'))for(const size of [12,95,96,150])for(const pressure of [false,true]){
+   const s:any={...preset.settings,...brushStrokeMetadata(preset.settings),id:'reference-'+preset.id,kind:'stroke',tool:'brush',size,pressure,flow:.17,taperStart:.05,taperEnd:.1,points:[]},a=document.createElement('canvas'),b=document.createElement('canvas');a.width=b.width=800;a.height=b.height=460;const ac=a.getContext('2d')!,bc=b.getContext('2d')!,live=new LiveStrokeRaster();let max=0;
+   for(let i=0;i<=360;i++){s.points.push({x:400+280*Math.sin(i/360*Math.PI*5.7),y:230+130*Math.sin(i/360*Math.PI*17.3),p:.1+.9*Math.sin(i/360*Math.PI)**2});if(i%30)continue;const g=strokeGeometry(s,'live');live.paint(ac,s,g);if(i%120===0){bc.clearRect(0,0,800,460);drawModernStroke(bc,s,'live',g);const x=ac.getImageData(0,0,800,460).data,y=bc.getImageData(0,0,800,460).data;for(let j=0;j<x.length;j++)max=Math.max(max,Math.abs(x[j]-y[j]));}}
+   live.paint(ac,s,strokeGeometry(s));bc.clearRect(0,0,800,460);drawModernStroke(bc,JSON.parse(JSON.stringify(s)));const x=ac.getImageData(0,0,800,460).data,y=bc.getImageData(0,0,800,460).data;for(let j=0;j<x.length;j++)max=Math.max(max,Math.abs(x[j]-y[j]));rows.push({id:preset.id,size,pressure,max});live.reset();
+  }return rows;
+ });console.log('REFERENCE_WATERCOLOR_REPLAY',JSON.stringify(rows));for(const row of rows)expect(row.max,JSON.stringify(row)).toBe(0);
+});
+test('watercolor pooling uses actual coverage edges while the belly stays quiet and transparent',async({page})=>{
+ await page.goto('/');const r=await page.evaluate(async()=>{
+  const {stockPresets}=await import('/src/core/brushes.ts'),{brushStrokeMetadata}=await import('/src/core/paintTips.ts'),{drawModernStroke}=await import('/src/engine/brushRaster.ts');const settings=stockPresets.find(p=>p.id==='watercolor-round')!.settings,c=document.createElement('canvas');c.width=1000;c.height=300;const s:any={...settings,...brushStrokeMetadata(settings),id:'edge-pooling',kind:'stroke',tool:'brush',size:150,pressure:false,flow:.3,hardness:.8,textureStrength:0,taperStart:0,taperEnd:0,smoothness:0,stabilization:0,points:[{x:100,y:150,p:1},{x:900,y:150,p:1}]};drawModernStroke(c.getContext('2d')!,s);const d=c.getContext('2d')!.getImageData(0,0,1000,300).data;let belly=0,n=0,peak=0,min=255,max=0;for(let x=250;x<750;x++){const a=d[(150*1000+x)*4+3];belly+=a;n++;min=Math.min(min,a);max=Math.max(max,a);for(let y=75;y<225;y++)peak=Math.max(peak,d[(y*1000+x)*4+3]);}return {belly:belly/n,peak,range:max-min};
+ });console.log('WATERCOLOR_POOLING',r);expect(r.belly).toBeLessThan(190);expect(r.peak).toBeGreaterThan(r.belly+12);expect(r.range).toBeLessThan(20);
+});
+test('fresh watercolor contacts cannot pick up pixels left by other brushes in pooled buffers',async({page})=>{
+ await page.goto('/');const r=await page.evaluate(async()=>{
+  const {stockPresets}=await import('/src/core/brushes.ts'),{brushStrokeMetadata}=await import('/src/core/paintTips.ts'),{drawModernStroke}=await import('/src/engine/brushRaster.ts');const make=()=>{const c=document.createElement('canvas');c.width=800;c.height=460;return c;},render=(id:string,patch:any)=>{const p=stockPresets.find(p=>p.id===id)!.settings,c=make();drawModernStroke(c.getContext('2d')!,{...p,...brushStrokeMetadata(p),id,kind:'stroke',tool:'brush',size:150,pressure:false,points:[{x:400,y:230,p:1}],...patch});return c;};const clean=render('watercolor',{taperStart:.1}).toDataURL();render('paint',{points:[{x:80,y:120,p:1},{x:720,y:120,p:1},{x:720,y:370,p:1},{x:80,y:370,p:1}],flow:1});const empty=render('watercolor',{taperStart:.1});return clean===empty.toDataURL();
+ });expect(r).toBe(true);
+});

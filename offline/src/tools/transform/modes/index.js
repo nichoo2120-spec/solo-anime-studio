@@ -1,0 +1,11 @@
+import { freeTransform } from './FreeTransform.js';
+import { move } from './Move.js';
+import { scale } from './Scale.js';
+import { rotate } from './Rotate.js';
+import { perspective } from './Perspective.js';
+import { skew } from './Skew.js';
+import { distort } from './Distort.js';
+import { meshWarp } from './MeshWarp.js';
+import { pivotPoint } from './PivotPoint.js';
+export const modeFns = { free: freeTransform, move, scale, rotate, perspective, skew, distort, mesh: meshWarp, pivot: pivotPoint };
+export const MODES = [['free', 'FREE TRANSFORM', 'T'], ['move', 'MOVE', 'V'], ['scale', 'SCALE', 'SHIFT+T'], ['rotate', 'ROTATE', 'R'], ['perspective', 'PERSPECTIVE', 'CTRL+SHIFT+P'], ['skew', 'SKEW', 'K'], ['distort', 'DISTORT', 'SHIFT+D'], ['mesh', 'MESH WARP', 'M'], ['flip', 'FLIP', 'H / SHIFT+H'], ['pivot', 'PIVOT POINT', 'DOUBLE-CLICK']];
