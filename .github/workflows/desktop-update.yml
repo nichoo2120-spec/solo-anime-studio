@@ -1,0 +1,77 @@
+name: Desktop update
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'electron/**'
+      - 'electron-builder.config.cjs'
+      - 'release.config.json'
+      - 'scripts/release-desktop.cjs'
+      - '.github/workflows/desktop-update.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-update-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm test -- --maxWorkers=2
+      - run: node --test tests/desktop-update.test.cjs tests/desktop-release.test.cjs
+      - run: npm run dist:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - run: node scripts/release-desktop.cjs verify
+      - run: node tests/desktop-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-update
+          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/*.blockmap
+            release/latest.yml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-verification
+          path: validation/desktop-*
+
+  publish:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-update
+          path: release
+      - run: node scripts/release-desktop.cjs publish
+        env:
+          GH_TOKEN: ${{ github.token }}

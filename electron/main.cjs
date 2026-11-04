@@ -30,13 +30,8 @@ function registerAppProtocol() {
 }
 
 let win = null;
-let updater = null;
-let upState = 'idle';
-let upVersion = '';
-let installAfterClose = false;
 let relCfg = { owner: 'OWNER' };
 try { relCfg = require('../release.config.json'); } catch {}
-const updatesConfigured = () => relCfg.owner && relCfg.owner !== 'OWNER';
 
 let logFile = null;
 function ulog(...a) {
@@ -46,43 +41,12 @@ function ulog(...a) {
   } catch {}
 }
 
-async function askRestart(version) {
-  if (!win || win.isDestroyed()) return;
-  const r = await dialog.showMessageBox(win, { type: 'info', buttons: ['Restart now', 'Later'], defaultId: 0, cancelId: 1, title: 'Update ready',
-    message: `Solo Anime Studio ${version} is ready.`, detail: 'Save your work, then click "Restart now". If you click "Later", the update is installed the next time you close the app.' });
-  if (r.response === 0) { installAfterClose = true; win.close(); } // the page can still ask about unsaved changes
-}
+const updates = require('./updates.cjs').createUpdates({
+  app, dialog, getWindow: () => win,
+  loadUpdater: () => require('electron-updater').autoUpdater, log: ulog,
+});
+const manualCheck = () => updates.check();
 
-function setupUpdater() {
-  ulog(`app ${app.getVersion()} packaged=${app.isPackaged} configured=${updatesConfigured()}`);
-  if (!app.isPackaged || process.env.SAS_NO_UPDATE || !updatesConfigured()) return;
-  try {
-    updater = require('electron-updater').autoUpdater;
-    updater.logger = { info: (m) => ulog('info', m), warn: (m) => ulog('warn', m), error: (m) => ulog('error', m), debug: () => {} };
-    updater.autoDownload = true;
-    updater.autoInstallOnAppQuit = true;
-    updater.allowDowngrade = false;
-    updater.on('update-available', (i) => { upState = 'downloading'; upVersion = i.version; });
-    updater.on('update-not-available', () => { upState = 'none'; });
-    updater.on('update-downloaded', (i) => { upState = 'ready'; upVersion = i.version; askRestart(i.version); });
-    updater.on('error', (e) => { upState = 'error'; ulog('error', e); });
-    const check = () => { if (upState === 'ready' || upState === 'downloading') return; updater.checkForUpdates().catch((e) => ulog('check failed', e)); };
-    setTimeout(check, 8000);
-    setInterval(check, 4 * 3600 * 1000);
-  } catch (e) { ulog('init failed', e); }
-}
-
-async function manualCheck() {
-  if (!updater) return `Version ${app.getVersion()}. ${!updatesConfigured() ? 'The update server is not set up yet.' : app.isPackaged ? 'Updates are turned off.' : 'Updates work only in the installed app.'}`;
-  if (upState === 'ready') { askRestart(upVersion); return `Update ${upVersion} is ready.`; }
-  if (upState === 'downloading') return `Downloading update ${upVersion} in the background...`;
-  try {
-    const r = await updater.checkForUpdates();
-    const v = r && r.updateInfo && r.updateInfo.version;
-    if (v && v !== app.getVersion() && r.isUpdateAvailable !== false) return `Update ${v} found. It is downloading in the background; you will be asked to restart.`;
-    return `You have the latest version (${app.getVersion()}).`;
-  } catch (e) { return `Could not check for updates: ${String((e && e.message) || e).split('\n')[0].slice(0, 160)}`; }
-}
 ipcMain.on('sas-version', (e) => { e.returnValue = app.getVersion(); });
 ipcMain.handle('sas-check-updates', () => manualCheck());
 
@@ -106,7 +70,7 @@ function createWindow() {
   win.webContents.on('will-prevent-unload', (e) => {
     const c = dialog.showMessageBoxSync(win, { type: 'warning', buttons: ['Stay', 'Close anyway'], defaultId: 0, cancelId: 0, title: 'Unsaved changes',
       message: 'You have unsaved changes.', detail: 'Click "Stay" and save (Ctrl+S) first, or "Close anyway" to lose the latest changes.' });
-    if (c === 1) e.preventDefault(); else installAfterClose = false;
+    if (c === 1) e.preventDefault(); else updates.cancelRestart();
   });
   // Ctrl+Shift+U = check for updates (no menu bar, so a key is used); F12 = dev tools only when not packaged
   win.webContents.on('before-input-event', async (e, input) => {
@@ -118,7 +82,7 @@ function createWindow() {
   });
   win.on('closed', () => {
     win = null;
-    if (installAfterClose && updater && upState === 'ready') { ulog(`quitAndInstall ${upVersion}`); setImmediate(() => updater.quitAndInstall(true, true)); }
+    updates.windowClosed();
   });
   win.loadURL(`${ORIGIN}/index.html`);
 }
@@ -131,7 +95,7 @@ else {
     session.defaultSession.on('will-download', (_e, item) => { if (process.env.SAS_DOWNLOAD_DIR) item.setSavePath(path.join(process.env.SAS_DOWNLOAD_DIR, item.getFilename())); });
     session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(['clipboard-read', 'clipboard-sanitized-write', 'fullscreen', 'persistent-storage', 'pointerLock'].includes(perm)));
     createWindow();
-    setupUpdater();
+    updates.setup(relCfg, !!process.env.SAS_NO_UPDATE);
   });
-  app.on('window-all-closed', () => { if (!(installAfterClose && upState === 'ready')) app.quit(); });
+  app.on('window-all-closed', () => { if (!updates.isInstalling()) app.quit(); });
 }

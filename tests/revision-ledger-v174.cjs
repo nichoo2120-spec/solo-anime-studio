@@ -10,6 +10,7 @@ const fixture175=path.join(root,'tests/fixtures/performance-v175-revisions.json'
 const fixture176=path.join(root,'tests/fixtures/performance-v176-revisions.json'),rows176=fs.existsSync(fixture176)?JSON.parse(fs.readFileSync(fixture176,'utf8')):{};
 // v0.5.177: fourth link (v176 hash -> v177 hash): desktop installer build.
 const fixture177=path.join(root,'tests/fixtures/performance-v177-revisions.json'),rows177=fs.existsSync(fixture177)?JSON.parse(fs.readFileSync(fixture177,'utf8')):{};
+const fixture178=path.join(root,'tests/fixtures/performance-v178-revisions.json'),rows178=fs.existsSync(fixture178)?JSON.parse(fs.readFileSync(fixture178,'utf8')):{};
 module.exports=function ledger(file,expected){
  const rel=path.isAbsolute(file)?path.relative(root,file):file,row=rows[rel];
  let r=expected;if(row&&(row.before===expected||(row.alsoBefore??[]).includes(expected)))r=row.after;
@@ -17,5 +18,6 @@ module.exports=function ledger(file,expected){
  const row175=rows175[rel];if(row175&&row175.before===r)r=row175.after;
  const row176=rows176[rel];if(row176&&row176.before===r)r=row176.after;
  const row177=rows177[rel];if(row177&&row177.before===r)r=row177.after;
+ const row178=rows178[rel];if(row178&&row178.before===r)r=row178.after;
  return r;
 };

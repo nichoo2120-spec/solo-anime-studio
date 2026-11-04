@@ -1,3 +1,9 @@
+# Solo Anime Studio — v0.5.178
+
+The installed Windows application checks for updates eight seconds after launch, downloads in the background and offers **Install and restart**. Save your drawing before installing. **Later** keeps working without silently installing on close. **Ctrl+Shift+U** checks again. The older ZIP/browser launcher is a separate application and cannot install desktop updates.
+
+This update changes desktop update delivery only; the brush renderers are unchanged. GitHub Actions builds and tests the Windows app on pull requests. A tested version bump on `main` publishes the installer, blockmap and checksum manifest together. Installed copies then detect that release. See `UPDATE_v0.5.178.md`.
+
 # Solo Anime Studio — v0.5.172
 
 ## Open the application (Windows)
@@ -39,6 +45,8 @@ Packaging files (keep them, change rarely):
 | `release.config.json` | The ONE place for where updates come from: GitHub `nichoo2120-spec/solo-anime-studio`. |
 | `scripts/dist-win.cjs` | `npm run dist:win`: `npm run build` then electron-builder. |
 | `scripts/wine-shim/` | Lets Linux build the Windows installer without Wine. |
+| `.github/workflows/desktop-update.yml` | Tests and packages on Windows; publishes verified version bumps from main using the built-in Actions token. |
+| `scripts/release-desktop.cjs` | Verifies checksums, uploads to a draft, then publishes the complete update feed. |
 | `scripts/publish_release.sh` | Bump version, test, build, upload a **published (not draft)** GitHub Release. |
 
 Commands:

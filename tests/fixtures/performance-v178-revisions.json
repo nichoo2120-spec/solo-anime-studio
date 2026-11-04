@@ -1,0 +1,12 @@
+{
+  "package.json": {
+    "before": "98b461aaa6af724d9fb8cde8255ba6990aba8dc51956063fd4eb7494314828b6",
+    "after": "664fb67fa661c9a946335ead2d082166010cb01f4b8ffa1c40c88ff4df6e4f0a",
+    "why": "v0.5.178 desktop automatic update delivery; brush renderers unchanged"
+  },
+  "src/core/buildInfo.ts": {
+    "before": "243d7110f9255f8cc1e2650f2c0f7628159a71eb7ea5a0483cceb07e1a95f3c6",
+    "after": "0fa2f05271b58416e5f377eb6b0ef264ff29d625b014e4ba2b4496ed50e52035",
+    "why": "v0.5.178 desktop automatic update delivery; brush renderers unchanged"
+  }
+}

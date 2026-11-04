@@ -1,7 +1,7 @@
 {
   "name": "solo-anime-studio",
   "private": true,
-  "version": "0.5.177",
+  "version": "0.5.178",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -24,7 +24,8 @@
     "test:mix-worker-dirty": "python tests/mix-worker-dirty-v171-browser.py",
     "electron": "vite build && electron .",
     "dist:win": "node scripts/dist-win.cjs",
-    "release": "bash scripts/publish_release.sh"
+    "release": "bash scripts/publish_release.sh",
+    "test:desktop-update": "node --test tests/desktop-update.test.cjs tests/desktop-release.test.cjs"
   },
   "dependencies": {
     "electron-updater": "^6.8.11"
