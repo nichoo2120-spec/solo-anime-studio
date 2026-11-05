@@ -1,7 +1,7 @@
 import {fitInkNodes} from './flowCurveFitting';
 import {fitCleanInkNodes} from './cleanInkFitting';
 import {cleanInkPathData,traceCleanInk} from './cleanInkContour';
-import type {Matrix,Point} from '../core/model';
+import type {ArtworkOrigin,Matrix,Point} from '../core/model';
 import {projectPoint,type H} from './perspectiveWarp';
 import {cubicAt,flattenCubic,pressureResponse,type Cubic,type PressureNode} from './strokeGeometry';
 export type Handle={x:number;y:number};
@@ -41,13 +41,13 @@ export function createCleanFreehandVector(id:string,samples:Point[],width:number
 }
 export function transformVector(line:VectorLine,m:Matrix):VectorLine{
  const apply=(p:Handle)=>({x:m[0]*p.x+m[2]*p.y+m[4],y:m[1]*p.x+m[3]*p.y+m[5]}),nodes=(items:VectorNode[])=>items.map(p=>({...p,...apply(p),in:apply(p.in),out:apply(p.out)}));
- const {inShot:_inShot,...editable}=line as VectorLine&{inShot?:true};
+ const {inShot:_inShot,inPreviousStage:_inPreviousStage,...editable}=line as VectorLine&ArtworkOrigin;
  return {...editable,nodes:nodes(line.nodes),sourceNodes:line.sourceNodes?nodes(line.sourceNodes):undefined,width:Math.max(.1,Math.min(500,line.width*Math.sqrt(Math.abs(m[0]*m[3]-m[1]*m[2]))))};
 }
 /** Warp vector anchors and handles separately; remains an editable Bézier stroke. */
 export function projectiveVector(line:VectorLine,h:H):VectorLine{
  const nodes=(items:VectorNode[])=>items.map(p=>({...p,...projectPoint(p,h),in:projectPoint(p.in,h),out:projectPoint(p.out,h)}));
- const {inShot:_inShot,...editable}=line as VectorLine&{inShot?:true};
+ const {inShot:_inShot,inPreviousStage:_inPreviousStage,...editable}=line as VectorLine&ArtworkOrigin;
  return {...editable,nodes:nodes(line.nodes),sourceNodes:line.sourceNodes?nodes(line.sourceNodes):undefined};
 }
 export function adjustVectorSmoothness(line:VectorLine,amount:number):VectorLine{

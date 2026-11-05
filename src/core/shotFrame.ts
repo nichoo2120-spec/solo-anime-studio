@@ -1,4 +1,4 @@
-import type {Matrix,Operation,Project} from './model';
+import {MAX_STAGE_PIXELS,MAX_STAGE_SIDE,type ArtworkOrigin,type Matrix,type Operation,type Project} from './model';
 import {affineH,multiplyH} from '../engine/perspectiveWarp';
 import {transformVector} from '../engine/vector';
 
@@ -28,34 +28,43 @@ function offsetArtwork(x:number,y:number){
  };
 }
 
-/** Replay older pixels at the original dimensions, including paper grain
- * and paint sampling near the previous canvas edge. */
-export function originalShotArtwork(operations:Operation[],frame:ShotFrame){
- const translate=offsetArtwork(-frame.x,-frame.y);
- return operations.map(op=>({...translate(op),inShot:undefined}));
+/** Replay older pixels at their original dimensions for edge clipping and paint sampling. */
+export function artworkAtOrigin(operations:Operation[],bounds:ShotFrame,origin:keyof ArtworkOrigin){
+ const translate=offsetArtwork(-bounds.x,-bounds.y);
+ return operations.map(op=>({...translate(op),inShot:op.inShot,inPreviousStage:op.inPreviousStage,[origin]:undefined}));
 }
 
-/** Expand the drawing surface around the original shot as one document edit. */
-export function addDrawingMargins(project:Project):Project{
- if(project.shotFrame)return project;
- const x=Math.max(24,Math.ceil(project.width/8)),y=Math.max(24,Math.ceil(project.height/8));
- const frame={x,y,width:project.width,height:project.height};
+/** Add paper around the shot once. Navigation keeps the viewport within this paper. */
+export function expandPasteboard(project:Project,viewportWidth:number,viewportHeight:number):Project{
+ if(project.version===5)return project;
+ const shot=shotFrame(project),{width,height}=project;
+ const minimumMargin=project.shotFrame?0:1,minWidth=width+2*minimumMargin,minHeight=height+2*minimumMargin;
+ const targetWidth=Math.max(shot.width*3,viewportWidth*4,minWidth),targetHeight=Math.max(shot.height*3,viewportHeight*4,minHeight);
+ const budget=Math.min(MAX_STAGE_PIXELS,Math.max(1_048_576,shot.width*shot.height*8,minWidth*minHeight));
+ // Scale both dimensions together, while retaining at least the old page on each axis.
+ const scale=Math.min(1,MAX_STAGE_SIDE/targetWidth,MAX_STAGE_SIDE/targetHeight,
+  Math.sqrt(budget/(targetWidth*targetHeight)),budget/(minWidth*targetHeight),budget/(minHeight*targetWidth));
+ const x=Math.max(minimumMargin,Math.floor((targetWidth*scale-width)/2));
+ const y=Math.max(minimumMargin,Math.floor((targetHeight*scale-height)/2));
+ if(!x&&!y)return {...project,version:5};
  const point=<T extends {x:number;y:number}>(p:T):T=>({...p,x:p.x+x,y:p.y+y});
  const translate=offsetArtwork(x,y),ops=new WeakMap<Operation,Operation>(),lists=new WeakMap<Operation[],Operation[]>();
+ const origin=project.shotFrame?'inPreviousStage':'inShot';
  const artwork=(input:Operation[])=>{
   const cached=lists.get(input);
   if(cached)return cached;
   const output=input.map(op=>{
    const existing=ops.get(op);
    if(existing)return existing;
-   const moved={...translate(op),inShot:true as const};ops.set(op,moved);return moved;
+   const moved={...translate(op),inShot:op.inShot,[origin]:true as const};ops.set(op,moved);return moved;
   });
   lists.set(input,output);return output;
  };
  const drawings=(record:Record<string,Operation[]>)=>Object.fromEntries(Object.entries(record).map(([id,items])=>[id,artwork(items)]));
  const {animation,camera,substitutionShelf,cycleShelf,motionPlanning}=project;
  return {
-  ...project,version:4,width:project.width+2*x,height:project.height+2*y,shotFrame:frame,
+  ...project,version:5,width:width+2*x,height:height+2*y,shotFrame:point(shot),
+  previousStage:project.shotFrame?{x,y,width,height}:undefined,
   layers:project.layers.map(layer=>({...layer,operations:artwork(layer.operations)})),
   animation:animation&&{
    ...animation,frames:animation.frames.map(cel=>({...cel,drawings:drawings(cel.drawings)})),

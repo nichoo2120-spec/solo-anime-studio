@@ -1,0 +1,67 @@
+{
+  "src/core/buildInfo.ts": {
+    "before": "80930db4ed292d3de167735d2df48e645a72b313d3d589f49f59522c842b6345",
+    "after": "b0a63f709f7caf999fd2b21ef4e2d884e25a4f3f6f978c20bea4b64afb3849d7",
+    "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
+  },
+  "src/core/geometry.ts": {
+    "before": "287db72fe044f6a7b5c995b61c52dcc6734f069500ee0bb418cc6822d700f51d",
+    "after": "9f1c460f5bfb6d0055ad3d8ae7c38d18211dbb80491bffd278afbb4a6748115c",
+    "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
+  },
+  "src/core/model.ts": {
+    "before": "cf25b8910985f3bd926f58b18d959a950f9d84d39b18c5412f8cfd4b02e32d05",
+    "after": "9f86925c94a41d5b7b6b203c75781ffab9bf4bd3d876fc41aae1bcb44a1dee8d",
+    "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
+  },
+  "src/core/shotFrame.ts": {
+    "before": "6b8350ab0bead552a47303343e19b08b56b4454cfcc90865f426203911417475",
+    "after": "93ce11c3ff75d95286e59e9e44e0d21e9757b968749786f3dde92b79d0bef802",
+    "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
+  },
+  "src/engine/EditingController.ts": {
+    "before": "6710eda542f58a74dbd37391b7f74387c33053c3985a294b27ad280bc4451cd5",
+    "after": "5503adde583631c833b1f44ce4770a088d43b6488d5b74e2114093ad6bb47110",
+    "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
+  },
+  "src/engine/InkDisplay.ts": {
+    "before": "92c44029944be92abf3abc908fee99f02896ca2f2a588677ef2c1e901f318e16",
+    "after": "39e2d9cd3ddabb6d2e89e710b8b3a3484a3b0fe4b01717e0bcc03428a4740d68",
+    "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
+  },
+  "src/engine/ReferenceController.ts": {
+    "before": "0bc6bbd072cd9a8724086f7b38e148fbb36fdfcc76d83a8e16ca04e221b19d5f",
+    "after": "24073612dab91b755c1454ab208fa400a08d429cca32a2a17d44f6f6c1a5ab1c",
+    "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
+  },
+  "src/engine/renderer.ts": {
+    "before": "213e05d5adce3bdc5aa0bf0c4760789c85ac0df5b9c9b376cbc39f8c1bca3cf9",
+    "after": "763445086d24e5f98aea330c4aa258597e35ca7e957a11e3b9b9187f8667d8bf",
+    "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
+  },
+  "src/engine/strokeSelection.ts": {
+    "before": "d3c9371fb8e3a58137f33555e69a7969b6163ccf05be997882cd57a3d122758e",
+    "after": "7394cc5367f693981e6c5c7f521bc45bf9aa3968c1115b1222a63778e56b2685",
+    "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
+  },
+  "src/engine/StudioEngine.ts": {
+    "before": "2b783513746ea0c0089a34f1846c1e74107f1d4c27ed694935a3c3a0ee7b0701",
+    "after": "0e78deef5beb70d5d11fa45e85a940397621cbeca923940635b12a4bce1ecba2",
+    "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
+  },
+  "src/engine/vector.ts": {
+    "before": "5db7c505ed225778b377035b5ead0968b6529b847fe0c93d6af957d21b175e7e",
+    "after": "e2d515a5cd0c5bb229defe9c852d00040f49ba7481d5943080ab7aff5d96fd05",
+    "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
+  },
+  "src/engine/VectorController.ts": {
+    "before": "870ae64ae3ad855761b43b3f7ef78fd919cfbb5443e8b135cb81e3bb4ac8c05b",
+    "after": "5ab1e8b6aa9d7d095a28a11ef9eccdbbfd695427bbdd28e157a9707f32261745",
+    "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
+  },
+  "src/ui/App.tsx": {
+    "before": "096ac997beb04816adb76f6c3e3cee452501c785e500ff3ec745deac27954592",
+    "after": "3a81744c46902f57568c401bca88245cf64f2cf373e71e5876ce7a8142ab2928",
+    "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
+  }
+}

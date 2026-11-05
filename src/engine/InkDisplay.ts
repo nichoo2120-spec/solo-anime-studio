@@ -1,4 +1,4 @@
-import type {Layer,Stroke,Project} from '../core/model';
+import type {ArtworkOrigin,Layer,Stroke,Project} from '../core/model';
 import {finalGeometry} from './geometryCache';
 import {blendOperation,type LayerRenderer} from './renderer';
 import {drawSolidInkV10} from './solidInkV10';
@@ -13,7 +13,7 @@ type Prepared={geometry:Geometry;bounds:Box;weight:number;nativePath?:{path:Path
 type Key={operations:Layer['operations'];matrix:number[];firstClean:number;width:number;height:number;frameWidth:number;frameHeight:number;renderer?:LayerRenderer;rendererRevision?:number};
 type Pending={token:number;layer:string;key:Key;operations:Layer['operations'];base:HTMLCanvasElement;timer:ReturnType<typeof setTimeout>};
 type ViewPending={token:number;layer:string;key:Key;base?:Key;timer:ReturnType<typeof setTimeout>};
-export const displayCleanInk=(s:Stroke&{inShot?:true})=>!s.inShot&&!s.nativeMixVersion&&!s.mixStops&&!s.paintTipVersion&&!s.perspective&&!s.textureStrength&&!(s.pressure&&s.pressureOpacity)&&(
+export const displayCleanInk=(s:Stroke&ArtworkOrigin)=>!s.inShot&&!s.inPreviousStage&&!s.nativeMixVersion&&!s.mixStops&&!s.paintTipVersion&&!s.perspective&&!s.textureStrength&&!(s.pressure&&s.pressureOpacity)&&(
  !!s.engineVersion&&['technical','eraser-hard','g-pen','mapping','brush-pen'].includes(s.brushKind??'technical')||s.flatNibVersion===1
 );
 const native=(s:Stroke)=>!s.pressureOpacity&&!s.taperStart&&!s.taperEnd&&!(s.pressure&&s.pressureWidth!==false)&&!s.velocityTaper&&['technical','eraser-hard'].includes(s.brushKind??'technical');

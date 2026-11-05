@@ -20,7 +20,8 @@ import {activeLayer,appendOperation,uid,type Point,type Stroke,type Tool,type Pr
 import {DocumentStore} from '../core/history';
 import {syncActiveFrame} from '../animation/timeline';
 import {followBoundSelectionTransform} from '../animation/motionPlanning';
-import {fitView,toProject,toScreen,type View} from '../core/geometry';
+import {coverView,fitView,toProject,toScreen,type View} from '../core/geometry';
+import {shotFrame} from '../core/shotFrame';
 import {LayerRenderer,makeCanvas,context,drawStroke,polygonPath,applyTransform,blendOperation,paintVectorLayer} from './renderer';
 import {VectorController} from './VectorController';
 import {SmoothingController} from './SmoothingController';
@@ -66,6 +67,7 @@ export class StudioEngine {
  setMirrorPivot(p:{x:number;y:number}){const doc=this.store.getSnapshot();this.mirrorDrawing.pivot={x:Math.max(0,Math.min(1,p.x/doc.width)),y:Math.max(0,Math.min(1,p.y/doc.height))};this.request();}
  centerMirrorPivot(){this.mirrorDrawing.pivot={x:.5,y:.5};this.mirrorDrawing.center=.5;this.pickMirrorPivot=false;this.request();this.onMirrorChange();}
  tool:Tool='brush';brush={...defaultBrush};view:View={x:0,y:0,zoom:1,rotation:0};space=false;busy=false;
+ private outsideFrame=false;
  selection:Point[]=[];strokeIds:string[]=[];strokePickMode:PickMode='touch';strokeShape:'rectangle'|'lasso'='lasso';strokeScope:'current'|'visible'='current';strokeMode:'select'|'lasso'|'move'|'scale'|'rotate'|'perspective-move'|'perspective'|'freeform'='select';freeformCornerMode:'scale'|'perspective'='scale';areaTransformMode:'freeform'|'move'|'scale'|'rotate'='freeform';private warpQuad?:XY[];vanishingPoint?:{x:number;y:number};pickVanishingPoint=false;private strokeClipboard?:Selectable[];private strokeExact=new Map<string,{source:Project['layers'][number]['operations'];key:string;operations:Project['layers'][number]['operations']}>();private strokePending?:{x:number;y:number;shift:boolean};transform:TransformSettings={dx:0,dy:0,scale:1,angle:0};
  renderer=new LayerRenderer();private scratch=makeCanvas(1920,1080);private stroke?:Stroke;private pickup?:Pickup;private lasso?:Point[];
  private pan?:{x:number;y:number;vx:number;vy:number};private drag?:{x:number;y:number;settings:TransformSettings;kind:'move'|'scale'|'rotate'|'perspective-move'|'perspective';center:{x:number;y:number};anchor?:{x:number;y:number};corner?:number;edge?:number;startQuad?:XY[]};private cursor?:Point;private navigation?:{x:number;y:number;view:View;alt:boolean;moved:boolean};private rectangleStart?:Point;
@@ -211,13 +213,24 @@ export class StudioEngine {
   ctx.beginPath();ctx.arc(position.x,position.y,radius,0,Math.PI*2);ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.stroke();ctx.strokeStyle='#29343a';ctx.lineWidth=1;ctx.stroke();
  }
  private resizeCursor(){const c=this.cursorOverlay,dpr=window.devicePixelRatio||1,w=Math.round(this.width*dpr),h=Math.round(this.height*dpr);if(c.width!==w)c.width=w;if(c.height!==h)c.height=h;this.previousCursor=undefined;this.paintCursor();}
- private resize(){const r=this.canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;if(Math.abs(r.width-this.width)<.01&&Math.abs(r.height-this.height)<.01&&this.canvas.width===Math.round(r.width*dpr)&&this.canvas.height===Math.round(r.height*dpr))return;if(this.stroke||this.lasso)this.finishGesture('resize');const dx=r.width-this.width,dy=r.height-this.height;this.width=r.width;this.height=r.height;this.canvas.width=Math.round(r.width*dpr);this.canvas.height=Math.round(r.height*dpr);this.view={...this.view,x:this.view.x+dx/2,y:this.view.y+dy/2};this.onView(this.view);this.resizeCursor();this.onion.setView(this.view,this.width,this.height,dpr);this.flipbook.setView(this.view,this.width,this.height,dpr);this.request();}
- fit(){const p=this.store.getSnapshot();this.setView(fitView(this.width,this.height,p.width,p.height,this.view.rotation));}
- reset(){const p=this.store.getSnapshot();this.setView({x:(this.width-p.width)/2,y:(this.height-p.height)/2,zoom:1,rotation:0});}
+ private resize(){const r=this.canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;if(Math.abs(r.width-this.width)<.01&&Math.abs(r.height-this.height)<.01&&this.canvas.width===Math.round(r.width*dpr)&&this.canvas.height===Math.round(r.height*dpr))return;if(this.stroke||this.lasso)this.finishGesture('resize');const dx=r.width-this.width,dy=r.height-this.height;this.width=r.width;this.height=r.height;this.canvas.width=Math.round(r.width*dpr);this.canvas.height=Math.round(r.height*dpr);this.resizeCursor();this.setView({...this.view,x:this.view.x+dx/2,y:this.view.y+dy/2});}
+ setOutsideFrame(enabled:boolean){
+  if(this.outsideFrame===enabled)return;
+  this.outsideFrame=enabled;
+  if(enabled&&this.store.getSnapshot().version===5)this.setView(this.view);
+ }
+ private fitBounds(){const p=this.store.getSnapshot();return p.version===5&&!this.outsideFrame?shotFrame(p):{x:0,y:0,width:p.width,height:p.height};}
+ fit(){
+  const bounds=this.fitBounds(),view=fitView(this.width,this.height,bounds.width,bounds.height,this.view.rotation);
+  this.setView({...view,...toScreen({x:-bounds.x,y:-bounds.y},view)});
+ }
+ reset(){const p=this.fitBounds();this.setView({x:(this.width-p.width)/2-p.x,y:(this.height-p.height)/2-p.y,zoom:1,rotation:0});}
  private stopViewMotion(){if(this.viewRefineTimer)clearTimeout(this.viewRefineTimer);this.viewRefineTimer=undefined;this.viewMoving=false;this.viewRefining=false;}
  private beginViewMotion(){this.stopViewMotion();this.viewMoving=true;this.viewRefineTimer=setTimeout(()=>{this.viewRefineTimer=undefined;this.viewMoving=false;this.viewRefining=true;this.request();},160);}
  private publishView(){this.viewPending=false;this.onView(this.view);this.paintCursor();}
  setView(view:View,deferNotification=false,interactive=false){
+  const project=this.store.getSnapshot();
+  if(this.outsideFrame&&project.version===5)view=coverView(view,this.width,this.height,project.width,project.height);
   const changed=view.x!==this.view.x||view.y!==this.view.y||view.zoom!==this.view.zoom||view.rotation!==this.view.rotation;
   if(changed&&interactive&&!this.viewMoving&&this.hasRendered&&this.navigationSurface.style.display==='none'&&this.navigationSnapshot.canvas.style.display==='none')this.navigationSnapshot.capture(this.canvas,this.store.getSnapshot(),this.view,this.width,this.height);
   if(changed&&interactive)this.beginViewMotion();if(changed&&!deferNotification&&!interactive)this.stopViewMotion();if(changed&&(this.stroke||this.lasso))this.finishGesture('view-change');this.view=view;
@@ -552,7 +565,7 @@ export class StudioEngine {
   for(const l of [...p.layers].reverse()){if(snapshotPending&&snapshotPassed){this.editingSnapshot.capture(ctx,snapshotKey!);snapshotPending=false;}if(l.id===snapshotTop)snapshotPassed=true;if(!l.visible||rasterGroup?.has(l.id))continue;if(cachedDrawing&&l.id===this.strokeTarget!.layer)this.drawingFrames.capture(ctx);ctx.globalCompositeOperation=blendOperation(l.blend);let displayed=this.smoothing.previewLayer?.id===l.id?this.smoothing.previewLayer:this.vectors.layerPreview(l);if(l.kind==='vector'&&l.id===p.activeLayerId&&this.selection.length&&!this.strokeIds.length)displayed=this.vectors.transformedLayer(l,this.selection,this.matrix());// Empty layers contribute no pixels. Avoid repeatedly scaling full-size blank
    // bitmaps while a brush is active, especially below 100% zoom.
    if(!displayed.operations.length&&!(this.stroke&&l.id===this.strokeTarget?.layer)&&!(l.id===p.activeLayerId&&this.selection.length))continue;
-   if(l.kind==='vector'){ctx.globalAlpha=l.opacity;if(!selectionStable&&displayed.operations.some(o=>selectedStrokeIds.has(o.id))){const ids=selectedStrokeIds,h=this.projectiveMatrix(),m=this.matrix();paintVectorLayer(ctx,{...displayed,opacity:1,operations:displayed.operations.map(o=>!ids.has(o.id)||o.kind!=='vector'?o:h?projectiveVector(o,h):transformVector(o,m))});}else if(displayed.operations.every(o=>o.kind==='vector'&&!o.inShot)){
+   if(l.kind==='vector'){ctx.globalAlpha=l.opacity;if(!selectionStable&&displayed.operations.some(o=>selectedStrokeIds.has(o.id))){const ids=selectedStrokeIds,h=this.projectiveMatrix(),m=this.matrix();paintVectorLayer(ctx,{...displayed,opacity:1,operations:displayed.operations.map(o=>!ids.has(o.id)||o.kind!=='vector'?o:h?projectiveVector(o,h):transformVector(o,m))});}else if(displayed.operations.every(o=>o.kind==='vector'&&!o.inShot&&!o.inPreviousStage)){
     // Draw actual vector paths at device resolution. For opacity/blend layers,
     // paintVectorLayer isolates the group at display resolution as well.
     ctx.globalAlpha=1;paintVectorLayer(ctx,displayed);
@@ -589,7 +602,7 @@ export class StudioEngine {
    const pivot=mirrorPivot(this.mirrorDrawing,p),split=this.mirrorDrawing.axis==='vertical'?pivot.x:pivot.y;
    ctx.beginPath();if(this.mirrorDrawing.axis==='vertical'){ctx.moveTo(split,0);ctx.lineTo(split,p.height);}else{ctx.moveTo(0,split);ctx.lineTo(p.width,split);}ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.arc(pivot.x,pivot.y,6/this.view.zoom,0,Math.PI*2);ctx.moveTo(pivot.x-10/this.view.zoom,pivot.y);ctx.lineTo(pivot.x+10/this.view.zoom,pivot.y);ctx.moveTo(pivot.x,pivot.y-10/this.view.zoom);ctx.lineTo(pivot.x,pivot.y+10/this.view.zoom);ctx.stroke();ctx.restore();
   }
-  if(!snapshotPreview&&p.settings.guides){ctx.strokeStyle='#8cabb845';ctx.lineWidth=1/this.view.zoom;const inset=Math.min(p.width,p.height)*.035;ctx.strokeRect(inset,inset,p.width-inset*2,p.height-inset*2);ctx.setLineDash([8/this.view.zoom,8/this.view.zoom]);ctx.beginPath();ctx.moveTo(p.width/2,0);ctx.lineTo(p.width/2,18/this.view.zoom);ctx.moveTo(0,p.height/2);ctx.lineTo(18/this.view.zoom,p.height/2);ctx.stroke();ctx.setLineDash([]);}
+  if(!snapshotPreview&&p.settings.guides){const guide=p.version===5?shotFrame(p):{x:0,y:0,width:p.width,height:p.height};ctx.strokeStyle='#8cabb845';ctx.lineWidth=1/this.view.zoom;const inset=Math.min(guide.width,guide.height)*.035;ctx.strokeRect(guide.x+inset,guide.y+inset,guide.width-inset*2,guide.height-inset*2);ctx.setLineDash([8/this.view.zoom,8/this.view.zoom]);ctx.beginPath();ctx.moveTo(guide.x+guide.width/2,guide.y);ctx.lineTo(guide.x+guide.width/2,guide.y+18/this.view.zoom);ctx.moveTo(guide.x,guide.y+guide.height/2);ctx.lineTo(guide.x+18/this.view.zoom,guide.y+guide.height/2);ctx.stroke();ctx.setLineDash([]);}
   ctx.restore();ctx.save();ctx.translate(this.view.x,this.view.y);ctx.rotate(this.view.rotation);ctx.scale(this.view.zoom,this.view.zoom);
   if(this.lasso||this.selection.length&&!this.strokeIds.length){ctx.save();if(!this.lasso)ctx.transform(...this.matrix());polygonPath(ctx,this.lasso??this.selection);ctx.lineWidth=1/this.view.zoom;ctx.strokeStyle='#55d9c4';ctx.setLineDash([5/this.view.zoom,4/this.view.zoom]);ctx.stroke();ctx.restore();}
   // Highlight the REAL selected line paths. Picking shows no rectangular box.
