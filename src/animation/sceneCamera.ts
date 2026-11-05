@@ -15,15 +15,15 @@ export type CameraState={x:number;y:number;zoom:number;rotation:number};
 export type SceneCamera={version:1;enabled:boolean;keys:CameraKey[];depth:Record<string,number>;safeArea:boolean;fieldGuide:boolean};
 export const MAX_CAMERA_KEYS=500;
 export function newSceneCamera():SceneCamera{return {version:1,enabled:true,keys:[],depth:{},safeArea:true,fieldGuide:false};}
-export function homeCamera(width:number,height:number):CameraState{return {x:width/2,y:height/2,zoom:1,rotation:0};}
+export function homeCamera(width:number,height:number,originX=0,originY=0):CameraState{return {x:originX+width/2,y:originY+height/2,zoom:1,rotation:0};}
 const finite=(n:unknown):n is number=>typeof n==='number'&&Number.isFinite(n);
 export const clampZoom=(z:number)=>Math.max(.1,Math.min(20,z));
 export const clampDepth=(d:number)=>Math.max(-.9,Math.min(50,d));
 export function easeValue(ease:CameraEase,t:number){t=Math.max(0,Math.min(1,t));switch(ease){case 'hold':return 0;case 'ease-in':return t*t;case 'ease-out':return 1-(1-t)*(1-t);case 'ease-in-out':return t<.5?2*t*t:1-2*(1-t)*(1-t);default:return t;}}
 export function sortedKeys(c:SceneCamera){return [...c.keys].sort((a,b)=>a.frame-b.frame);}
 /** Camera state at exposure `frame` (1-based). No keys = home camera. */
-export function cameraAt(c:SceneCamera|undefined,frame:number,width:number,height:number):CameraState{
- const home=homeCamera(width,height);if(!c||!c.keys.length)return home;
+export function cameraAt(c:SceneCamera|undefined,frame:number,width:number,height:number,originX=0,originY=0):CameraState{
+ const home=homeCamera(width,height,originX,originY);if(!c||!c.keys.length)return home;
  const k=sortedKeys(c);if(frame<=k[0].frame)return pick(k[0]);const last=k[k.length-1];if(frame>=last.frame)return pick(last);
  for(let i=0;i<k.length-1;i++){const a=k[i],b=k[i+1];if(frame>=a.frame&&frame<=b.frame){if(frame===b.frame)return pick(b);const t=easeValue(a.ease,(frame-a.frame)/(b.frame-a.frame)),m=(p:number,q:number)=>p+(q-p)*t;
   // Zoom moves in log space, so a push-in feels even (like pro tools).
@@ -36,8 +36,9 @@ export function deleteCameraKey(c:SceneCamera,frame:number):SceneCamera{return {
 export function layerDepth(c:SceneCamera|undefined,layerId:string){const d=c?.depth[layerId];return finite(d)?clampDepth(d):0;}
 /** Matrix [a,b,c,d,e,f] mapping document px -> camera output px (output = page size).
  * Depth gives parallax: a layer at depth d follows the camera move with factor 1/(1+d). */
-export function cameraMatrix(state:CameraState,width:number,height:number,depth=0):[number,number,number,number,number,number]{
- const k=1/(1+clampDepth(depth)),cx=width/2+(state.x-width/2)*k,cy=height/2+(state.y-height/2)*k,z=1+(clampZoom(state.zoom)-1)*k,r=-state.rotation*k*Math.PI/180,cos=Math.cos(r)*z,sin=Math.sin(r)*z;
+export function cameraMatrix(state:CameraState,width:number,height:number,depth=0,originX=0,originY=0):[number,number,number,number,number,number]{
+ const homeX=originX+width/2,homeY=originY+height/2;
+ const k=1/(1+clampDepth(depth)),cx=homeX+(state.x-homeX)*k,cy=homeY+(state.y-homeY)*k,z=1+(clampZoom(state.zoom)-1)*k,r=-state.rotation*k*Math.PI/180,cos=Math.cos(r)*z,sin=Math.sin(r)*z;
  if(cx===width/2&&cy===height/2&&z===1&&r===0)return [1,0,0,1,0,0];
  return [cos,sin,-sin,cos,width/2-(cos*cx-sin*cy),height/2-(sin*cx+cos*cy)];
 }

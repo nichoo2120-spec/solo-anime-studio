@@ -41,12 +41,14 @@ export function createCleanFreehandVector(id:string,samples:Point[],width:number
 }
 export function transformVector(line:VectorLine,m:Matrix):VectorLine{
  const apply=(p:Handle)=>({x:m[0]*p.x+m[2]*p.y+m[4],y:m[1]*p.x+m[3]*p.y+m[5]}),nodes=(items:VectorNode[])=>items.map(p=>({...p,...apply(p),in:apply(p.in),out:apply(p.out)}));
- return {...line,nodes:nodes(line.nodes),sourceNodes:line.sourceNodes?nodes(line.sourceNodes):undefined,width:Math.max(.1,Math.min(500,line.width*Math.sqrt(Math.abs(m[0]*m[3]-m[1]*m[2]))))};
+ const {inShot:_inShot,...editable}=line as VectorLine&{inShot?:true};
+ return {...editable,nodes:nodes(line.nodes),sourceNodes:line.sourceNodes?nodes(line.sourceNodes):undefined,width:Math.max(.1,Math.min(500,line.width*Math.sqrt(Math.abs(m[0]*m[3]-m[1]*m[2]))))};
 }
 /** Warp vector anchors and handles separately; remains an editable Bézier stroke. */
 export function projectiveVector(line:VectorLine,h:H):VectorLine{
  const nodes=(items:VectorNode[])=>items.map(p=>({...p,...projectPoint(p,h),in:projectPoint(p.in,h),out:projectPoint(p.out,h)}));
- return {...line,nodes:nodes(line.nodes),sourceNodes:line.sourceNodes?nodes(line.sourceNodes):undefined};
+ const {inShot:_inShot,...editable}=line as VectorLine&{inShot?:true};
+ return {...editable,nodes:nodes(line.nodes),sourceNodes:line.sourceNodes?nodes(line.sourceNodes):undefined};
 }
 export function adjustVectorSmoothness(line:VectorLine,amount:number):VectorLine{
  const sourceNodes=line.sourceNodes??line.nodes,copy=sourceNodes.map(p=>({...p,in:{...p.in},out:{...p.out}})),t=amount/100;

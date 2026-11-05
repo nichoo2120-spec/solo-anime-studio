@@ -1,37 +1,50 @@
-import {memo,useEffect,useRef,useState,useSyncExternalStore} from 'react';
+import {memo,useEffect,useId,useRef,useState,useSyncExternalStore} from 'react';
 import type {PointerEvent as ReactPointerEvent} from 'react';
 import type {Project} from '../core/model';
+import {shotFrame} from '../core/shotFrame';
 import type {CameraViewState} from '../core/CameraViewState';
 import {toScreen,toProject} from '../core/geometry';
 import type {LayerRenderer} from '../engine/renderer';
 import {CAMERA_EASES,cameraAt,cameraFrame,clampDepth,clampZoom,deleteCameraKey,homeCamera,layerDepth,newSceneCamera,setCameraKey,sortedKeys,type CameraEase,type CameraState,type SceneCamera} from '../animation/sceneCamera';
 
 /** v0.5.174 Scene Camera: frame overlay on the canvas (drag = truck), safe areas and field guide. */
-export const SceneCameraOverlay=memo(function SceneCameraOverlay({project,frame,view,onMove}:{project:Project;frame:number;view:CameraViewState;onMove:(x:number,y:number)=>void}){
+export const SceneCameraOverlay=memo(function SceneCameraOverlay({project,frame,view,frameOnly,canMove,onMove}:{project:Project;frame:number;view:CameraViewState;frameOnly:boolean;canMove:boolean;onMove:(x:number,y:number)=>void}){
  const v=useSyncExternalStore(view.subscribe,view.getSnapshot);
+ const maskId=useId();
  const [drag,setDrag]=useState<{id:number;sx:number;sy:number;ox:number;oy:number;x:number;y:number}|null>(null);
- const c=project.camera;if(!c?.enabled)return null;
- const base=cameraAt(c,frame,project.width,project.height),state:CameraState=drag?{...base,x:drag.x,y:drag.y}:base;
- const poly=(scale:number)=>cameraFrame(state,project.width,project.height,scale).map(p=>toScreen(p,v)).map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+ const c=project.camera?.enabled?project.camera:undefined;
+ if(!c&&!project.shotFrame&&!frameOnly)return null;
+ const shot=shotFrame(project);
+ const base=cameraAt(c,frame,shot.width,shot.height,shot.x,shot.y),state:CameraState=drag?{...base,x:drag.x,y:drag.y}:base;
+ const poly=(scale:number)=>cameraFrame(state,shot.width,shot.height,scale).map(p=>toScreen(p,v)).map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
  const centre=toScreen({x:state.x,y:state.y},v);
  const local=(e:ReactPointerEvent<SVGElement>)=>{const r=e.currentTarget.ownerSVGElement!.getBoundingClientRect();return toProject({x:e.clientX-r.left,y:e.clientY-r.top},v);};
- const guides:string[]=[];if(c.fieldGuide)for(const s of [1/6,2/6,3/6,4/6,5/6])guides.push(poly(s));
+ const guides:string[]=[];if(c?.fieldGuide)for(const s of [1/6,2/6,3/6,4/6,5/6])guides.push(poly(s));
  return <svg className="scene-camera-overlay" aria-label="Scene camera frame">
-  <polygon className="camera-frame-hit" points={poly(1)} onPointerDown={e=>{e.preventDefault();e.stopPropagation();e.currentTarget.setPointerCapture(e.pointerId);const p=local(e);setDrag({id:e.pointerId,sx:p.x,sy:p.y,ox:base.x,oy:base.y,x:base.x,y:base.y});}}
+  {frameOnly&&<>
+   <defs><mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="100%" height="100%">
+    <rect width="100%" height="100%" fill="white"/><polygon points={poly(1)} fill="black"/>
+   </mask></defs>
+   <rect className="camera-surround-mask" width="100%" height="100%" mask={`url(#${maskId})`}/>
+  </>}
+  {c&&canMove&&<polygon className="camera-frame-hit" points={poly(1)} onPointerDown={e=>{e.preventDefault();e.stopPropagation();e.currentTarget.setPointerCapture(e.pointerId);const p=local(e);setDrag({id:e.pointerId,sx:p.x,sy:p.y,ox:base.x,oy:base.y,x:base.x,y:base.y});}}
    onPointerMove={e=>{if(!drag||drag.id!==e.pointerId)return;const p=local(e);setDrag({...drag,x:drag.ox+p.x-drag.sx,y:drag.oy+p.y-drag.sy});}}
    onPointerUp={e=>{if(!drag||drag.id!==e.pointerId)return;const d=drag;setDrag(null);if(d.x!==d.ox||d.y!==d.oy)onMove(Math.round(d.x*10)/10,Math.round(d.y*10)/10);}}
-   onPointerCancel={()=>setDrag(null)}><title>Drag to move (truck) the camera</title></polygon>
+   onPointerCancel={()=>setDrag(null)}><title>Drag to move (truck) the camera</title></polygon>}
   <polygon className="camera-frame" points={poly(1)}/>
-  {c.safeArea&&<><polygon className="camera-safe action" points={poly(.9)}/><polygon className="camera-safe title" points={poly(.8)}/></>}
+  {c?.safeArea&&<><polygon className="camera-safe action" points={poly(.9)}/><polygon className="camera-safe title" points={poly(.8)}/></>}
   {guides.map((g,i)=><polygon key={i} className="camera-field" points={g}/>)}
-  <path className="camera-centre" d={`M ${centre.x-9} ${centre.y} H ${centre.x+9} M ${centre.x} ${centre.y-9} V ${centre.y+9}`}/>
-  <text className="camera-label" x={toScreen(cameraFrame(state,project.width,project.height)[0],v).x+6} y={toScreen(cameraFrame(state,project.width,project.height)[0],v).y+16}>CAMERA · frame {frame}{c.keys.some(k=>k.frame===frame)?' · KEY':''}</text>
+  {c&&<>
+   <path className="camera-centre" d={`M ${centre.x-9} ${centre.y} H ${centre.x+9} M ${centre.x} ${centre.y-9} V ${centre.y+9}`}/>
+   <text className="camera-label" x={toScreen(cameraFrame(state,shot.width,shot.height)[0],v).x+6} y={toScreen(cameraFrame(state,shot.width,shot.height)[0],v).y+16}>CAMERA · frame {frame}{c.keys.some(k=>k.frame===frame)?' · KEY':''}</text>
+  </>}
  </svg>;
 });
 
 const num=(s:string,f:number)=>{const n=parseFloat(s);return Number.isFinite(n)?n:f;};
 export function SceneCameraPanel({project,frame,frameCount,renderer,activeLayerId,onCommit,onGoToFrame}:{project:Project;frame:number;frameCount:number;renderer?:LayerRenderer;activeLayerId:string;onCommit:(p:Project,label:string)=>void;onGoToFrame:(frame:number)=>void}){
- const c=project.camera,state=cameraAt(c,frame,project.width,project.height),key=c?.keys.find(k=>k.frame===frame);
+ const shot=shotFrame(project);
+ const c=project.camera,state=cameraAt(c,frame,shot.width,shot.height,shot.x,shot.y),key=c?.keys.find(k=>k.frame===frame);
  const preview=useRef<HTMLCanvasElement>(null);
  const update=(cam:SceneCamera,label:string)=>onCommit({...project,camera:cam},label);
  /** Editing any value at a frame without a key makes a key there (auto-key, like pro tools). */
@@ -43,7 +56,7 @@ export function SceneCameraPanel({project,frame,frameCount,renderer,activeLayerI
  return <div className="scene-camera-panel">
   <div className="section-caption">SCENE CAMERA · FRAME {frame}/{frameCount}{key?' · KEY':''}</div>
   <label className="camera-check"><input type="checkbox" checked={c.enabled} onChange={e=>update({...c,enabled:e.target.checked},e.target.checked?'Show camera':'Hide camera')}/>Camera on (frame + preview + export option)</label>
-  {c.enabled&&<canvas ref={preview} className="camera-preview" width={320} height={Math.max(1,Math.round(320*project.height/project.width))} aria-label="Camera preview"/>}
+  {c.enabled&&<canvas ref={preview} className="camera-preview" width={320} height={Math.max(1,Math.round(320*shot.height/shot.width))} aria-label="Camera preview"/>}
   <div className="camera-grid">
    {field('X (truck)',state.x,10,x=>edit({x}),'px')}
    {field('Y (pedestal)',state.y,10,y=>edit({y}),'px')}
@@ -53,7 +66,7 @@ export function SceneCameraPanel({project,frame,frameCount,renderer,activeLayerI
   <div className="camera-buttons">
    <button onClick={()=>edit({})} title="Save the camera at this frame">{key?'Update key':'Set key'}</button>
    <button disabled={!key} onClick={()=>update(deleteCameraKey(c,frame),'Delete camera key')}>Delete key</button>
-   <button onClick={()=>edit({...homeCamera(project.width,project.height)})} title="Full page, no zoom, no roll">Reset view</button>
+   <button onClick={()=>edit({...homeCamera(shot.width,shot.height,shot.x,shot.y)})} title="Original shot, no zoom, no roll">Reset view</button>
   </div>
   <label className="camera-field-row camera-scrub">Frame<input aria-label="Camera frame" type="range" min={1} max={Math.max(1,frameCount)} value={frame} onChange={e=>onGoToFrame(+e.target.value)}/><span>{frame}</span></label>
   <div className="camera-buttons">

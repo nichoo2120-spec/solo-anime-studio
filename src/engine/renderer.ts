@@ -1,4 +1,5 @@
 import {cameraAt,cameraMatrix,layerDepth} from '../animation/sceneCamera';
+import {originalShotArtwork,shotFrame,type ShotFrame} from '../core/shotFrame';
 import {HistoryTiles} from './HistoryTiles';
 import {dryRasterPadding} from '../core/dryBrush';
 import {resetDryBristleV3MixModel} from './dryBristleV3';
@@ -110,7 +111,14 @@ export class LayerRenderer {
  private historyPatch(layer:Layer,op:Layer['operations'][number],index:number,width:number,height:number){const d=this.deltaLookup.get(op);return d&&d.id===layer.id&&d.width===width&&d.height===height&&d.prefix.length===index&&d.prefix.every((o,i)=>o===layer.operations[i])?d:undefined;}
  async prepare(project:Project){
   const images=project.layers.flatMap(l=>l.operations).filter(o=>o.kind==='fill'||o.kind==='image');
-  await Promise.all(images.map(async o=>{if((o.kind==='fill'||o.kind==='image')&&!this.bitmaps.has(o.png)){const image=new Image();image.src=o.png;await image.decode();if(o.kind==='fill'&&(image.width!==project.width||image.height!==project.height))throw Error('Fill bitmap dimensions do not match the project.');if(image.width*image.height>16777216)throw Error('Image exceeds the decode limit.');this.bitmaps.set(o.png,image);}}));
+  await Promise.all(images.map(async o=>{
+   let image=this.bitmaps.get(o.png);
+   if(!image){image=new Image();image.src=o.png;await image.decode();}
+   const bounds=o.kind==='fill'&&o.inShot?shotFrame(project):project;
+   if(o.kind==='fill'&&(image.width!==bounds.width||image.height!==bounds.height))throw Error('Fill bitmap dimensions do not match the project.');
+   if(image.width*image.height>16777216)throw Error('Image exceeds the decode limit.');
+   this.bitmaps.set(o.png,image);
+  }));
  }
  clear(){this.pendingLayer=undefined;this.cancelFinal();this.finalWorker?.terminate();this.finalWorker=undefined;for(const c of this.caches.values())c.canvas.width=c.canvas.height=0;this.caches.clear();while(this.celRasters.length){const {canvas}=this.releaseCelRaster(this.celRasters.length-1);canvas.width=canvas.height=0;}if(this.scratch)this.scratch.width=this.scratch.height=0;this.scratch=undefined;this.bitmaps.clear();while(this.strokeRasters.size)this.dropStroke();for(const c of this.checkpoints){c.canvas.width=0;c.canvas.height=0;}for(const d of this.deltas)d.patch.clear();this.checkpoints=[];this.checkpointBytes=0;this.deltas=[];this.deltaLookup.clear();this.deltaBytes=0;}
  private cancelFinal(){const job=this.pendingFinal;if(job){clearTimeout(job.timer);job.preview.clear();this.pendingFinal=undefined;job.resolve();this.displayRevision++;}}
@@ -147,6 +155,20 @@ export class LayerRenderer {
   if(!cached||cached.canvas!==base||result===base||base.width!==p.width||base.height!==p.height||result.width!==p.width||result.height!==p.height||layer.operations[index]!==stroke||cached.layer.operations.length!==index||!cached.layer.operations.every((o,i)=>o===layer.operations[i]))return undefined;
   this.beforeOperation(layer,base,index);this.caches.set(layer.id,{layer,canvas:result,frame:p.animation?.activeFrameId});this.afterOperation(layer,result,index);this.remember(layer,result,index+1);return base;
  }
+ private paintOriginalShot(ctx:CanvasRenderingContext2D,layer:Layer,project:Project){
+  const frame=project.shotFrame;
+  if(!frame||!layer.operations[0]?.inShot)return 0;
+  const next=layer.operations.findIndex(op=>!op.inShot);
+  const end=next<0?layer.operations.length:next;
+  const renderer=new LayerRenderer(false);
+  renderer.bitmaps=this.bitmaps;
+  const originalLayer={...layer,operations:originalShotArtwork(layer.operations.slice(0,end),frame)};
+  const original={...project,shotFrame:undefined,width:frame.width,height:frame.height};
+  const canvas=renderer.get(originalLayer,original);
+  ctx.drawImage(canvas,frame.x,frame.y);
+  canvas.width=canvas.height=0;
+  return end;
+ }
  get(layer:Layer,p:Project){
   const frame=p.animation?.activeFrameId;
   let cached=this.caches.get(layer.id);
@@ -174,7 +196,8 @@ export class LayerRenderer {
   const incremental=cached&&cached.canvas.width===p.width&&cached.canvas.height===p.height&&cached.layer.operations.length<layer.operations.length&&cached.layer.operations.every((o,i)=>o===layer.operations[i]);
   const canvas=cached&&cached.canvas.width===p.width&&cached.canvas.height===p.height?cached.canvas:makeCanvas(p.width,p.height),ctx=context(canvas),capture=incremental||!cached&&layer.operations.length===1;let scratch:HTMLCanvasElement|undefined,start=incremental&&cached?cached.layer.operations.length:0;
   if(!incremental){const checkpoint=this.checkpoints.filter(c=>c.id===layer.id&&c.canvas.width===p.width&&c.canvas.height===p.height&&c.operations.length<=layer.operations.length&&c.operations.every((o,i)=>o===layer.operations[i])).sort((a,b)=>b.operations.length-a.operations.length)[0];ctx.clearRect(0,0,p.width,p.height);if(checkpoint){ctx.drawImage(checkpoint.canvas,0,0);start=checkpoint.operations.length;this.checkpoints.splice(this.checkpoints.indexOf(checkpoint),1);this.checkpoints.push(checkpoint);}}
-  for(let i=start;i<layer.operations.length;i++){const op=layer.operations[i];if(capture)this.beforeOperation(layer,canvas,i);else this.replayed++;if(op.kind==='stroke'){const ready=this.strokeRasters.get(op);let source:HTMLCanvasElement,sourceX=0,sourceY=0;if(ready&&ready.width===p.width&&ready.height===p.height){source=ready.canvas as HTMLCanvasElement;sourceX=ready.x;sourceY=ready.y;this.strokeRasters.delete(op);this.strokeRasters.set(op,ready);}else{scratch??=this.scratch??=makeCanvas(p.width,p.height);if(scratch.width!==p.width)scratch.width=p.width;if(scratch.height!==p.height)scratch.height=p.height;const sc=context(scratch);sc.clearRect(0,0,p.width,p.height);drawStroke(sc,op);source=scratch;}compositePaintStroke(ctx,source,op,sourceX,sourceY);}else if(op.kind==='fill'){const image=this.bitmaps.get(op.png);if(image){ctx.save();ctx.globalCompositeOperation=op.under?'destination-over':'source-over';ctx.drawImage(image,0,0);ctx.restore();}}else if(op.kind==='image'){const image=this.bitmaps.get(op.png);if(image)ctx.drawImage(image,op.x,op.y,op.width,op.height);}else if(op.kind==='clear'){ctx.save();ctx.globalCompositeOperation='destination-out';polygonPath(ctx,op.polygon);ctx.fill();ctx.restore();}else if(op.kind==='vector')drawVector(ctx,op);else applyTransform(canvas,op.polygon,op.matrix);if(capture){this.afterOperation(layer,canvas,i);this.remember(layer,canvas,i+1);}}
+  if(!incremental&&!start)start=this.paintOriginalShot(ctx,layer,p);
+  for(let i=start;i<layer.operations.length;i++){const op=layer.operations[i];if(capture)this.beforeOperation(layer,canvas,i);else this.replayed++;if(op.kind==='stroke'){const ready=this.strokeRasters.get(op);let source:HTMLCanvasElement,sourceX=0,sourceY=0;if(ready&&ready.width===p.width&&ready.height===p.height){source=ready.canvas as HTMLCanvasElement;sourceX=ready.x;sourceY=ready.y;this.strokeRasters.delete(op);this.strokeRasters.set(op,ready);}else{scratch??=this.scratch??=makeCanvas(p.width,p.height);if(scratch.width!==p.width)scratch.width=p.width;if(scratch.height!==p.height)scratch.height=p.height;const sc=context(scratch);sc.clearRect(0,0,p.width,p.height);drawStroke(sc,op);source=scratch;}compositePaintStroke(ctx,source,op,sourceX,sourceY);}else if(op.kind==='fill'){const image=this.bitmaps.get(op.png);if(image){ctx.save();ctx.globalCompositeOperation=op.under?'destination-over':'source-over';const origin=op.inShot?shotFrame(p):undefined;ctx.drawImage(image,origin?.x??0,origin?.y??0);ctx.restore();}}else if(op.kind==='image'){const image=this.bitmaps.get(op.png);if(image)ctx.drawImage(image,op.x,op.y,op.width,op.height);}else if(op.kind==='clear'){ctx.save();ctx.globalCompositeOperation='destination-out';polygonPath(ctx,op.polygon);ctx.fill();ctx.restore();}else if(op.kind==='vector')drawVector(ctx,op);else applyTransform(canvas,op.polygon,op.matrix);if(capture){this.afterOperation(layer,canvas,i);this.remember(layer,canvas,i+1);}}
   if(!cached&&layer.operations.length>=(p.width*p.height*4>=4*1024*1024?24:8))this.remember(layer,canvas,layer.operations.length,true);
   this.caches.set(layer.id,{layer,canvas,frame});return canvas;
  }
@@ -182,14 +205,33 @@ export class LayerRenderer {
  /** v174: same as composite(), but each layer is framed by the scene camera
   * (with multiplane depth). Home camera gives the same pixels as composite(). */
  compositeCamera(p:Project,frame:number,options:ExportOptions={}){
-  const cam=cameraAt(p.camera,frame,p.width,p.height),plain=cameraMatrix(cam,p.width,p.height,0);
+  const {x,y,width,height}=shotFrame(p);
+  const cam=cameraAt(p.camera,frame,width,height,x,y),plain=cameraMatrix(cam,width,height,0,x,y);
   const flat=!p.camera||p.layers.every(l=>layerDepth(p.camera,l.id)===0);
-  if(plain.join()==='1,0,0,1,0,0'&&flat)return this.composite(p,options);
-  const w=options.width??p.width,h=options.height??p.height;if(!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||w>8192||h>8192||w*h>16777216)throw Error('Export dimensions must be 1–8192 px and at most 16 megapixels.');
+  if(flat&&plain.join()===[1,0,0,1,-x,-y].join())return this.composite(p,options,p.shotFrame);
+  const w=options.width??width,h=options.height??height;if(!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||w>8192||h>8192||w*h>16777216)throw Error('Export dimensions must be 1–8192 px and at most 16 megapixels.');
   const canvas=makeCanvas(w,h),ctx=context(canvas);if(!options.transparent){ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);}
   ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-  for(const l of [...p.layers].reverse())if((options.layerId?l.id===options.layerId:l.visible)&&(!l.reference||options.includeReferences===true||options.includeReferences===undefined&&l.exportReference)){const m=cameraMatrix(cam,p.width,p.height,layerDepth(p.camera,l.id));ctx.setTransform(w/p.width,0,0,h/p.height,0,0);ctx.transform(...m);ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=blendOperation(l.blend);ctx.drawImage(this.get(l,p),0,0);}
+  for(const l of [...p.layers].reverse())if((options.layerId?l.id===options.layerId:l.visible)&&(!l.reference||options.includeReferences===true||options.includeReferences===undefined&&l.exportReference)){const m=cameraMatrix(cam,width,height,layerDepth(p.camera,l.id),x,y);ctx.setTransform(w/width,0,0,h/height,0,0);ctx.transform(...m);ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=blendOperation(l.blend);ctx.drawImage(this.get(l,p),0,0);}
   ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';return canvas;
  }
- composite(p:Project,options:ExportOptions={}){const w=options.width??p.width,h=options.height??p.height;if(!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||w>8192||h>8192||w*h>16777216)throw Error('Export dimensions must be 1–8192 px and at most 16 megapixels.');const canvas=makeCanvas(w,h),ctx=context(canvas);if(!options.transparent){ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);}ctx.scale(w/p.width,h/p.height);for(const l of [...p.layers].reverse())if((options.layerId?l.id===options.layerId:l.visible)&&(!l.reference||options.includeReferences===true||options.includeReferences===undefined&&l.exportReference)){ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=blendOperation(l.blend);ctx.drawImage(this.get(l,p),0,0);}ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';return canvas;}
+ compositeShot(p:Project,options:ExportOptions={}){
+  if(options.cameraFrame!==undefined)return this.compositeCamera(p,options.cameraFrame,options);
+  return this.composite(p,options,p.shotFrame);
+ }
+ composite(p:Project,options:ExportOptions={},crop?:ShotFrame){
+  const width=crop?.width??p.width,height=crop?.height??p.height,w=options.width??width,h=options.height??height;
+  if(!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||w>8192||h>8192||w*h>16777216)throw Error('Export dimensions must be 1–8192 px and at most 16 megapixels.');
+  const canvas=makeCanvas(w,h),ctx=context(canvas);
+  if(!options.transparent){ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);}
+  ctx.scale(w/width,h/height);
+  for(const l of [...p.layers].reverse())if((options.layerId?l.id===options.layerId:l.visible)&&(!l.reference||options.includeReferences===true||options.includeReferences===undefined&&l.exportReference)){
+   ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=blendOperation(l.blend);
+   const artwork=this.get(l,p);
+   if(crop)ctx.drawImage(artwork,crop.x,crop.y,width,height,0,0,width,height);
+   else ctx.drawImage(artwork,0,0);
+  }
+  ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+  return canvas;
+ }
 }

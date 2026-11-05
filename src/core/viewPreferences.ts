@@ -12,4 +12,4 @@ export class ViewPreferences {
 }
 
 /** Active-layer focus and viewport preferences are not artwork changes. */
-export function documentDirty(current:Project,saved:Project){return current.id!==saved.id||current.layers!==saved.layers||current.name!==saved.name||current.width!==saved.width||current.height!==saved.height||current.settings.guides!==saved.settings.guides||current.animation!==saved.animation||current.substitutionShelf!==saved.substitutionShelf||current.cycleShelf!==saved.cycleShelf||current.audio!==saved.audio||current.motionPlanning!==saved.motionPlanning;}
+export function documentDirty(current:Project,saved:Project){return current.id!==saved.id||current.layers!==saved.layers||current.name!==saved.name||current.width!==saved.width||current.height!==saved.height||current.settings.guides!==saved.settings.guides||current.animation!==saved.animation||current.substitutionShelf!==saved.substitutionShelf||current.cycleShelf!==saved.cycleShelf||current.audio!==saved.audio||current.motionPlanning!==saved.motionPlanning||current.camera!==saved.camera||current.shotFrame!==saved.shotFrame;}

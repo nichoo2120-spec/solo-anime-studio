@@ -90,13 +90,14 @@ export class StudioEngine {
   this.lastLayer=store.getSnapshot().activeLayerId;this.lastFrame=store.getSnapshot().animation?.activeFrameId;
   this.cachedLayerIds=store.getSnapshot().layers.map(layer=>layer.id);
   this.observer=new ResizeObserver(()=>this.resize());this.observer.observe(canvas);
-  this.unsubscribe=store.subscribe(()=>{const p=store.getSnapshot();if(p.activeLayerId!==this.lastLayer){this.recorder.event('layer-change',{id:p.activeLayerId});this.clearSelection();this.lastLayer=p.activeLayerId;}if(p.animation?.activeFrameId!==this.lastFrame){this.lastFrame=p.animation?.activeFrameId;this.clearSelection();}else if(this.strokeIds.length){const allowed=new Set(this.selectableLayers().flatMap(l=>selectable(l).map(o=>o.id)));if(this.strokeIds.some(id=>!allowed.has(id)))this.clearSelection();}this.smoothing.documentChanged();
+  let previous=store.getSnapshot();
+  this.unsubscribe=store.subscribe(()=>{const p=store.getSnapshot(),resized=p.id===previous.id&&(p.width!==previous.width||p.height!==previous.height);previous=p;if(p.activeLayerId!==this.lastLayer){this.recorder.event('layer-change',{id:p.activeLayerId});this.clearSelection();this.lastLayer=p.activeLayerId;}if(p.animation?.activeFrameId!==this.lastFrame){this.lastFrame=p.animation?.activeFrameId;this.clearSelection();}else if(this.strokeIds.length){const allowed=new Set(this.selectableLayers().flatMap(l=>selectable(l).map(o=>o.id)));if(this.strokeIds.some(id=>!allowed.has(id)))this.clearSelection();}this.smoothing.documentChanged();
    // prune() scans raster checkpoints, deltas and layer IDs. Ordinary strokes
    // cannot orphan those caches, so only prune when the layer set changes.
    if(p.layers.length!==this.cachedLayerIds.length||p.layers.some((l,i)=>l.id!==this.cachedLayerIds[i])){
     this.renderer.prune(p);this.cachedLayerIds=p.layers.map(l=>l.id);
    }
-   this.onion.update(p);this.flipbook.update(p);this.request();});
+   this.onion.update(p);this.flipbook.update(p);if(resized)this.fit();else this.request();});
   canvas.addEventListener('pointerdown',this.down);canvas.addEventListener('pointermove',this.move);canvas.addEventListener('pointerrawupdate',this.rawMove);canvas.addEventListener('pointerup',this.up);canvas.addEventListener('pointercancel',this.cancel);canvas.addEventListener('lostpointercapture',this.lostCapture);canvas.addEventListener('wheel',this.wheel,{passive:false});canvas.addEventListener('pointerleave',this.leave);
   window.addEventListener('pointermove',this.windowMove,true);window.addEventListener('blur',this.blur);window.addEventListener('lostpointercapture',this.windowLostCapture,true);this.resize();this.fit();
  }
@@ -551,7 +552,7 @@ export class StudioEngine {
   for(const l of [...p.layers].reverse()){if(snapshotPending&&snapshotPassed){this.editingSnapshot.capture(ctx,snapshotKey!);snapshotPending=false;}if(l.id===snapshotTop)snapshotPassed=true;if(!l.visible||rasterGroup?.has(l.id))continue;if(cachedDrawing&&l.id===this.strokeTarget!.layer)this.drawingFrames.capture(ctx);ctx.globalCompositeOperation=blendOperation(l.blend);let displayed=this.smoothing.previewLayer?.id===l.id?this.smoothing.previewLayer:this.vectors.layerPreview(l);if(l.kind==='vector'&&l.id===p.activeLayerId&&this.selection.length&&!this.strokeIds.length)displayed=this.vectors.transformedLayer(l,this.selection,this.matrix());// Empty layers contribute no pixels. Avoid repeatedly scaling full-size blank
    // bitmaps while a brush is active, especially below 100% zoom.
    if(!displayed.operations.length&&!(this.stroke&&l.id===this.strokeTarget?.layer)&&!(l.id===p.activeLayerId&&this.selection.length))continue;
-   if(l.kind==='vector'){ctx.globalAlpha=l.opacity;if(!selectionStable&&displayed.operations.some(o=>selectedStrokeIds.has(o.id))){const ids=selectedStrokeIds,h=this.projectiveMatrix(),m=this.matrix();paintVectorLayer(ctx,{...displayed,opacity:1,operations:displayed.operations.map(o=>!ids.has(o.id)||o.kind!=='vector'?o:h?projectiveVector(o,h):transformVector(o,m))});}else if(displayed.operations.every(o=>o.kind==='vector')){
+   if(l.kind==='vector'){ctx.globalAlpha=l.opacity;if(!selectionStable&&displayed.operations.some(o=>selectedStrokeIds.has(o.id))){const ids=selectedStrokeIds,h=this.projectiveMatrix(),m=this.matrix();paintVectorLayer(ctx,{...displayed,opacity:1,operations:displayed.operations.map(o=>!ids.has(o.id)||o.kind!=='vector'?o:h?projectiveVector(o,h):transformVector(o,m))});}else if(displayed.operations.every(o=>o.kind==='vector'&&!o.inShot)){
     // Draw actual vector paths at device resolution. For opacity/blend layers,
     // paintVectorLayer isolates the group at display resolution as well.
     ctx.globalAlpha=1;paintVectorLayer(ctx,displayed);
