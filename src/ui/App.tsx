@@ -4,7 +4,7 @@ import {useEffect,useMemo,useRef,useState,useSyncExternalStore,Fragment,type Rea
 import {Plus,ChevronDown,ChevronRight,Folder,Layers,Copy,Trash2,Eye,EyeOff,Lock,Unlock,ArrowUp,ArrowDown,Undo2,Redo2,Maximize,RotateCcw,Settings,Download,Check,Keyboard,X,PanelLeftClose,PanelRightClose,GripVertical,Film,Play,Pause,Square,SkipBack,SkipForward,ChevronsLeft,ChevronsRight,SlidersHorizontal,Palette,Image as ImageIcon,Save,FilePlus,FolderOpen,Clock,MousePointer2,Maximize2,Minimize2,PanelLeftOpen,PanelRightOpen,Link2,MapPinned,Target} from 'lucide-react';
 import {AutosaveWriter} from '../core/AutosaveWriter';
 import {ViewPreferences,documentDirty} from '../core/viewPreferences';
-import {addDrawingMargins,shotFrame} from '../core/shotFrame';
+import {expandPasteboard,shotFrame} from '../core/shotFrame';
 import {CameraViewState} from '../core/CameraViewState';
 import {DocumentStore} from '../core/history';
 import {addDrawingFrame,duplicateDrawingFrame,deleteDrawingFrame,selectDrawingFrame,adjacentFrame,frameList,currentFrameIndex,MAX_DRAWING_FRAMES,frameHold,frameExposureStart,totalExposureFrames,currentExposureRange,setDrawingFrameHold,setDrawingFrameHoldById,holdFromDrag,MAX_FRAME_HOLD,hasIndependentLayers,isLayerHeld,layerKeyStart,layerKeyEnd,setLayerHoldEnd,insertLayerKey,enableIndependentLayers} from '../animation/timeline';
@@ -283,7 +283,7 @@ export function App(){
  useEffect(()=>{writePreference('onion-settings',onionSettings);engine.current?.onion.setSettings(onionSettings);},[onionSettings]);
  useEffect(()=>{writePreference('vector-settings-solid-ink',vectorDefaults);if(engine.current)Object.assign(engine.current.vectors,vectorDefaults);},[vectorDefaults]);
  useEffect(()=>{if(!initialCheck.current){initialCheck.current=true;// v0.5.176: open the last project directly; only read the full project list when it is missing.
-  const lastId=readPreference<string|null>('last-project',null);(lastId?repository.get(lastId).catch(()=>undefined):Promise.resolve(undefined)).then(async direct=>{const list=direct?[direct]:await repository.list();if(!direct)setRecords(list);if(!list.length)return;const record=list.find(r=>r.id===lastId)??list[0],e=engine.current;if(e&&store.revision===0&&!e.drawing){validateProject(record.project);if(await e.load(record.project,0)){saved.current=record.project;setStatus('Opened local project');setLastSaved(record.savedAt);writePreference('last-project',record.id);}}}).catch(e=>notify('Saved work remains in local storage; could not automatically reopen it: '+String(e)));}},[]);
+  const lastId=readPreference<string|null>('last-project',null);(lastId?repository.get(lastId).catch(()=>undefined):Promise.resolve(undefined)).then(async direct=>{const list=direct?[direct]:await repository.list();if(!direct)setRecords(list);if(!list.length)return;const record=list.find(r=>r.id===lastId)??list[0],e=engine.current;if(e&&store.revision===0&&!e.drawing){validateProject(record.project);if(await loadStudioProject(record.project,0)){setStatus('Opened local project');setLastSaved(record.savedAt);writePreference('last-project',record.id);}}}).catch(e=>notify('Saved work remains in local storage; could not automatically reopen it: '+String(e)));}},[]);
  useEffect(()=>{if(!message)return;const timer=setTimeout(()=>setMessage(''),7000);return()=>clearTimeout(timer);},[message]);
  async function save(kind:'manual'|'autosave'='manual'){
   if(kind==='autosave')await new Promise<void>(resolve=>{if('requestIdleCallback' in window)window.requestIdleCallback(()=>resolve(),{timeout:1000});else setTimeout(resolve,16);});
@@ -299,7 +299,7 @@ export function App(){
  useEffect(()=>{if(!documentDirty(doc,saved.current))return;const timer=setTimeout(()=>{if(documentDirty(store.getSnapshot(),saved.current))void save('autosave');},2500);return()=>clearTimeout(timer);},[doc]);
  useEffect(()=>{const before=(e:BeforeUnloadEvent)=>{if(documentDirty(store.getSnapshot(),saved.current)||engine.current?.drawing||pendingSaves.current||engine.current?.recorder.warnOnClose){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',before);return()=>window.removeEventListener('beforeunload',before);},[store]);
  function discard(){return !engine.current?.drawing&&!documentDirty(doc,saved.current)||window.confirm('There are unsaved changes or an active stroke. Continue and discard those changes?');}
- async function openProject(p:Project){if(!discard())return;try{if(operationLock.current)return;validateProject(p);engine.current!.cancelGesture();if(!await engine.current!.load(p)){notify('Project opening was canceled because the current document changed.');return;}saved.current=p;writePreference('last-project',p.id);if(modal==='recover')writePreference('onboarding-dismissed',true);setLastSaved('');setStatus('Opened local project');setModal('');}catch(e){notify('Could not open project: '+String(e));}}
+ async function openProject(p:Project){if(!discard())return;try{if(operationLock.current)return;validateProject(p);engine.current!.cancelGesture();if(!await loadStudioProject(p)){notify('Project opening was canceled because the current document changed.');return;}writePreference('last-project',p.id);if(modal==='recover')writePreference('onboarding-dismissed',true);setLastSaved('');setStatus('Opened local project');setModal('');}catch(e){notify('Could not open project: '+String(e));}}
  function closeModal(){if(sequenceBusy){sequenceAbort.current?.abort();return;}if(modal==='recover')writePreference('onboarding-dismissed',true);setModal('');}
  async function showOnboarding(){try{setDeleteSelection([]);setRecords(await repository.list());setModal('recover');}catch(e){notify('Could not read saved projects: '+String(e));}}
  async function listProjects(){try{setDeleteSelection([]);setRecords(await repository.list());setModal('open');}catch(e){notify('Could not read projects: '+String(e));}}
@@ -337,7 +337,7 @@ export function App(){
   else if(modal==='saveas'){const p={...doc,id:uid(),name:name.trim(),createdAt:new Date().toISOString()};setLastSaved('');store.replace(p);setModal('');await save();}
   else if(modal==='rename'){store.commit({...doc,name:name.trim()});setModal('');}
  }
- async function openProjectWithoutConfirm(p:Project){try{engine.current!.cancelGesture();if(!await engine.current!.load(p)){notify('Project opening was canceled because the document changed.');return;}saved.current=p;setLastSaved('');setStatus('New project');setModal('');}catch(e){notify(String(e));}}
+ async function openProjectWithoutConfirm(p:Project){try{engine.current!.cancelGesture();if(!await loadStudioProject(p)){notify('Project opening was canceled because the document changed.');return;}setLastSaved('');setStatus('New project');setModal('');}catch(e){notify(String(e));}}
  function commit(p:Project){if(operationLock.current)return;engine.current?.cancelGesture();engine.current?.clearSelection();store.commit(p);}
  function animationAction(action:'add'|'duplicate'|'delete'){
   playback.current?.stop();
@@ -523,20 +523,40 @@ export function App(){
   const k=p.camera.keys.find(k=>k.frame===cameraExposure);
   commitCamera({...p,camera:setCameraKey(p.camera,{frame:cameraExposure,...st,x,y,ease:k?.ease??'ease-in-out'})},'Move camera');
  }
+ function fullDrawingArea(project:Project){
+  const viewport=canvas.current?.getBoundingClientRect();
+  return validateProject(expandPasteboard(project,viewport?.width??0,viewport?.height??0));
+ }
+ async function loadStudioProject(project:Project,expectedRevision?:number){
+  const studio=engine.current!;
+  let opened=project;
+  if(project.version===4&&!frameOnly){
+   try{opened=fullDrawingArea(project);}
+   catch{
+    const loaded=await studio.load(project,expectedRevision);
+    if(loaded)notify('Opened in Frame Only. Studio could not expand this drawing area.');
+    return loaded;
+   }
+  }
+  return studio.load(opened,expectedRevision);
+ }
+ useEffect(()=>{engine.current?.setOutsideFrame(!frameOnly);},[frameOnly]);
  function toggleOutsideFrame(){
   const current=store.getSnapshot(),studio=engine.current;
   if(!studio||busy||sequenceBusy||operationLock.current||studio.drawing)return;
-  if(current.shotFrame){setFrameOnly(value=>!value);return;}
+  if(current.version===5){setFrameOnly(value=>!value);return;}
   stopPlayback();clearFlipPreview();
   try{
-   const expanded=validateProject(addDrawingMargins(current));
+   const expanded=fullDrawingArea(current);
    studio.clearSelection();
-   store.commit(expanded,'Add outside drawing area');
+   studio.setOutsideFrame(true);
+   store.commit(expanded,'Expand outside drawing area');
    setFrameOnly(false);
   }catch(error){notify(error instanceof Error?error.message:'Could not extend the drawing area.');}
  }
  const frameSize=shotFrame(doc);
- const showingOutside=!!doc.shotFrame&&!frameOnly;
+ const showingOutside=doc.version===5&&!frameOnly;
+ const maskOutside=!!doc.shotFrame&&!showingOutside;
  const outsideFrameLabel=showingOutside?'Frame Only':'Show Outside Frame';
  function goToCameraExposure(n:number){const item=cameraPlan.find(i=>i.number===n)??cameraPlan.at(-1);if(!item)return;setCameraExposure(item.number);if(doc.animation&&item.frameId!==doc.animation.activeFrameId)goToDrawingFrame(item.frameId);}
  function goToDrawingFrame(id:string){
@@ -966,7 +986,7 @@ export function App(){
       if(e.target!==canvas.current)return;
       if(playback.current?.active){e.preventDefault();e.stopPropagation();stopPlayback();return;}
       const studio=engine.current;
-      if(!studio||!frameOnly||!doc.shotFrame||e.button!==0||studio.space||tool==='hand'||tool==='zoom'||tool==='rotate')return;
+      if(!studio||!maskOutside||e.button!==0||studio.space||tool==='hand'||tool==='zoom'||tool==='rotate')return;
       const rect=e.currentTarget.getBoundingClientRect(),shot=shotFrame(doc);
       const frame=cameraAt(doc.camera?.enabled?doc.camera:undefined,cameraExposure,shot.width,shot.height,shot.x,shot.y);
       const point=toProject({x:e.clientX-rect.left,y:e.clientY-rect.top},studio.view);
@@ -979,7 +999,7 @@ export function App(){
      {(tool==='transform'||tool==='stroke-select'&&advancedStrokeTransform)&&engineReady&&!busy&&<TransformOverlay engine={engineReady} view={view} scope={{frameIds:multiCelAvailable?selectedFrames.ids:[],layerIds:multiCelAvailable?selectedLayers.ids:[]}} keyDelegate={transformHotkeyRef} onCancel={()=>{if(tool==='stroke-select'){setAdvancedStrokeTransform(false);}else{engine.current?.clearSelection();chooseTool('brush');}}} onMessage={notify}/>}
      {multiCelAvailable&&batchCanvasMode&&batchCanvasMode!=='depth'&&batchCanvasBounds&&!busy&&<BatchCanvasTransform key={batchCanvasMode} view={view} bounds={batchCanvasBounds} mode={batchCanvasMode} onCommit={applyBatchTransform}/>}
      {multiCelAvailable&&batchCanvasMode==='depth'&&depthPreviewFrames.length&&!busy&&<ProgressiveScaleCanvas key={selectedFrames.ids.join('|')+'|'+selectedLayers.ids.join('|')} view={view} frames={depthPreviewFrames} initialFocus={doc.animation?.activeFrameId??''} onFocusFrame={goToDrawingFrame} onApply={applyProgressiveScale} onCancel={()=>setBatchCanvasMode(null)}/>}
-     <SceneCameraOverlay project={doc} frame={cameraExposure} view={camera} frameOnly={frameOnly&&!!doc.shotFrame} canMove={!doc.shotFrame||rightTab==='camera'} onMove={moveSceneCamera}/>
+     <SceneCameraOverlay project={doc} frame={cameraExposure} view={camera} frameOnly={maskOutside} canMove={!doc.shotFrame||rightTab==='camera'} onMove={moveSceneCamera}/>
      {motionToolsOpen&&rightTab==='motion'&&workspaceMode==='ANIMATE'&&pathVisible&&<MotionArcOverlay planning={doc.motionPlanning} view={view} activeFrameId={frameList(doc)[currentFrameIndex(doc)].id} frameIds={motionFrameIds} activeArcId={doc.motionPlanning?.arcs.some(a=>a.id===activeMotionArcId)?activeMotionArcId:doc.motionPlanning?.arcs.at(-1)?.id} editing={pathEditable} addingDot={addingMotionDot} selectedDotId={selectedMotionDotId} onMovePoint={motionPointEditCallback.current} onAddDot={motionDotAddCallback.current} onMoveDot={motionDotMoveCallback.current} onSelectDot={setSelectedMotionDotId}/>}
      {multiCelAvailable&&tool!=='transform'&&<FloatingTransformPanel id="multi" className="batch-canvas-toolbar" label="Multi-frame canvas transform">
       <strong>{frameSelectionSet.size} FRAMES</strong>

@@ -23,10 +23,12 @@ export type Fill = {id:string;kind:'fill';png:string;under?:boolean};
 export type ImageOperation={id:string;kind:'image';png:string;x:number;y:number;width:number;height:number};
 export type ClearOperation={id:string;kind:'clear';polygon:Point[]};
 export type Transform = {id:string;kind:'transform';polygon:Point[];matrix:Matrix};
-export type Operation = (Stroke | Fill | Transform | VectorLine | ImageOperation | ClearOperation)&{inShot?:true};
+export type ArtworkOrigin={inShot?:true;inPreviousStage?:true};
+export type Operation = (Stroke | Fill | Transform | VectorLine | ImageOperation | ClearOperation)&ArtworkOrigin;
 export type BlendMode='normal'|'multiply'|'screen'|'overlay'|'add';
 export type Layer = {id:string;name:string;visible:boolean;locked:boolean;opacity:number;operations:Operation[];kind?:'raster'|'vector';blend?:BlendMode;reference?:boolean;exportReference?:boolean};
-export type Project = {format:'solo-anime-studio';version:1|2|3|4;id:string;name:string;width:number;height:number;shotFrame?:ShotFrame;activeLayerId:string;layers:Layer[];settings:{guides:boolean};createdAt:string;animation?:DrawingTimeline;substitutionShelf?:SubstitutionShelfData;cycleShelf?:CycleShelf;audio?:SceneAudio;motionPlanning?:MotionPlanning;camera?:SceneCamera};
+export type Project = {format:'solo-anime-studio';version:1|2|3|4|5;id:string;name:string;width:number;height:number;shotFrame?:ShotFrame;previousStage?:ShotFrame;activeLayerId:string;layers:Layer[];settings:{guides:boolean};createdAt:string;animation?:DrawingTimeline;substitutionShelf?:SubstitutionShelfData;cycleShelf?:CycleShelf;audio?:SceneAudio;motionPlanning?:MotionPlanning;camera?:SceneCamera};
+export const MAX_STAGE_SIDE=8192,MAX_STAGE_PIXELS=16_777_216;
 export const uid = () => crypto.randomUUID();
 export function newLayer(name:string,kind:'raster'|'vector'='raster'):Layer {return {id:uid(),name,visible:true,locked:false,opacity:1,operations:[],kind};}
 export function newProject(name='Untitled scene',width=1920,height=1080):Project {
@@ -34,7 +36,7 @@ export function newProject(name='Untitled scene',width=1920,height=1080):Project
  return {format:'solo-anime-studio',version:3,id:uid(),name,width,height,activeLayerId:layers[1].id,layers,settings:{guides:true},createdAt:new Date().toISOString()};
 }
 export const activeLayer = (p:Project) => p.layers.find(l=>l.id===p.activeLayerId)!;
-export function editLayer(p:Project,id:string,patch:Partial<Layer>):Project {return {...p,version:p.version===4?4:3,layers:p.layers.map(l=>l.id===id?{...l,...patch}:l)};}
+export function editLayer(p:Project,id:string,patch:Partial<Layer>):Project {return {...p,version:p.version>=3?p.version:3,layers:p.layers.map(l=>l.id===id?{...l,...patch}:l)};}
 export function appendOperation(p:Project,op:Operation):Project {
  const layer=activeLayer(p); if(layer.locked||!layer.visible)return p;
  return editLayer(p,layer.id,{operations:[...layer.operations,op]});
@@ -60,14 +62,17 @@ const bounded=(n:unknown,min:number,max:number)=>finite(n)&&n>=min&&n<=max;
 const point=(p:any)=>p&&finite(p.x)&&finite(p.y)&&Math.abs(p.x)<=1e6&&Math.abs(p.y)<=1e6&&bounded(p.p,0,1)&&(p.v===undefined||bounded(p.v,0,1));
 export function validateProject(value:unknown):Project {
  const p=value as any;
- if(!p||p.format!=='solo-anime-studio'||![1,2,3,4].includes(p.version))throw Error('Unsupported project format or version.');
- const frame=p.shotFrame,expanded=p.version===4;
- if(typeof p.id!=='string'||typeof p.name!=='string'||p.name.length>200||typeof p.createdAt!=='string'||!Number.isInteger(p.width)||!Number.isInteger(p.height)||!bounded(p.width,64,expanded?8192:4096)||!bounded(p.height,64,expanded?8192:4096)||p.width*p.height>(expanded?16777216:8388608))throw Error('Invalid project dimensions or metadata.');
+ if(!p||p.format!=='solo-anime-studio'||![1,2,3,4,5].includes(p.version))throw Error('Unsupported project format or version.');
+ const frame=p.shotFrame,expanded=p.version>=4,previous=p.previousStage;
+ if(typeof p.id!=='string'||typeof p.name!=='string'||p.name.length>200||typeof p.createdAt!=='string'||!Number.isInteger(p.width)||!Number.isInteger(p.height)||!bounded(p.width,64,expanded?MAX_STAGE_SIDE:4096)||!bounded(p.height,64,expanded?MAX_STAGE_SIDE:4096)||p.width*p.height>(expanded?MAX_STAGE_PIXELS:8388608))throw Error('Invalid project dimensions or metadata.');
  if(expanded){
   if(!frame||![frame.x,frame.y,frame.width,frame.height].every(Number.isInteger)||frame.x<1||frame.y<1||
     !bounded(frame.width,64,4096)||!bounded(frame.height,64,4096)||frame.width*frame.height>8388608||
     frame.x+frame.width>=p.width||frame.y+frame.height>=p.height)throw Error('Invalid shot frame.');
  }else if(frame!==undefined)throw Error('Shot frame requires an expanded project.');
+ if(previous!==undefined&&(p.version!==5||!previous||![previous.x,previous.y,previous.width,previous.height].every(Number.isInteger)||
+    previous.x<0||previous.y<0||previous.x>=frame.x||previous.y>=frame.y||previous.x+previous.width>p.width||previous.y+previous.height>p.height||
+    previous.x+previous.width<=frame.x+frame.width||previous.y+previous.height<=frame.y+frame.height))throw Error('Invalid previous drawing area.');
  if(!Array.isArray(p.layers)||p.layers.length<1||p.layers.length>100)throw Error('Projects require 1–100 layers.');
  const ids=new Set<string>();let count=0;
  for(const l of p.layers){
@@ -81,6 +86,7 @@ export function validateProject(value:unknown):Project {
   for(const o of l.operations){
    if(!o||typeof o.id!=='string'||++count>100000)throw Error('Invalid drawing operation.');
    if(o.inShot!==undefined&&(!expanded||o.inShot!==true))throw Error('Invalid drawing operation frame.');
+   if(o.inPreviousStage!==undefined&&(!previous||o.inPreviousStage!==true))throw Error('Invalid drawing operation area.');
    if(o.kind==='stroke'){
     if(!['brush','eraser'].includes(o.tool)||!bounded(o.size,.1,500)||!bounded(o.opacity,0,1)||!/^#[\da-f]{6}$/i.test(o.color)||typeof o.pressure!=='boolean'||!bounded(o.response,.2,3)||!Array.isArray(o.points)||!o.points.length||o.points.length>200000||!o.points.every(point))throw Error('Invalid stroke data.');
     if(o.engineVersion!==undefined&&o.engineVersion!==2&&o.engineVersion!==3&&o.engineVersion!==4&&o.engineVersion!==5&&o.engineVersion!==6&&o.engineVersion!==7&&o.engineVersion!==8&&o.engineVersion!==9&&o.engineVersion!==10)throw Error('Unsupported stroke renderer.');

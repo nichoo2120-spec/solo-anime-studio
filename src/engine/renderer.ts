@@ -1,10 +1,10 @@
 import {cameraAt,cameraMatrix,layerDepth} from '../animation/sceneCamera';
-import {originalShotArtwork,shotFrame,type ShotFrame} from '../core/shotFrame';
+import {artworkAtOrigin,shotFrame,type ShotFrame} from '../core/shotFrame';
 import {HistoryTiles} from './HistoryTiles';
 import {dryRasterPadding} from '../core/dryBrush';
 import {resetDryBristleV3MixModel} from './dryBristleV3';
 import {compositePaintStroke,strokeRasterBounds} from './paintCompositing';
-import type {Layer,Point,Project,Stroke,Matrix} from '../core/model';
+import type {ArtworkOrigin,Layer,Point,Project,Stroke,Matrix} from '../core/model';
 import {pressureWidth} from '../core/geometry';
 import type {strokeGeometry} from './strokeGeometry';
 import {drawModernStroke} from './brushRaster';
@@ -19,6 +19,7 @@ export const blendOperation=(mode:Layer['blend']):GlobalCompositeOperation=>mode
 type HistoryDelta={id:string;prefix:Layer['operations'];operation:Layer['operations'][number];patch:HistoryTiles;width:number;height:number;bytes:number};
 const releaseRaster=(c:HTMLCanvasElement|ImageBitmap)=>{if('close' in c)c.close();else c.width=c.height=0;};
 export type ExportOptions={transparent?:boolean;width?:number;height?:number;layerId?:string;includeReferences?:boolean;/** v174: 1-based exposure number; render through the scene camera. */cameraFrame?:number};
+const bitmapOrigin=(project:Project,op:ArtworkOrigin)=>op.inShot?project.shotFrame:op.inPreviousStage?project.previousStage:undefined;
 let reflectedSurface:HTMLCanvasElement|undefined;
 let vectorSurface:HTMLCanvasElement|undefined;
 /** Isolate opacity/blend per layer, not per vector line. Rasterize at display pixels. */
@@ -114,7 +115,7 @@ export class LayerRenderer {
   await Promise.all(images.map(async o=>{
    let image=this.bitmaps.get(o.png);
    if(!image){image=new Image();image.src=o.png;await image.decode();}
-   const bounds=o.kind==='fill'&&o.inShot?shotFrame(project):project;
+   const bounds=bitmapOrigin(project,o)??project;
    if(o.kind==='fill'&&(image.width!==bounds.width||image.height!==bounds.height))throw Error('Fill bitmap dimensions do not match the project.');
    if(image.width*image.height>16777216)throw Error('Image exceeds the decode limit.');
    this.bitmaps.set(o.png,image);
@@ -155,18 +156,23 @@ export class LayerRenderer {
   if(!cached||cached.canvas!==base||result===base||base.width!==p.width||base.height!==p.height||result.width!==p.width||result.height!==p.height||layer.operations[index]!==stroke||cached.layer.operations.length!==index||!cached.layer.operations.every((o,i)=>o===layer.operations[i]))return undefined;
   this.beforeOperation(layer,base,index);this.caches.set(layer.id,{layer,canvas:result,frame:p.animation?.activeFrameId});this.afterOperation(layer,result,index);this.remember(layer,result,index+1);return base;
  }
- private paintOriginalShot(ctx:CanvasRenderingContext2D,layer:Layer,project:Project){
-  const frame=project.shotFrame;
-  if(!frame||!layer.operations[0]?.inShot)return 0;
-  const next=layer.operations.findIndex(op=>!op.inShot);
+ private paintOriginalBounds(ctx:CanvasRenderingContext2D,layer:Layer,project:Project){
+  const first=layer.operations[0];
+  const previous=first?.inPreviousStage&&project.previousStage;
+  const bounds=previous||(first?.inShot&&project.shotFrame);
+  if(!bounds)return 0;
+  const origin=previous?'inPreviousStage':'inShot';
+  const next=layer.operations.findIndex(op=>!op[origin]);
   const end=next<0?layer.operations.length:next;
   const renderer=new LayerRenderer(false);
   renderer.bitmaps=this.bitmaps;
-  const originalLayer={...layer,operations:originalShotArtwork(layer.operations.slice(0,end),frame)};
-  const original={...project,shotFrame:undefined,width:frame.width,height:frame.height};
+  const frame=previous?shotFrame(project):undefined;
+  const originalLayer={...layer,operations:artworkAtOrigin(layer.operations.slice(0,end),bounds,origin)};
+  const original={...project,previousStage:undefined,shotFrame:frame&&{...frame,x:frame.x-bounds.x,y:frame.y-bounds.y},width:bounds.width,height:bounds.height};
   const canvas=renderer.get(originalLayer,original);
-  ctx.drawImage(canvas,frame.x,frame.y);
+  ctx.drawImage(canvas,bounds.x,bounds.y);
   canvas.width=canvas.height=0;
+  if(renderer.scratch)renderer.scratch.width=renderer.scratch.height=0;
   return end;
  }
  get(layer:Layer,p:Project){
@@ -196,8 +202,8 @@ export class LayerRenderer {
   const incremental=cached&&cached.canvas.width===p.width&&cached.canvas.height===p.height&&cached.layer.operations.length<layer.operations.length&&cached.layer.operations.every((o,i)=>o===layer.operations[i]);
   const canvas=cached&&cached.canvas.width===p.width&&cached.canvas.height===p.height?cached.canvas:makeCanvas(p.width,p.height),ctx=context(canvas),capture=incremental||!cached&&layer.operations.length===1;let scratch:HTMLCanvasElement|undefined,start=incremental&&cached?cached.layer.operations.length:0;
   if(!incremental){const checkpoint=this.checkpoints.filter(c=>c.id===layer.id&&c.canvas.width===p.width&&c.canvas.height===p.height&&c.operations.length<=layer.operations.length&&c.operations.every((o,i)=>o===layer.operations[i])).sort((a,b)=>b.operations.length-a.operations.length)[0];ctx.clearRect(0,0,p.width,p.height);if(checkpoint){ctx.drawImage(checkpoint.canvas,0,0);start=checkpoint.operations.length;this.checkpoints.splice(this.checkpoints.indexOf(checkpoint),1);this.checkpoints.push(checkpoint);}}
-  if(!incremental&&!start)start=this.paintOriginalShot(ctx,layer,p);
-  for(let i=start;i<layer.operations.length;i++){const op=layer.operations[i];if(capture)this.beforeOperation(layer,canvas,i);else this.replayed++;if(op.kind==='stroke'){const ready=this.strokeRasters.get(op);let source:HTMLCanvasElement,sourceX=0,sourceY=0;if(ready&&ready.width===p.width&&ready.height===p.height){source=ready.canvas as HTMLCanvasElement;sourceX=ready.x;sourceY=ready.y;this.strokeRasters.delete(op);this.strokeRasters.set(op,ready);}else{scratch??=this.scratch??=makeCanvas(p.width,p.height);if(scratch.width!==p.width)scratch.width=p.width;if(scratch.height!==p.height)scratch.height=p.height;const sc=context(scratch);sc.clearRect(0,0,p.width,p.height);drawStroke(sc,op);source=scratch;}compositePaintStroke(ctx,source,op,sourceX,sourceY);}else if(op.kind==='fill'){const image=this.bitmaps.get(op.png);if(image){ctx.save();ctx.globalCompositeOperation=op.under?'destination-over':'source-over';const origin=op.inShot?shotFrame(p):undefined;ctx.drawImage(image,origin?.x??0,origin?.y??0);ctx.restore();}}else if(op.kind==='image'){const image=this.bitmaps.get(op.png);if(image)ctx.drawImage(image,op.x,op.y,op.width,op.height);}else if(op.kind==='clear'){ctx.save();ctx.globalCompositeOperation='destination-out';polygonPath(ctx,op.polygon);ctx.fill();ctx.restore();}else if(op.kind==='vector')drawVector(ctx,op);else applyTransform(canvas,op.polygon,op.matrix);if(capture){this.afterOperation(layer,canvas,i);this.remember(layer,canvas,i+1);}}
+  if(!incremental&&!start)start=this.paintOriginalBounds(ctx,layer,p);
+  for(let i=start;i<layer.operations.length;i++){const op=layer.operations[i];if(capture)this.beforeOperation(layer,canvas,i);else this.replayed++;if(op.kind==='stroke'){const ready=this.strokeRasters.get(op);let source:HTMLCanvasElement,sourceX=0,sourceY=0;if(ready&&ready.width===p.width&&ready.height===p.height){source=ready.canvas as HTMLCanvasElement;sourceX=ready.x;sourceY=ready.y;this.strokeRasters.delete(op);this.strokeRasters.set(op,ready);}else{scratch??=this.scratch??=makeCanvas(p.width,p.height);if(scratch.width!==p.width)scratch.width=p.width;if(scratch.height!==p.height)scratch.height=p.height;const sc=context(scratch);sc.clearRect(0,0,p.width,p.height);drawStroke(sc,op);source=scratch;}compositePaintStroke(ctx,source,op,sourceX,sourceY);}else if(op.kind==='fill'){const image=this.bitmaps.get(op.png);if(image){ctx.save();ctx.globalCompositeOperation=op.under?'destination-over':'source-over';const origin=bitmapOrigin(p,op);ctx.drawImage(image,origin?.x??0,origin?.y??0);ctx.restore();}}else if(op.kind==='image'){const image=this.bitmaps.get(op.png);if(image)ctx.drawImage(image,op.x,op.y,op.width,op.height);}else if(op.kind==='clear'){ctx.save();ctx.globalCompositeOperation='destination-out';polygonPath(ctx,op.polygon);ctx.fill();ctx.restore();}else if(op.kind==='vector')drawVector(ctx,op);else applyTransform(canvas,op.polygon,op.matrix);if(capture){this.afterOperation(layer,canvas,i);this.remember(layer,canvas,i+1);}}
   if(!cached&&layer.operations.length>=(p.width*p.height*4>=4*1024*1024?24:8))this.remember(layer,canvas,layer.operations.length,true);
   this.caches.set(layer.id,{layer,canvas,frame});return canvas;
  }
