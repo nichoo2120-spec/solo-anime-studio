@@ -1,6 +1,7 @@
 import {describe,expect,it} from 'vitest';
 import {cameraAt,cameraMatrix,newSceneCamera} from '../src/animation/sceneCamera';
 import {activeLayer,appendOperation,newProject,validateProject,type Operation} from '../src/core/model';
+import {DocumentStore} from '../src/core/history';
 import {addDrawingMargins,originalShotArtwork,shotFrame} from '../src/core/shotFrame';
 
 describe('drawing outside the shot frame',()=>{
@@ -26,7 +27,9 @@ describe('drawing outside the shot frame',()=>{
   const reopened=validateProject(JSON.parse(JSON.stringify(expanded)));
   expect(JSON.parse(JSON.stringify(originalShotArtwork(activeLayer(reopened).operations,frame)))).toEqual(operations);
   const outside={...operations[1],id:'outside'} as Operation;
-  const edited=validateProject(appendOperation(reopened,outside));
+  const store=new DocumentStore(reopened);
+  store.commit(appendOperation(reopened,outside));
+  const edited=validateProject(store.getSnapshot());
   expect(edited.version).toBe(4);
   expect(shotFrame(edited)).toEqual(frame);
   expect(addDrawingMargins(edited)).toBe(edited);
