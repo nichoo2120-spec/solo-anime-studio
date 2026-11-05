@@ -63,10 +63,16 @@ export class OnionSkinOverlay {
   if(signature!==this.signature){this.signature=signature;this.ghosts.clear();}
   this.generation++;
   this.cancelTask();
-  // Only reuse a cached neighboring cel when both its frame object and its layer
-  // presentation remain unchanged. Cache holds only requested ghosts/pins (at most 10 onion ghosts plus pinned guides).
+  // Retain a few recently used ghosts for back-and-forth frame inspection.
+  // The frame object and layer presentation must still match.
   const ids=new Set(this.neighbors.map(n=>this.key(n)));
-  for(const id of this.ghosts.keys())if(!ids.has(id))this.ghosts.delete(id);
+  const validFrames=new Set(frames);
+  const inactive:string[]=[];
+  for(const [id,ghost] of this.ghosts){
+   if(!validFrames.has(ghost.frame))this.ghosts.delete(id);
+   else if(!ids.has(id))inactive.push(id);
+  }
+  for(const id of inactive.slice(0,Math.max(0,inactive.length-4)))this.ghosts.delete(id);
   this.paint();this.schedule();
  }
  private key(n:Guide){return `${n.frame.id}:${n.kind}:${n.color??'original'}`;}

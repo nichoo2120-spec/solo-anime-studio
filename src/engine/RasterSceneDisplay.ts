@@ -21,8 +21,15 @@ export class RasterSceneDisplay{
   return {project:p,layers,renderer,revision:renderer.displayRevision,role:stopLayerId?'live':'idle'};
  }
  /** Prepare the navigation surface before the first wheel event. */
- warm(p:Project,renderer:LayerRenderer){const key=this.group(p,renderer);if(!key)return;this.wanted=key;const entry=this.entries.get(key.role);if(!entry||!same(entry.key,key))this.schedule();}
- prepareSurface(surface:HTMLCanvasElement,p:Project,renderer:LayerRenderer):Set<string>|undefined{
+ warm(p:Project,renderer:LayerRenderer){
+  const key=this.group(p,renderer);if(!key)return;
+  if(this.wanted&&!same(this.wanted,key))this.pauseWarmup();
+  this.wanted=key;
+  const entry=this.entries.get(key.role);
+  if(!entry||!same(entry.key,key))this.schedule(200);
+ }
+ pauseWarmup(){if(this.task)clearTimeout(this.task);this.task=undefined;}
+ private prepareSurface(surface:HTMLCanvasElement,p:Project,renderer:LayerRenderer):Set<string>|undefined{
   const key=this.group(p,renderer);if(!key)return;this.wanted=key;const entry=this.entries.get(key.role);if(!entry||!same(entry.key,key)){this.schedule();return;}
   if(this.presented?.entry!==entry||this.presented.surface!==surface){surface.width=p.width;surface.height=p.height;surface.style.width=p.width+'px';surface.style.height=p.height+'px';surface.getContext('2d')!.drawImage(entry.levels[0].bitmap,0,0);this.presented={entry,surface};}
   return new Set(key.layers.map(l=>l.id));
@@ -43,7 +50,7 @@ export class RasterSceneDisplay{
   if(entry&&same(entry.key,key)){const matrix=ctx.getTransform(),scale=Math.hypot(matrix.a,matrix.b);let level=entry.levels[0];for(const candidate of entry.levels)if(candidate.factor*scale<=1+1e-7)level=candidate;ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.drawImage(level.bitmap,0,0,level.bitmap.width*level.factor,level.bitmap.height*level.factor);ctx.restore();return new Set(layers.map(l=>l.id));}
   this.schedule();
  }
- private schedule(){if(this.pending||this.task||this.disposed||this.failed)return;this.task=setTimeout(()=>{this.task=undefined;const key=this.wanted,entry=key?this.entries.get(key.role):undefined;if(key&&(!entry||!same(entry.key,key)))void this.prepare(key);},0);}
+ private schedule(delay=0){if(this.pending||this.disposed||this.failed)return;if(!delay)this.pauseWarmup();if(this.task)return;this.task=setTimeout(()=>{this.task=undefined;const key=this.wanted,entry=key?this.entries.get(key.role):undefined;if(key&&(!entry||!same(entry.key,key)))void this.prepare(key);},delay);}
  private async prepare(key:Key){
   const token=++this.serial,job:Job={key,token,timer:setTimeout(()=>this.fail(),20000)};this.pending=job;
   try{const worker=this.worker??=new Worker(new URL('./rasterScene.worker.ts',import.meta.url),{type:'module'});worker.onmessage=event=>this.received(event.data);worker.onerror=event=>{event.preventDefault();if(this.worker===worker)this.fail();};worker.onmessageerror=()=>{if(this.worker===worker)this.fail();};worker.postMessage({kind:'begin',token,width:key.project.width,height:key.project.height});

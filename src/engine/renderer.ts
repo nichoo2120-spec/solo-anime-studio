@@ -58,7 +58,23 @@ export class LayerRenderer {
  private pendingLayer?:{layer:Layer;project:Project;stroke:Stroke;base:HTMLCanvasElement;preview:HTMLCanvasElement;done:Promise<HTMLCanvasElement|undefined>};
  private finalWorker?:Worker;private finalSerial=0;
  private pendingFinal?:{token:number;stroke:Stroke;layer:string;width:number;height:number;preview:LayerRenderer;request:()=>void;done:Promise<void>;resolve:()=>void;timer:ReturnType<typeof setTimeout>};
- private scratch?:HTMLCanvasElement;private caches=new Map<string,{layer:Layer;canvas:HTMLCanvasElement}>();private bitmaps=new Map<string,HTMLImageElement>();
+ private scratch?:HTMLCanvasElement;private caches=new Map<string,{layer:Layer;canvas:HTMLCanvasElement;frame?:string}>();private bitmaps=new Map<string,HTMLImageElement>();
+ private celRasters:{layer:Layer;canvas:HTMLCanvasElement}[]=[];
+ private celRasterBytes=0;
+ private readonly celRasterBudget=96*1024*1024;
+ private releaseCelRaster(index:number){
+  const [entry]=this.celRasters.splice(index,1);
+  this.celRasterBytes-=entry.canvas.width*entry.canvas.height*4;
+  return entry;
+ }
+ private parkCelRaster(entry:{layer:Layer;canvas:HTMLCanvasElement}){
+  const bytes=entry.canvas.width*entry.canvas.height*4;
+  if(!entry.layer.operations.length||bytes>this.celRasterBudget)return;
+  while(this.celRasterBytes+bytes>this.celRasterBudget){
+   const {canvas}=this.releaseCelRaster(0);canvas.width=canvas.height=0;
+  }
+  this.celRasters.push(entry);this.celRasterBytes+=bytes;
+ }
  private strokeRasters=new Map<Stroke,{canvas:HTMLCanvasElement|ImageBitmap;bytes:number;width:number;height:number;x:number;y:number}>();private strokeBytes=0;
  /** Accept the exact final scratch pixels, avoiding an immediate second render
   * of a long paint stroke on release. This shares the existing cache budget. */
@@ -96,7 +112,7 @@ export class LayerRenderer {
   const images=project.layers.flatMap(l=>l.operations).filter(o=>o.kind==='fill'||o.kind==='image');
   await Promise.all(images.map(async o=>{if((o.kind==='fill'||o.kind==='image')&&!this.bitmaps.has(o.png)){const image=new Image();image.src=o.png;await image.decode();if(o.kind==='fill'&&(image.width!==project.width||image.height!==project.height))throw Error('Fill bitmap dimensions do not match the project.');if(image.width*image.height>16777216)throw Error('Image exceeds the decode limit.');this.bitmaps.set(o.png,image);}}));
  }
- clear(){this.pendingLayer=undefined;this.cancelFinal();this.finalWorker?.terminate();this.finalWorker=undefined;for(const c of this.caches.values())c.canvas.width=c.canvas.height=0;this.caches.clear();if(this.scratch)this.scratch.width=this.scratch.height=0;this.scratch=undefined;this.bitmaps.clear();while(this.strokeRasters.size)this.dropStroke();for(const c of this.checkpoints){c.canvas.width=0;c.canvas.height=0;}for(const d of this.deltas)d.patch.clear();this.checkpoints=[];this.checkpointBytes=0;this.deltas=[];this.deltaLookup.clear();this.deltaBytes=0;}
+ clear(){this.pendingLayer=undefined;this.cancelFinal();this.finalWorker?.terminate();this.finalWorker=undefined;for(const c of this.caches.values())c.canvas.width=c.canvas.height=0;this.caches.clear();while(this.celRasters.length){const {canvas}=this.releaseCelRaster(this.celRasters.length-1);canvas.width=canvas.height=0;}if(this.scratch)this.scratch.width=this.scratch.height=0;this.scratch=undefined;this.bitmaps.clear();while(this.strokeRasters.size)this.dropStroke();for(const c of this.checkpoints){c.canvas.width=0;c.canvas.height=0;}for(const d of this.deltas)d.patch.clear();this.checkpoints=[];this.checkpointBytes=0;this.deltas=[];this.deltaLookup.clear();this.deltaBytes=0;}
  private cancelFinal(){const job=this.pendingFinal;if(job){clearTimeout(job.timer);job.preview.clear();this.pendingFinal=undefined;job.resolve();this.displayRevision++;}}
  private failedFinal(){const request=this.pendingFinal?.request;this.cancelFinal();this.finalWorker?.terminate();this.finalWorker=undefined;request?.();}
  /** A temporary renderer serves only on-screen drawing. Canonical get(), PNG
@@ -129,22 +145,38 @@ export class LayerRenderer {
  adoptLayerResult(layer:Layer,p:Project,stroke:Stroke,base:HTMLCanvasElement,result:HTMLCanvasElement){
   const cached=this.caches.get(layer.id),index=layer.operations.length-1;
   if(!cached||cached.canvas!==base||result===base||base.width!==p.width||base.height!==p.height||result.width!==p.width||result.height!==p.height||layer.operations[index]!==stroke||cached.layer.operations.length!==index||!cached.layer.operations.every((o,i)=>o===layer.operations[i]))return undefined;
-  this.beforeOperation(layer,base,index);this.caches.set(layer.id,{layer,canvas:result});this.afterOperation(layer,result,index);this.remember(layer,result,index+1);return base;
+  this.beforeOperation(layer,base,index);this.caches.set(layer.id,{layer,canvas:result,frame:p.animation?.activeFrameId});this.afterOperation(layer,result,index);this.remember(layer,result,index+1);return base;
  }
  get(layer:Layer,p:Project){
-  const cached=this.caches.get(layer.id);if(cached&&cached.layer.operations===layer.operations&&cached.canvas.width===p.width&&cached.canvas.height===p.height)return cached.canvas;
+  const frame=p.animation?.activeFrameId;
+  let cached=this.caches.get(layer.id);
+  if(cached&&cached.canvas.width===p.width&&cached.canvas.height===p.height){
+   const previous=cached.layer.operations,next=layer.operations;
+   if(previous===next||frame!==cached.frame&&previous.length===next.length&&previous.every((op,i)=>op===next[i])){
+    if(frame!==cached.frame||previous!==next)this.caches.set(layer.id,{layer,canvas:cached.canvas,frame});
+    return cached.canvas;
+   }
+   if(this.captureHistory&&frame&&cached.frame&&frame!==cached.frame){
+    const index=this.celRasters.findIndex(entry=>entry.layer.id===layer.id&&entry.layer.operations===next&&entry.canvas.width===p.width&&entry.canvas.height===p.height);
+    const restored=index<0?undefined:this.releaseCelRaster(index);
+    this.caches.delete(layer.id);
+    this.parkCelRaster(cached);
+    if(restored){this.caches.set(layer.id,{layer,canvas:restored.canvas,frame});return restored.canvas;}
+    cached=undefined;
+   }
+  }
   if(cached&&cached.canvas.width===p.width&&cached.canvas.height===p.height){
    const old=cached.layer.operations,next=layer.operations,undo=next.length<old.length&&next.every((o,i)=>o===old[i]),redo=old.length<next.length&&old.every((o,i)=>o===next[i]);
    if(undo||redo){const operations=undo?old.slice(next.length):next.slice(old.length),source=undo?cached.layer:layer,start=undo?next.length:old.length,patches=operations.map((op,j)=>this.historyPatch(source,op,start+j,p.width,p.height));
-    if(patches.every(d=>d&&(!redo||d.patch.complete))){const ctx=context(cached.canvas);for(const d of undo?patches.reverse():patches)d!.patch.restore(ctx,undo?'before':'after');this.caches.set(layer.id,{layer,canvas:cached.canvas});if(undo)this.undoHits++;else this.redoHits++;return cached.canvas;}
+    if(patches.every(d=>d&&(!redo||d.patch.complete))){const ctx=context(cached.canvas);for(const d of undo?patches.reverse():patches)d!.patch.restore(ctx,undo?'before':'after');this.caches.set(layer.id,{layer,canvas:cached.canvas,frame});if(undo)this.undoHits++;else this.redoHits++;return cached.canvas;}
    }
   }
   const incremental=cached&&cached.canvas.width===p.width&&cached.canvas.height===p.height&&cached.layer.operations.length<layer.operations.length&&cached.layer.operations.every((o,i)=>o===layer.operations[i]);
-  const canvas=cached&&cached.canvas.width===p.width&&cached.canvas.height===p.height?cached.canvas:makeCanvas(p.width,p.height),ctx=context(canvas),capture=incremental||!cached&&layer.operations.length===1;let scratch:HTMLCanvasElement|undefined,start=incremental?cached.layer.operations.length:0;
+  const canvas=cached&&cached.canvas.width===p.width&&cached.canvas.height===p.height?cached.canvas:makeCanvas(p.width,p.height),ctx=context(canvas),capture=incremental||!cached&&layer.operations.length===1;let scratch:HTMLCanvasElement|undefined,start=incremental&&cached?cached.layer.operations.length:0;
   if(!incremental){const checkpoint=this.checkpoints.filter(c=>c.id===layer.id&&c.canvas.width===p.width&&c.canvas.height===p.height&&c.operations.length<=layer.operations.length&&c.operations.every((o,i)=>o===layer.operations[i])).sort((a,b)=>b.operations.length-a.operations.length)[0];ctx.clearRect(0,0,p.width,p.height);if(checkpoint){ctx.drawImage(checkpoint.canvas,0,0);start=checkpoint.operations.length;this.checkpoints.splice(this.checkpoints.indexOf(checkpoint),1);this.checkpoints.push(checkpoint);}}
   for(let i=start;i<layer.operations.length;i++){const op=layer.operations[i];if(capture)this.beforeOperation(layer,canvas,i);else this.replayed++;if(op.kind==='stroke'){const ready=this.strokeRasters.get(op);let source:HTMLCanvasElement,sourceX=0,sourceY=0;if(ready&&ready.width===p.width&&ready.height===p.height){source=ready.canvas as HTMLCanvasElement;sourceX=ready.x;sourceY=ready.y;this.strokeRasters.delete(op);this.strokeRasters.set(op,ready);}else{scratch??=this.scratch??=makeCanvas(p.width,p.height);if(scratch.width!==p.width)scratch.width=p.width;if(scratch.height!==p.height)scratch.height=p.height;const sc=context(scratch);sc.clearRect(0,0,p.width,p.height);drawStroke(sc,op);source=scratch;}compositePaintStroke(ctx,source,op,sourceX,sourceY);}else if(op.kind==='fill'){const image=this.bitmaps.get(op.png);if(image){ctx.save();ctx.globalCompositeOperation=op.under?'destination-over':'source-over';ctx.drawImage(image,0,0);ctx.restore();}}else if(op.kind==='image'){const image=this.bitmaps.get(op.png);if(image)ctx.drawImage(image,op.x,op.y,op.width,op.height);}else if(op.kind==='clear'){ctx.save();ctx.globalCompositeOperation='destination-out';polygonPath(ctx,op.polygon);ctx.fill();ctx.restore();}else if(op.kind==='vector')drawVector(ctx,op);else applyTransform(canvas,op.polygon,op.matrix);if(capture){this.afterOperation(layer,canvas,i);this.remember(layer,canvas,i+1);}}
   if(!cached&&layer.operations.length>=(p.width*p.height*4>=4*1024*1024?24:8))this.remember(layer,canvas,layer.operations.length,true);
-  this.caches.set(layer.id,{layer,canvas});return canvas;
+  this.caches.set(layer.id,{layer,canvas,frame});return canvas;
  }
  prune(p:Project){for(const id of this.caches.keys())if(!p.layers.some(l=>l.id===id))this.caches.delete(id);this.checkpoints=this.checkpoints.filter(c=>{if(p.layers.some(l=>l.id===c.id))return true;this.checkpointBytes-=c.bytes;c.canvas.width=0;c.canvas.height=0;return false;});this.deltas=this.deltas.filter(d=>{if(p.layers.some(l=>l.id===d.id))return true;this.deltaBytes-=d.bytes;if(this.deltaLookup.get(d.operation)===d)this.deltaLookup.delete(d.operation);d.patch.clear();return false;});}
  /** v174: same as composite(), but each layer is framed by the scene camera

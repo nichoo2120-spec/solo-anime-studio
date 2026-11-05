@@ -342,6 +342,7 @@ export class StudioEngine {
  private local(e:PointerEvent|WheelEvent){const r=this.canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
  private point(e:PointerEvent,rect=this.canvas.getBoundingClientRect()):Point {return {...toProject({x:e.clientX-rect.left,y:e.clientY-rect.top},this.view),p:e.pointerType==='pen'?inputPressure(e.pressure,this.stroke?.points.at(-1)?.p):1};}
  private down=(e:PointerEvent)=>{
+  this.navigationScene.pauseWarmup();
   if(this.flipbook.previewActive){this.recorder.event('ignored-contact',{reason:'flipbook-preview',pointerType:e.pointerType});return;}
   const rejection=rejectCanvasContact(e,this.pointerId,this.busy);if(rejection){this.recorder.event('ignored-contact',{reason:rejection,pointerType:e.pointerType,pointerId:e.pointerId,button:e.button,isPrimary:e.isPrimary,busy:this.busy,activePointerId:this.pointerId});return;}if(this.pointerId!==undefined){if(e.timeStamp<(this.capture?.started??0))return;this.finishGesture('new-primary-contact');}e.preventDefault();this.pointerId=e.pointerId;this.capture=new PointerPath(e.pointerId,e.timeStamp,e,uid());this.diagnostics.begin(this.capture.gestureId,this.tool,this.view,this.canvas.getBoundingClientRect(),this.brush,e,this.preset);this.recorder.event('gesture-start',{id:this.capture.gestureId,pointerId:e.pointerId,pointerType:e.pointerType,button:e.button,preset:this.preset,tool:this.tool});this.device=e.pointerType;this.geometricDuplicates=0;this.capture.onBatch=(event,samples,replay)=>this.diagnostics.record(event,samples,replay);this.canvas.focus({preventScroll:true});try{this.canvas.setPointerCapture(e.pointerId);}catch{this.recorder.event('capture-fallback',{pointerId:e.pointerId});this.captureFallback();}const local=this.local(e),p=this.point(e),doc=this.store.getSnapshot();
   if(this.mirrorDrawing.enabled&&!this.mirrorDrawing.lockCenter&&!this.space&&e.button===0&&(this.pickMirrorPivot||Math.hypot(p.x-mirrorPivot(this.mirrorDrawing,doc).x,p.y-mirrorPivot(this.mirrorDrawing,doc).y)<8/this.view.zoom)){this.setMirrorPivot(p);this.mirrorPivotDrag=true;this.pickMirrorPivot=false;this.onMirrorChange();return;}
@@ -576,7 +577,11 @@ export class StudioEngine {
     else{this.previewStrokeId='';this.previewBase=undefined;this.previewBaseOperations=undefined;}
     c=preview;}
    ctx.globalAlpha=l.opacity;ctx.drawImage(c,0,0);
-  }if(snapshotPending&&snapshotPassed){this.editingSnapshot.capture(ctx,snapshotKey!);snapshotPending=false;}if(plainView&&!this.viewMoving&&!this.viewRefining&&!this.busy){this.navigationScene.warm(p,this.renderer);this.navigationScene.prepareSurface(this.navigationSurface,p,this.renderer);}ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';this.vectors.renderNewLayer(ctx);if(this.tool==='vector')this.vectors.renderHandles(ctx,this.view.zoom);
+  }if(snapshotPending&&snapshotPassed){this.editingSnapshot.capture(ctx,snapshotKey!);snapshotPending=false;}
+  // Animation can change cels again before a navigation preview is useful.
+  // Build it when the animator actually pans or zooms instead.
+  if(plainView&&!p.animation&&!this.viewMoving&&!this.viewRefining&&!this.busy)this.navigationScene.warm(p,this.renderer);
+  ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';this.vectors.renderNewLayer(ctx);if(this.tool==='vector')this.vectors.renderHandles(ctx,this.view.zoom);
   frameState.exact=overlayFree&&!navigationActive&&!this.viewMoving&&!this.viewRefining&&!this.initialPressurePending;this.lastExactFrame=this.stroke?strokeBand(this.lastExactFrame,frameState,dirtyFrame,this.stroke.points.length):frameState.exact?{...frameState,band:!!commitBand}:undefined;
   if(!snapshotPreview&&this.mirrorDrawing.enabled&&this.mirrorDrawing.showLine){
    ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.strokeStyle='#3fe0f0';ctx.lineWidth=1/this.view.zoom;ctx.setLineDash([6/this.view.zoom,5/this.view.zoom]);

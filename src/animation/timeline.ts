@@ -218,7 +218,10 @@ function showFrame(project:Project,id:string):Project {
  const timeline=project.animation!;
  const frame=timeline.frames.find(f=>f.id===id);
  if(!frame)return project;
- return {...project,animation:{...timeline,activeFrameId:id},layers:project.layers.map(layer=>({...layer,operations:frame.drawings[layer.id]??[]}))};
+ return {...project,animation:{...timeline,activeFrameId:id},layers:project.layers.map(layer=>{
+  const operations=frame.drawings[layer.id]??[];
+  return layer.operations===operations?layer:{...layer,operations};
+ })};
 }
 export function selectDrawingFrame(project:Project,id:string):Project {
  const preparedProject=prepared(project);
