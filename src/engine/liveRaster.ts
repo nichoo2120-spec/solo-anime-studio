@@ -12,6 +12,12 @@ import {paintColorFilter} from './paintColorFilter';
 export type RasterRegion={x:number;y:number;width:number;height:number};
 const samePoint=(a:Point,b:Point)=>a.x===b.x&&a.y===b.y&&a.p===b.p&&a.v===b.v;
 const sameCurve=(a:Cubic,b:Cubic)=>samePoint(a.a,b.a)&&samePoint(a.c1,b.c1)&&samePoint(a.c2,b.c2)&&samePoint(a.b,b.b);
+function union(a:RasterRegion,b:RasterRegion):RasterRegion{
+ if(!a.width||!a.height)return b;
+ if(!b.width||!b.height)return a;
+ const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);
+ return {x,y,width:Math.max(a.x+a.width,b.x+b.width)-x,height:Math.max(a.y+a.height,b.y+b.height)-y};
+}
 /** Retain unchanged pixels. Invalidate the union of the old/new curve tail,
  * including the moving end-taper footprint. Full redraw on reflow/unknown data. */
 export class LiveStrokeRaster{
@@ -20,10 +26,24 @@ export class LiveStrokeRaster{
  private id='';private previous?:ReturnType<typeof strokeGeometry>;private hadSingle=false;
  private settled?:HTMLCanvasElement;private paintMask?:HTMLCanvasElement;private settledCurves=0;
  private filtered=false;
+ private footprint?:{id:string;region:RasterRegion};
  /** Area changed on the scratch surface by the last paint. Undefined means full canvas. */
  lastRegion?:RasterRegion;
- reset(){this.dryV2.reset();this.dryV3.reset();this.mixColors?.reset();this.mixColors=undefined;this.mixGeometry=undefined;this.mixId='';this.unmixed?.reset();this.unmixed=undefined;if(this.mixSurface)this.mixSurface.width=this.mixSurface.height=0;this.mixSurface=undefined;this.painting.reset();this.id='';this.previous=undefined;this.lastRegion=undefined;this.settledCurves=0;for(const c of [this.settled,this.paintMask])if(c)c.width=c.height=0;this.settled=this.paintMask=undefined;}
+ reset(){this.footprint=undefined;this.dryV2.reset();this.dryV3.reset();this.mixColors?.reset();this.mixColors=undefined;this.mixGeometry=undefined;this.mixId='';this.unmixed?.reset();this.unmixed=undefined;if(this.mixSurface)this.mixSurface.width=this.mixSurface.height=0;this.mixSurface=undefined;this.painting.reset();this.id='';this.previous=undefined;this.lastRegion=undefined;this.settledCurves=0;for(const c of [this.settled,this.paintMask])if(c)c.width=c.height=0;this.settled=this.paintMask=undefined;}
  paint(ctx:CanvasRenderingContext2D,stroke:Stroke,geometry:ReturnType<typeof strokeGeometry>){
+  const pixels=this.rasterize(ctx,stroke,geometry);
+  // A reflow still redraws the scratch stroke for exact pixels. Only its old
+  // and new footprints can change the already-composited layer preview.
+  const local=!stroke.transform&&!stroke.perspective&&!stroke.nativeMixVersion&&!stroke.mixStops?.length&&
+   (stroke.engineVersion===9&&stroke.brushKind?.startsWith('graphite-')||stroke.coloringEngine===1&&stroke.brushTip==='color-soft');
+  if(local){
+   const region=strokeRasterBounds(stroke,ctx.canvas.width,ctx.canvas.height,geometry),previous=this.footprint;
+   if(!this.lastRegion&&previous?.id===stroke.id)this.lastRegion=union(previous.region,region);
+   this.footprint={id:stroke.id,region};
+  }else this.footprint=undefined;
+  return pixels;
+ }
+ private rasterize(ctx:CanvasRenderingContext2D,stroke:Stroke,geometry:ReturnType<typeof strokeGeometry>){
   if(stroke.mixStops?.length&&stroke.mixVersion===2){
    const surface=this.mixSurface??=document.createElement('canvas');if(surface.width!==ctx.canvas.width)surface.width=ctx.canvas.width;if(surface.height!==ctx.canvas.height)surface.height=ctx.canvas.height;
    const raw=this.unmixed??=new LiveStrokeRaster();raw.paint(surface.getContext('2d')!,{...stroke,mixStops:undefined},geometry);
