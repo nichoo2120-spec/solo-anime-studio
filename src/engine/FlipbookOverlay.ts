@@ -43,7 +43,7 @@ export class FlipbookOverlay {
   if(signature!==this.signature){this.signature=signature;this.cache.clear();this.failed.clear();}
   const dirs:[FlipDirection,FlipDirection]=[-1,1];
   const next=dirs.map(d=>flipCandidate(project,d)).filter((f):f is DrawingFrame=>f!==null);
-  for(const [id,item] of this.cache)if(!next.some(f=>f===item.frame))this.cache.delete(id);
+  for(const [id,item] of this.cache)if(!project.animation?.frames.some(f=>f===item.frame))this.cache.delete(id);
   for(const [id,failedFrame] of this.failed)if(!next.some(f=>f===failedFrame))this.failed.delete(id);
   if(old.animation?.activeFrameId!==project.animation?.activeFrameId||old.id!==project.id)this.direction=null;
   this.generation++;this.cancelTask();this.paint();this.schedule();
@@ -64,7 +64,9 @@ export class FlipbookOverlay {
  private schedule(){
   if(this.disposed||this.rendering||this.task!==undefined||this.isDrawing())return;
   const missing=([-1,1] as FlipDirection[]).map(d=>flipCandidate(this.project,d))
-   .find(f=>f&&!this.cache.has(f.id)&&this.failed.get(f.id)!==f);
+   .find(f=>f&&!this.cache.has(f.id)&&this.failed.get(f.id)!==f
+    &&(this.direction!==null&&f===flipCandidate(this.project,this.direction)
+       ||Object.values(f.drawings).reduce((count,ops)=>count+ops.length,0)<=120));
   if(!missing)return;
   const generation=this.generation;
   const run=()=>{this.task=undefined;if(!this.disposed&&generation===this.generation&&!this.isDrawing())void this.prepareOne(missing,generation);};
@@ -81,7 +83,12 @@ export class FlipbookOverlay {
    if(this.disposed||generation!==this.generation||this.isDrawing())return;
    const picture=renderer.composite(snapshot,{transparent:true,includeReferences:false});
    if(!this.disposed&&generation===this.generation){
-    this.cache.set(frame.id,{frame,picture});this.paint();
+    this.cache.set(frame.id,{frame,picture});
+    while(this.cache.size>3||this.cache.size>1&&this.cache.size*picture.width*picture.height*4>32*1024*1024){
+     const oldest=this.cache.keys().next().value!;
+     this.cache.delete(oldest);
+    }
+    this.paint();
    }
   }catch(error){if(generation===this.generation)this.failed.set(frame.id,frame);console.warn('Flipbook preview not available:',error);}
   finally{renderer.clear();this.rendering=false;

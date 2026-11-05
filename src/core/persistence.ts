@@ -147,4 +147,27 @@ export class ProjectRepository {
 export const repository=new ProjectRepository();
 export function downloadProject(project:Project){validateProject(project);const blob=new Blob([JSON.stringify(project)],{type:'application/json'});downloadBlob(blob,project.name.replace(/[^a-z\d -]/gi,'_')+'.solo.json');}
 export function downloadBlob(blob:Blob,name:string){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-export async function importProject(file:File){if(file.size>200*1024*1024)throw Error('Project backups are limited to 200 MB.');return validateProject(JSON.parse(await file.text()));}
+export async function importProject(file:File){
+ if(file.size>200*1024*1024)throw Error('Project backups are limited to 200 MB.');
+ const project=validateProject(JSON.parse(await file.text()));
+ if(!project.animation)return project;
+ // JSON backups lose reference sharing between held and duplicated drawings.
+ // Only share exact content. An operation ID can survive an independent edit.
+ type Operations=Project['layers'][number]['operations'];
+ const drawings=new Map<string,Operations[]>();
+ const share=(id:string,operations:Operations)=>{
+  const key=JSON.stringify([id,operations.length,operations[0]?.id,operations.at(-1)?.id]);
+  const candidates=drawings.get(key);
+  if(!candidates){drawings.set(key,[operations]);return operations;}
+  const content=JSON.stringify(operations);
+  const existing=candidates.find(candidate=>JSON.stringify(candidate)===content);
+  if(existing)return existing;
+  candidates.push(operations);
+  return operations;
+ };
+ for(const layer of project.layers)layer.operations=share(layer.id,layer.operations);
+ for(const frame of project.animation.frames){
+  for(const [id,operations] of Object.entries(frame.drawings))frame.drawings[id]=share(id,operations);
+ }
+ return project;
+}
