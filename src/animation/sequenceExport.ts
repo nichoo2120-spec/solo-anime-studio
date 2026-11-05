@@ -2,6 +2,7 @@
  * No external ZIP dependency. PNGs are already compressed, so use uncompressed ZIP entries.
  */
 import type {Project} from '../core/model';
+import {shotFrame} from '../core/shotFrame';
 import {frameHold,frameList} from './timeline';
 import {LayerRenderer,type ExportOptions} from '../engine/renderer';
 
@@ -55,7 +56,7 @@ function canvasPng(canvas:HTMLCanvasElement):Promise<Uint8Array>{return new Prom
  },'image/png'));}
 export async function renderSequenceZip(project:Project,settings:SequenceExportOptions,onProgress:(p:SequenceProgress)=>void=()=>{},signal?:AbortSignal):Promise<Blob>{
  const plan=sequencePlan(project,settings.uniqueCels),frames=frameList(project),renderer=new LayerRenderer(),entries:{name:string;bytes:Uint8Array}[]=[],cache=new Map<string,Uint8Array>();
- const width=settings.width??project.width,height=settings.height??project.height;
+ const shot=shotFrame(project),width=settings.width??shot.width,height=settings.height??shot.height;
  if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width*height>16777216)throw Error('Invalid sequence export resolution.');
  if(plan.length>2000)throw Error('A sequence may have at most 2,000 exported frames. Shorten the range or export unique cels.');
  try{
@@ -66,7 +67,7 @@ export async function renderSequenceZip(project:Project,settings:SequenceExportO
    let png=cache.get(cacheKey);
    if(!png){const snapshot=sequenceSnapshot(project,item.celIndex);
     await renderer.prepare(snapshot);
-    png=await canvasPng(camera?renderer.compositeCamera(snapshot,item.number,settings):renderer.composite(snapshot,settings));if(!camera)cache.set(cacheKey,png);
+    png=await canvasPng(renderer.compositeShot(snapshot,{...settings,cameraFrame:camera?item.number:undefined}));if(!camera)cache.set(cacheKey,png);
    }
    entries.push({name:sequenceFrameName(item.number,plan.length),bytes:png});
    onProgress({finished:i+1,total:plan.length,phase:'Rendering sequence'});

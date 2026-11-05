@@ -9,6 +9,7 @@ import type {CycleShelf} from '../animation/reuse';
 import {validateSceneAudio,type SceneAudio} from '../animation/audio';
 import {validateMotionPlanning,type MotionPlanning} from '../animation/motionPlanning';
 import {validateSceneCamera,pruneCameraDepth,type SceneCamera} from '../animation/sceneCamera';
+import type {ShotFrame} from './shotFrame';
 export type Tool = 'brush' | 'eraser' | 'lasso' | 'rectangle' | 'transform' | 'fill' | 'hand' | 'zoom' | 'rotate' | 'eyedropper' | 'vector' | 'stroke-select';
 export type Point = {x:number;y:number;p:number;v?:number};
 export type WatercolorShape='round'|'filbert'|'angular'|'liner'|'mop';
@@ -22,10 +23,10 @@ export type Fill = {id:string;kind:'fill';png:string;under?:boolean};
 export type ImageOperation={id:string;kind:'image';png:string;x:number;y:number;width:number;height:number};
 export type ClearOperation={id:string;kind:'clear';polygon:Point[]};
 export type Transform = {id:string;kind:'transform';polygon:Point[];matrix:Matrix};
-export type Operation = Stroke | Fill | Transform | VectorLine | ImageOperation | ClearOperation;
+export type Operation = (Stroke | Fill | Transform | VectorLine | ImageOperation | ClearOperation)&{inShot?:true};
 export type BlendMode='normal'|'multiply'|'screen'|'overlay'|'add';
 export type Layer = {id:string;name:string;visible:boolean;locked:boolean;opacity:number;operations:Operation[];kind?:'raster'|'vector';blend?:BlendMode;reference?:boolean;exportReference?:boolean};
-export type Project = {format:'solo-anime-studio';version:1|2|3;id:string;name:string;width:number;height:number;activeLayerId:string;layers:Layer[];settings:{guides:boolean};createdAt:string;animation?:DrawingTimeline;substitutionShelf?:SubstitutionShelfData;cycleShelf?:CycleShelf;audio?:SceneAudio;motionPlanning?:MotionPlanning;camera?:SceneCamera};
+export type Project = {format:'solo-anime-studio';version:1|2|3|4;id:string;name:string;width:number;height:number;shotFrame?:ShotFrame;activeLayerId:string;layers:Layer[];settings:{guides:boolean};createdAt:string;animation?:DrawingTimeline;substitutionShelf?:SubstitutionShelfData;cycleShelf?:CycleShelf;audio?:SceneAudio;motionPlanning?:MotionPlanning;camera?:SceneCamera};
 export const uid = () => crypto.randomUUID();
 export function newLayer(name:string,kind:'raster'|'vector'='raster'):Layer {return {id:uid(),name,visible:true,locked:false,opacity:1,operations:[],kind};}
 export function newProject(name='Untitled scene',width=1920,height=1080):Project {
@@ -33,7 +34,7 @@ export function newProject(name='Untitled scene',width=1920,height=1080):Project
  return {format:'solo-anime-studio',version:3,id:uid(),name,width,height,activeLayerId:layers[1].id,layers,settings:{guides:true},createdAt:new Date().toISOString()};
 }
 export const activeLayer = (p:Project) => p.layers.find(l=>l.id===p.activeLayerId)!;
-export function editLayer(p:Project,id:string,patch:Partial<Layer>):Project {return {...p,version:3,layers:p.layers.map(l=>l.id===id?{...l,...patch}:l)};}
+export function editLayer(p:Project,id:string,patch:Partial<Layer>):Project {return {...p,version:p.version===4?4:3,layers:p.layers.map(l=>l.id===id?{...l,...patch}:l)};}
 export function appendOperation(p:Project,op:Operation):Project {
  const layer=activeLayer(p); if(layer.locked||!layer.visible)return p;
  return editLayer(p,layer.id,{operations:[...layer.operations,op]});
@@ -59,8 +60,14 @@ const bounded=(n:unknown,min:number,max:number)=>finite(n)&&n>=min&&n<=max;
 const point=(p:any)=>p&&finite(p.x)&&finite(p.y)&&Math.abs(p.x)<=1e6&&Math.abs(p.y)<=1e6&&bounded(p.p,0,1)&&(p.v===undefined||bounded(p.v,0,1));
 export function validateProject(value:unknown):Project {
  const p=value as any;
- if(!p||p.format!=='solo-anime-studio'||![1,2,3].includes(p.version))throw Error('Unsupported project format or version.');
- if(typeof p.id!=='string'||typeof p.name!=='string'||p.name.length>200||typeof p.createdAt!=='string'||!Number.isInteger(p.width)||!Number.isInteger(p.height)||!bounded(p.width,64,4096)||!bounded(p.height,64,4096)||p.width*p.height>8388608)throw Error('Invalid project dimensions or metadata.');
+ if(!p||p.format!=='solo-anime-studio'||![1,2,3,4].includes(p.version))throw Error('Unsupported project format or version.');
+ const frame=p.shotFrame,expanded=p.version===4;
+ if(typeof p.id!=='string'||typeof p.name!=='string'||p.name.length>200||typeof p.createdAt!=='string'||!Number.isInteger(p.width)||!Number.isInteger(p.height)||!bounded(p.width,64,expanded?8192:4096)||!bounded(p.height,64,expanded?8192:4096)||p.width*p.height>(expanded?16777216:8388608))throw Error('Invalid project dimensions or metadata.');
+ if(expanded){
+  if(!frame||![frame.x,frame.y,frame.width,frame.height].every(Number.isInteger)||frame.x<1||frame.y<1||
+    !bounded(frame.width,64,4096)||!bounded(frame.height,64,4096)||frame.width*frame.height>8388608||
+    frame.x+frame.width>=p.width||frame.y+frame.height>=p.height)throw Error('Invalid shot frame.');
+ }else if(frame!==undefined)throw Error('Shot frame requires an expanded project.');
  if(!Array.isArray(p.layers)||p.layers.length<1||p.layers.length>100)throw Error('Projects require 1–100 layers.');
  const ids=new Set<string>();let count=0;
  for(const l of p.layers){
@@ -73,6 +80,7 @@ export function validateProject(value:unknown):Project {
   if(l.kind!=='vector'&&l.operations.some((o:any)=>o.kind==='vector'))throw Error('Vector lines require a vector layer.');
   for(const o of l.operations){
    if(!o||typeof o.id!=='string'||++count>100000)throw Error('Invalid drawing operation.');
+   if(o.inShot!==undefined&&(!expanded||o.inShot!==true))throw Error('Invalid drawing operation frame.');
    if(o.kind==='stroke'){
     if(!['brush','eraser'].includes(o.tool)||!bounded(o.size,.1,500)||!bounded(o.opacity,0,1)||!/^#[\da-f]{6}$/i.test(o.color)||typeof o.pressure!=='boolean'||!bounded(o.response,.2,3)||!Array.isArray(o.points)||!o.points.length||o.points.length>200000||!o.points.every(point))throw Error('Invalid stroke data.');
     if(o.engineVersion!==undefined&&o.engineVersion!==2&&o.engineVersion!==3&&o.engineVersion!==4&&o.engineVersion!==5&&o.engineVersion!==6&&o.engineVersion!==7&&o.engineVersion!==8&&o.engineVersion!==9&&o.engineVersion!==10)throw Error('Unsupported stroke renderer.');
@@ -152,7 +160,7 @@ export function validateProject(value:unknown):Project {
  }
  if(p.substitutionShelf!==undefined){
   const shelf=p.substitutionShelf;
-  if(p.version!==3||!shelf||shelf.version!==1||!Array.isArray(shelf.items)||shelf.items.length>32)throw Error('Invalid drawing substitution shelf.');
+  if(p.version<3||!shelf||shelf.version!==1||!Array.isArray(shelf.items)||shelf.items.length>32)throw Error('Invalid drawing substitution shelf.');
   const seen=new Set<string>();
   for(const item of shelf.items){
    if(!item||typeof item.id!=='string'||!item.id||seen.has(item.id)||typeof item.name!=='string'||!item.name.trim()||item.name.length>60||!['mouth','eyes','hands','pose','fx','other'].includes(item.category)||!['raster','vector'].includes(item.layerKind)||!Array.isArray(item.operations)||item.operations.length<1||item.operations.length>1500)throw Error('Invalid drawing substitution.');
@@ -163,7 +171,7 @@ export function validateProject(value:unknown):Project {
  }
  if(p.cycleShelf!==undefined){
   const shelf=p.cycleShelf;
-  if(p.version!==3||!shelf||shelf.version!==1||!Array.isArray(shelf.items)||shelf.items.length>16)throw Error('Invalid animation cycle shelf.');
+  if(p.version<3||!shelf||shelf.version!==1||!Array.isArray(shelf.items)||shelf.items.length>16)throw Error('Invalid animation cycle shelf.');
   const seenCycles=new Set<string>();
   for(const item of shelf.items){
    if(!item||typeof item.id!=='string'||!item.id||seenCycles.has(item.id)||typeof item.name!=='string'||!item.name.trim()||item.name.length>60||!['raster','vector'].includes(item.kind)||!Array.isArray(item.frames)||item.frames.length<2||item.frames.length>16)throw Error('Invalid reusable cycle.');
@@ -177,7 +185,7 @@ export function validateProject(value:unknown):Project {
  }
  if(p.animation!==undefined){
   const a=p.animation;
-  if(p.version!==3||!a||a.version!==1||!Array.isArray(a.frames)||a.frames.length<1||a.frames.length>240||typeof a.activeFrameId!=='string')throw Error('Invalid animation timeline.');
+  if(p.version<3||!a||a.version!==1||!Array.isArray(a.frames)||a.frames.length<1||a.frames.length>240||typeof a.activeFrameId!=='string')throw Error('Invalid animation timeline.');
   const frameIds=new Set<string>();let operationsCount=0;
   for(const frame of a.frames){
    if(!frame||typeof frame.id!=='string'||!frame.id||frameIds.has(frame.id)||!frame.drawings||typeof frame.drawings!=='object'||Array.isArray(frame.drawings))throw Error('Invalid drawing frame.');

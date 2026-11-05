@@ -63,6 +63,12 @@ export function inMarquee(op:Selectable,poly:{x:number;y:number}[],mode:PickMode
 }
 export function idsInMarquee(layer:Layer,poly:Point[],mode:PickMode){return selectable(layer).filter(o=>inMarquee(o,poly,mode)).map(o=>o.id);}
 export function nearSelection(p:{x:number;y:number},poly:Point[],tol=0){if(inPoly(p,poly))return true;for(let i=0;i<poly.length;i++)if(segmentDistance(p.x,p.y,poly[i],poly[(i+1)%poly.length])<=tol)return true;return false;}
-export function transformedStroke(op:Stroke,m:Matrix):Stroke{return op.perspective?{...op,perspective:multiplyH(affineH(m),op.perspective)}:{...op,transform:mul(m,op.transform??IDENTITY)};}
+export function transformedStroke(op:Stroke,m:Matrix):Stroke{
+ const {inShot:_inShot,...editable}=op as Stroke&{inShot?:true};
+ return op.perspective?{...editable,perspective:multiplyH(affineH(m),op.perspective)}:{...editable,transform:mul(m,op.transform??IDENTITY)};
+}
 /** Apply a fresh projective change outside all previously committed transforms. */
-export function projectiveStroke(op:Stroke,h:H):Stroke{return {...op,transform:undefined,perspective:multiplyH(h,op.perspective??affineH(op.transform??IDENTITY))};}
+export function projectiveStroke(op:Stroke,h:H):Stroke{
+ const {inShot:_inShot,...editable}=op as Stroke&{inShot?:true};
+ return {...editable,transform:undefined,perspective:multiplyH(h,op.perspective??affineH(op.transform??IDENTITY))};
+}

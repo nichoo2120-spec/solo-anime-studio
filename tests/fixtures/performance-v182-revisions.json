@@ -1,0 +1,42 @@
+{
+  "src/core/model.ts": {
+    "before": "74f432628ccc1c45a172551e55caec82083f8148b914d74b4a97a2dcb1a51742",
+    "after": "cf25b8910985f3bd926f58b18d959a950f9d84d39b18c5412f8cfd4b02e32d05",
+    "why": "Optional outside drawing area and shot framing in v0.5.182."
+  },
+  "src/engine/InkDisplay.ts": {
+    "before": "5e4b7edea1f60ee101b585ee3351734bd82ff88fb9d254c01102ab8e864f43f1",
+    "after": "92c44029944be92abf3abc908fee99f02896ca2f2a588677ef2c1e901f318e16",
+    "why": "Optional outside drawing area and shot framing in v0.5.182."
+  },
+  "src/engine/StudioEngine.ts": {
+    "before": "bdf3360de3871eb85ed773c0ec28ee69099215f1ba3a1b3fadf2740ced179c89",
+    "after": "2b783513746ea0c0089a34f1846c1e74107f1d4c27ed694935a3c3a0ee7b0701",
+    "why": "Desktop cel caching and optional outside drawing area with the original shot projection."
+  },
+  "src/engine/renderer.ts": {
+    "before": "58887c35d695c0197bb2946cee95410fb19e0e050bca39a216790125d90e50bc",
+    "after": "213e05d5adce3bdc5aa0bf0c4760789c85ac0df5b9c9b376cbc39f8c1bca3cf9",
+    "why": "Desktop cel caching and optional outside drawing area with the original shot projection."
+  },
+  "src/styles.css": {
+    "before": "f92af375f273da4468c08e06a9d56261a8f841cfc535e1ef8f087eab1e31ec23",
+    "after": "813ec242c9aa88274881860b1c462254e30d6c938103f5895099574d42c03a8d",
+    "why": "Optional outside drawing area and shot framing in v0.5.182."
+  },
+  "src/ui/App.tsx": {
+    "before": "3bf035252bee9a8fb43c98256234156ce1dcd5c681e639d82b098716ccc27346",
+    "after": "096ac997beb04816adb76f6c3e3cee452501c785e500ff3ec745deac27954592",
+    "why": "Optional outside drawing area and shot framing in v0.5.182."
+  },
+  "src/core/buildInfo.ts": {
+    "before": "649583af6035f8a4d3eb0a0ff5c77f5c89a574d68c5ae393235366698068be41",
+    "after": "80930db4ed292d3de167735d2df48e645a72b313d3d589f49f59522c842b6345",
+    "why": "Optional outside drawing area and shot framing in v0.5.182."
+  },
+  "package.json": {
+    "before": "eee6be42c1e2220068bf1018350cb4a05ce9425ec354685c37a9989067fee0f6",
+    "after": "9cd0af028affee8cefbb4bc0d02f469fd4960cd39443f40acef0931da8464813",
+    "why": "Optional outside drawing area and shot framing in v0.5.182."
+  }
+}
