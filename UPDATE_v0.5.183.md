@@ -5,3 +5,5 @@
 The orange outline marks the shot used for PNG and PNG sequence exports. Drawing outside the shot is saved with the project. You can move the scene camera to bring it into the shot.
 
 Large windows and rotated views can use a higher minimum zoom to keep the visible area drawable. Projects saved with the expanded workspace open in v0.5.183 and later.
+
+If Studio can't expand an older project, it opens the existing drawing in Frame Only.

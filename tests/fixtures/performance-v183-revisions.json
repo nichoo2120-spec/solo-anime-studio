@@ -61,7 +61,7 @@
   },
   "src/ui/App.tsx": {
     "before": "096ac997beb04816adb76f6c3e3cee452501c785e500ff3ec745deac27954592",
-    "after": "3a81744c46902f57568c401bca88245cf64f2cf373e71e5876ce7a8142ab2928",
+    "after": "d29a5714a7726878d260f03d1ff1263296d58670fc94e22c295d434dd8603ebe",
     "why": "Full drawing workspace around the shot, with compatibility for earlier artwork."
   }
 }

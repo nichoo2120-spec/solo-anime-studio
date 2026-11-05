@@ -527,9 +527,18 @@ export function App(){
   const viewport=canvas.current?.getBoundingClientRect();
   return validateProject(expandPasteboard(project,viewport?.width??0,viewport?.height??0));
  }
- function loadStudioProject(project:Project,expectedRevision?:number){
-  const opened=project.version===4&&!frameOnly?fullDrawingArea(project):project;
-  return engine.current!.load(opened,expectedRevision);
+ async function loadStudioProject(project:Project,expectedRevision?:number){
+  const studio=engine.current!;
+  let opened=project;
+  if(project.version===4&&!frameOnly){
+   try{opened=fullDrawingArea(project);}
+   catch{
+    const loaded=await studio.load(project,expectedRevision);
+    if(loaded)notify('Opened in Frame Only. Studio could not expand this drawing area.');
+    return loaded;
+   }
+  }
+  return studio.load(opened,expectedRevision);
  }
  useEffect(()=>{engine.current?.setOutsideFrame(!frameOnly);},[frameOnly]);
  function toggleOutsideFrame(){
