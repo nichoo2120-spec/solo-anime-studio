@@ -1,0 +1,17 @@
+{
+  "src/engine/liveRaster.ts": {
+    "before": "7ab355515956407330a753663fdf11ce91d67caaabcf0c777f21d83ec94e7476",
+    "after": "b22e79c2309067994deab1110f8fc2284fd9ba0256bdb984d3a192bd292df09f",
+    "why": "Update the live preview around the old and new stroke footprints."
+  },
+  "src/engine/paintCompositing.ts": {
+    "before": "2e9249e9c4a9bf7906ac1574b23f24360b98dfd7d6a1d2bc3d22ab09d093d023",
+    "after": "8223fa233fa2864f773cd100ecf35605614d262a9c802cbd120d67ad005dff89",
+    "why": "Update the live preview around the old and new stroke footprints."
+  },
+  "src/core/buildInfo.ts": {
+    "before": "b0a63f709f7caf999fd2b21ef4e2d884e25a4f3f6f978c20bea4b64afb3849d7",
+    "after": "e0f73569cbd4bade167725eb081d2a6da16e858a86d0465e918a19bc7c8a751d",
+    "why": "Update the live preview around the old and new stroke footprints."
+  }
+}
