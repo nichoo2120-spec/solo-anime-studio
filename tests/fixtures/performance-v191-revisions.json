@@ -1,0 +1,17 @@
+{
+  "src/ui/App.tsx": {
+    "before": "889332dc46714f8cff54aca04fadcf77857cfc9adab12e347042a752222edcca",
+    "after": "c14b3d2376653c329ee5df09e2edd38a211af04770540c0dacf37cb68dc44273",
+    "reason": "Compact timeline with persistent toolbar pins and optional Audio track."
+  },
+  "src/styles.css": {
+    "before": "803f7e0dbfa6c095cd8d22bc364499dd9d3dd7a2951660b390a92d39d5a238e1",
+    "after": "4ef58467d491a8bb3b92bd7a853ff5bd9cad1db521333636ee959ed10ec72a62",
+    "reason": "Compact timeline with persistent toolbar pins and optional Audio track."
+  },
+  "src/core/buildInfo.ts": {
+    "before": "cc1b8bcbf15d7830c4a81089af163c81208fe322df594c201dfd1ee0644accf5",
+    "after": "46d65cb595015e0a60e02e7a1a636649e770e58394a36e382e30010777c379d4",
+    "reason": "Compact timeline with persistent toolbar pins and optional Audio track."
+  }
+}
