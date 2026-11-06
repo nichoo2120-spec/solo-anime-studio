@@ -646,6 +646,10 @@
 .timeline-tools-popup .layer-cel-commandbar{flex:1 1 220px;min-width:0;display:flex;flex-wrap:wrap;overflow:visible}
 .timeline-tools-popup .layer-cel-commandbar button{flex:none;white-space:nowrap}
 .radial-options{max-height:min(65vh,420px);overflow-y:auto}
+.startup-update{position:fixed;left:20px;bottom:16px;z-index:1;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 40px);color:#a9c3cd;font-size:12px}
+.startup-update button{white-space:nowrap;padding:7px 10px;border:1px solid #38535e;border-radius:5px;background:#19262d;color:#c5e0e5}
+.startup-update button:hover:not(:disabled){border-color:#64d6c8;color:#75e3d5}
+.startup-modal .startup-content{padding-bottom:72px}
 .timeline .cel-hold,.timeline .cel-art{font-size:8px}
 .timeline .timeline-track>.layer-track-heading{height:31px;min-height:31px;font-size:8px}
 .timeline .layer-track-name,.timeline .layer-cel-row{height:23px;min-height:23px}

@@ -20,6 +20,14 @@ import {deformDirection} from './SkewDistortDirection';
 export type Interpolation='nearest'|'bilinear'|'bicubic';
 export type Options={x:number;y:number;w:number;h:number;angle:number;skew:number;lock:boolean;interpolation:Interpolation;meshRows:number;meshCols:number;meshScope:'artwork'|'layer';meshMode:'uniform'|'adaptive'|'triangle';meshFalloff:number;meshPinRadius:number;meshPinBehavior:'local'|'neighbor';meshPointSize:number;meshShowGrid:boolean;meshShowPoints:boolean;meshSmooth:boolean;meshLockCorners:boolean;meshLockBorder:boolean;perspectiveGrid:boolean;perspectiveSnap:number;skewAxis:'free'|'horizontal'|'vertical';skewSnap:number};
 export type Scope={frameIds:string[];layerIds:string[]};
+function rotationHandle(quad:Quad,offset:number){
+ const top=bilerp(quad,.5,0),center=centroid(quad);
+ const dx=quad[1].x-quad[0].x,dy=quad[1].y-quad[0].y;
+ const length=Math.hypot(dx,dy);
+ if(!length)return {top,point:{x:top.x,y:top.y-offset}};
+ const direction=dy*(top.x-center.x)-dx*(top.y-center.y)>=0?1:-1;
+ return {top,point:{x:top.x+direction*dy/length*offset,y:top.y-direction*dx/length*offset}};
+}
 const EPS=0.00001;
 const num=(n:number)=>Number.isFinite(n)?Math.round(n*100)/100:0;
 function validPolygon(points:Pt[]):boolean{return points.length>=3&&points.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y));}
@@ -52,12 +60,16 @@ export class TransformTool{
   const selected=this.editableIds.size?selectable(active).filter(op=>this.editableIds.has(op.id)):[];
   const selection=engine.selection.length>=3?engine.selection:[];
   const fullCel=!selected.length&&!selection.length&&active.operations.some(op=>op.kind!=='vector'&&!(op.kind==='stroke'&&op.tool==='brush'));
-  const box=fullCel?null:selected.length?boundsOf(selected):selection.length?bounds(selection):boundsOf(selectable(active));
+  const sourceLayer=this.engine.renderer.get(active,this.original);
+  const image=active.operations.length===1&&active.operations[0].kind==='image'?active.operations[0]:undefined;
+  const singleTarget=scope.layerIds.every(id=>id===active.id)&&scope.frameIds.every(id=>id===this.original.animation?.activeFrameId);
+  const bitmapBounds=fullCel&&singleTarget?(image?{x:image.x,y:image.y,w:image.width,h:image.height}:this.alphaBounds(sourceLayer,this.original.width,this.original.height)):null;
+  const box=fullCel?bitmapBounds:selected.length?boundsOf(selected):selection.length?bounds(selection):boundsOf(selectable(active));
   this.box=box?{x:Math.max(0,Math.floor(box.x-2)),y:Math.max(0,Math.floor(box.y-2)),w:1,h:1}:{x:0,y:0,w:this.original.width,h:this.original.height};
   this.box.w=Math.max(1,Math.min(this.original.width-this.box.x,Math.ceil((box?.x??0)+(box?.w??this.original.width)+2)-this.box.x));
   this.box.h=Math.max(1,Math.min(this.original.height-this.box.y,Math.ceil((box?.y??0)+(box?.h??this.original.height)+2)-this.box.y));
   this.polygon=selected.length?rectQuad(this.box):selection.length?selection:rectQuad(this.box);
-  const sourceLayer=this.engine.renderer.get(active,this.original);this.source=cacheSurface(this.box.w,this.box.h);
+  this.source=cacheSurface(this.box.w,this.box.h);
   const allEditable=active.operations.every(op=>op.kind==='vector'||op.kind==='stroke'&&op.tool==='brush');
   const selectedRenderer=this.editableIds.size&&allEditable&&selected.length<active.operations.length?new LayerRenderer():null;
   const selectedLayer=selectedRenderer?{...active,operations:selected}:active;
@@ -130,7 +142,7 @@ export class TransformTool{
   if(Math.hypot(pt.x-s.pivot.x,pt.y-s.pivot.y)<r&&['pivot','skew','distort','flip'].includes(s.mode))return {type:'pivot',index:0};
   if(s.mode==='flip')return null;
   const q=s.quad;
-  if(s.mode==='rotate'||s.mode==='free'){const top=bilerp(q,.5,0),rot={x:top.x,y:top.y-32*this.scalePx()};if(Math.hypot(rot.x-pt.x,rot.y-pt.y)<r*1.8)return {type:'rotate',index:0};}
+  if(s.mode==='rotate'||s.mode==='free'){const {point}=rotationHandle(q,32*this.scalePx());if(Math.hypot(point.x-pt.x,point.y-pt.y)<r*1.8)return {type:'rotate',index:0};}
   if(!['move','rotate','pivot'].includes(s.mode)){for(let i=0;i<4;i++)if(Math.hypot(q[i].x-pt.x,q[i].y-pt.y)<r)return {type:'corner',index:i};if(['free','scale','skew','perspective','distort'].includes(s.mode))for(let i=0;i<4;i++){const a=q[i],b=q[(i+1)%4],m={x:(a.x+b.x)/2,y:(a.y+b.y)/2};if(Math.hypot(m.x-pt.x,m.y-pt.y)<r)return {type:'edge',index:i};}}
   if(s.mode==='perspective'&&Math.hypot(pt.x-centroid(q).x,pt.y-centroid(q).y)<r*1.45)return {type:'inside',index:0};
   if(s.mode==='free'){for(let i=0;i<4;i++){const d=Math.hypot(q[i].x-pt.x,q[i].y-pt.y);if(d>r&&d<r*2.3&&!inside(pt,boundsOfQuad(q)))return {type:'rotate',index:i};}}
@@ -433,7 +445,7 @@ const s=this.session,pt=this.toDoc(e);const keys:PointerModifiers={shift:e.shift
     c.beginPath();c.moveTo(m.x,m.y-sz);c.lineTo(m.x+sz,m.y);c.lineTo(m.x,m.y+sz);c.lineTo(m.x-sz,m.y);c.closePath();c.fill();c.stroke();}
    const mid=centroid(q);c.beginPath();c.arc(mid.x,mid.y,8/z,0,Math.PI*2);c.stroke();c.beginPath();c.arc(mid.x,mid.y,3/z,0,Math.PI*2);c.fill();
   }
-  if(s.mode==='free'||s.mode==='rotate'||s.mode==='pivot'){const top=bilerp(q,.5,0),r={x:top.x,y:top.y-32/z};c.beginPath();c.moveTo(top.x,top.y);c.lineTo(r.x,r.y);c.stroke();c.beginPath();c.arc(r.x,r.y,5/z,0,Math.PI*2);c.fill();c.stroke();}
+  if(s.mode==='free'||s.mode==='rotate'||s.mode==='pivot'){const {top,point}=rotationHandle(q,32/z);c.beginPath();c.moveTo(top.x,top.y);c.lineTo(point.x,point.y);c.stroke();c.beginPath();c.arc(point.x,point.y,5/z,0,Math.PI*2);c.fill();c.stroke();}
   if(this.gesture&&this.direction&&!['move','scale','rotate','perspective','skew','distort'].includes(s.mode)&&!this.perspectiveArrow&&this.activeGestureType()!=='rotate'&&Math.hypot(this.direction.x,this.direction.y)>.1){
    const vector=this.direction,len=Math.hypot(vector.x,vector.y),nx=vector.x/len,ny=vector.y/len;
    const p=this.gesture.point,amount=Math.min(len,44/z),end={x:p.x+nx*amount,y:p.y+ny*amount};

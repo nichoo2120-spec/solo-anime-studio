@@ -1,0 +1,17 @@
+{
+  "src/styles.css": {
+    "before": "1c71c3e6a2defc5b6346f4a00b7e8090ed5aee10e4b604649a59422d8ca09da2",
+    "after": "e4fa8c80158c82dcc156f1c06c00cd959794d2348697efc6191b13e61778944d",
+    "reason": "Expose the updater on Home and align transform controls with artwork."
+  },
+  "src/tools/transform/TransformTool.ts": {
+    "before": "e2fe45fca52c21de3c28662aea38cad47223ed4dc064a213302e9995146c8876",
+    "after": "f5d9f5e374f80c83fdb1cc49cf9d213d33e75d53e2aa36073e0127164d8874c9",
+    "reason": "Expose the updater on Home and align transform controls with artwork."
+  },
+  "src/core/buildInfo.ts": {
+    "before": "51cf5645283c18dac6d267b425f15178473dcf95345bf58a7daaba2bdefcfeaf",
+    "after": "227b536427cdba5b987dc9134a542a6f6a41e3db39c68191c06eb1b28538aa40",
+    "reason": "Expose the updater on Home and align transform controls with artwork."
+  }
+}
