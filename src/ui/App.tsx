@@ -66,6 +66,12 @@ import {StudioStrokeSelectIcon,StudioLassoIcon,StudioFreeformIcon,StudioMoveIcon
 import {initialShortcuts,normalizeShortcuts,keyChord,type ShortcutCommand} from '../core/shortcuts';
 import {quickAction,timelineDeleteKey,steppedBrushSize,quickShortcutGuide} from '../core/keyboardActions';
 import {readPreference,writePreference} from './preferences';
+import {ProjectHome} from './ProjectHome';
+
+type DesktopCloseBridge={
+ onSaveBeforeClose?:(callback:()=>void)=>()=>void;
+ closeAfterSave?:()=>void;
+};
 type Layout={left:number;right:number;bottom:number;leftClosed:boolean;rightClosed:boolean;bottomClosed:boolean};
 function IconButton({label,onClick,disabled=false,children,active}:{label:string;onClick:()=>void;disabled?:boolean;children:ReactNode;active?:boolean}){return <button className={'icon-button '+(active?'selected':'')} title={label} aria-label={label} aria-pressed={active} disabled={disabled} onClick={onClick}>{children}</button>;}
 function Range({label,onChange,...rest}:{label:string;value:number;min?:number;max?:number;step?:number;unit?:string;onChange:(n:number)=>void}){return <ExactRange name={label} set={onChange} {...rest}/>;}
@@ -286,8 +292,16 @@ export function App(){
  useEffect(()=>{writePreference('brush-library',brushLibrary);},[brushLibrary]);
  useEffect(()=>{writePreference('onion-settings',onionSettings);engine.current?.onion.setSettings(onionSettings);},[onionSettings]);
  useEffect(()=>{writePreference('vector-settings-solid-ink',vectorDefaults);if(engine.current)Object.assign(engine.current.vectors,vectorDefaults);},[vectorDefaults]);
- useEffect(()=>{if(!initialCheck.current){initialCheck.current=true;// v0.5.176: open the last project directly; only read the full project list when it is missing.
-  const lastId=readPreference<string|null>('last-project',null);(lastId?repository.get(lastId).catch(()=>undefined):Promise.resolve(undefined)).then(async direct=>{const list=direct?[direct]:await repository.list();if(!direct)setRecords(list);if(!list.length)return;const record=list.find(r=>r.id===lastId)??list[0],e=engine.current;if(e&&store.revision===0&&!e.drawing){validateProject(record.project);if(await loadStudioProject(record.project,0)){setStatus('Opened local project');setLastSaved(record.savedAt);writePreference('last-project',record.id);}}}).catch(e=>notify('Saved work remains in local storage; could not automatically reopen it: '+String(e)));}},[]);
+ useEffect(()=>{
+  if(initialCheck.current)return;
+  initialCheck.current=true;
+  if(!(window as Window&{soloDesktop?:DesktopCloseBridge}).soloDesktop){
+const lastId=readPreference<string|null>('last-project',null);(lastId?repository.get(lastId).catch(()=>undefined):Promise.resolve(undefined)).then(async direct=>{const list=direct?[direct]:await repository.list();if(!direct)setRecords(list);if(!list.length)return;const record=list.find(r=>r.id===lastId)??list[0],e=engine.current;if(e&&store.revision===0&&!e.drawing){validateProject(record.project);if(await loadStudioProject(record.project,0)){setStatus('Opened local project');setLastSaved(record.savedAt);writePreference('last-project',record.id);}}}).catch(e=>notify('Saved work remains in local storage; could not automatically reopen it: '+String(e)));
+   return;
+  }
+  setModal('recover');
+  repository.list().then(setRecords).catch(e=>notify('Could not read saved projects: '+String(e)));
+ },[]);
  useEffect(()=>{if(!message)return;const timer=setTimeout(()=>setMessage(''),7000);return()=>clearTimeout(timer);},[message]);
  async function save(kind:'manual'|'autosave'='manual'){
   if(kind==='autosave')await new Promise<void>(resolve=>{if('requestIdleCallback' in window)window.requestIdleCallback(()=>resolve(),{timeout:1000});else setTimeout(resolve,16);});
@@ -300,12 +314,40 @@ export function App(){
   catch(e){if(mounted.current){if(store.getSnapshot().id===captured.id)setStatus('Save failed');notify('Save failed for “'+captured.name+'”. Previous successful saves remain intact. '+String(e));}}
   finally{pendingSaves.current--;}
  }
+ const closeAfterSave=useRef(false);
+ const savingToClose=useRef(false);
+ useEffect(()=>{
+  const desktop=(window as Window&{soloDesktop?:DesktopCloseBridge}).soloDesktop;
+  return desktop?.onSaveBeforeClose?.(()=>{
+   if(savingToClose.current)return;
+   savingToClose.current=true;
+   void (async()=>{
+    try{
+     if(engine.current?.drawing)engine.current.finishGesture('window-close');
+     const captured=store.getSnapshot();
+     await save();
+     if(!pendingSaves.current&&!documentDirty(store.getSnapshot(),captured)&&saved.current===captured){
+      closeAfterSave.current=true;
+      desktop.closeAfterSave?.();
+     }
+    }finally{savingToClose.current=false;}
+   })();
+  });
+ },[store]);
  useEffect(()=>{if(!documentDirty(doc,saved.current))return;const timer=setTimeout(()=>{if(documentDirty(store.getSnapshot(),saved.current))void save('autosave');},2500);return()=>clearTimeout(timer);},[doc]);
- useEffect(()=>{const before=(e:BeforeUnloadEvent)=>{if(documentDirty(store.getSnapshot(),saved.current)||engine.current?.drawing||pendingSaves.current||engine.current?.recorder.warnOnClose){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',before);return()=>window.removeEventListener('beforeunload',before);},[store]);
+ useEffect(()=>{const before=(e:BeforeUnloadEvent)=>{if(closeAfterSave.current)return;if(documentDirty(store.getSnapshot(),saved.current)||engine.current?.drawing||pendingSaves.current||engine.current?.recorder.warnOnClose){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',before);return()=>window.removeEventListener('beforeunload',before);},[store]);
  function discard(){return !engine.current?.drawing&&!documentDirty(doc,saved.current)||window.confirm('There are unsaved changes or an active stroke. Continue and discard those changes?');}
  async function openProject(p:Project){if(!discard())return;try{if(operationLock.current)return;validateProject(p);engine.current!.cancelGesture();if(!await loadStudioProject(p)){notify('Project opening was canceled because the current document changed.');return;}writePreference('last-project',p.id);if(modal==='recover')writePreference('onboarding-dismissed',true);setLastSaved('');setStatus('Opened local project');setModal('');}catch(e){notify('Could not open project: '+String(e));}}
  function closeModal(){if(sequenceBusy){sequenceAbort.current?.abort();return;}if(modal==='recover')writePreference('onboarding-dismissed',true);setModal('');}
  async function showOnboarding(){try{setDeleteSelection([]);setRecords(await repository.list());setModal('recover');}catch(e){notify('Could not read saved projects: '+String(e));}}
+ async function createHomeScene(title:string){
+  if(operationLock.current||!discard())return;
+  const scene=newProject(title);
+  await openProjectWithoutConfirm(scene);
+  if(store.getSnapshot().id!==scene.id)return;
+  await save();
+  return scene.id;
+ }
  async function listProjects(){try{setDeleteSelection([]);setRecords(await repository.list());setModal('open');}catch(e){notify('Could not read projects: '+String(e));}}
  async function showSnapshots(){try{setSnapshots(await repository.snapshots(doc.id));setModal('snapshots');}catch(e){notify('Could not read snapshots: '+String(e));}}
  function toggleProjectForDeletion(id:string,checked:boolean){
@@ -934,7 +976,7 @@ export function App(){
   updateMotionPoint(id,frameId,position.x,position.y,'Capture motion point');
  }
  const menus:Record<string,{label:string;action:()=>void;disabled?:boolean}[]>={
-  File:[{label:'New Project…',action:startNew},{label:'Open / Manage Projects · Ctrl+Alt+O',action:()=>void listProjects()},{label:'Import backup…',action:()=>fileInput.current?.click()},{label:'Save · Ctrl/⌘ S',action:()=>void save()},{label:'Save As…',action:beginSaveAs},{label:'Download editable backup',action:()=>downloadProject(doc)},{label:'Recover snapshot…',action:()=>void showSnapshots()},{label:'Rename project…',action:()=>{setName(doc.name);setModal('rename');}},{label:'Export PNG',action:showExport},{label:'Export animation PNG sequence…',action:()=>setModal('sequence')}],
+  File:[{label:'Project Home…',action:()=>void showOnboarding()},{label:'New Project…',action:startNew},{label:'Open / Manage Projects · Ctrl+Alt+O',action:()=>void listProjects()},{label:'Import backup…',action:()=>fileInput.current?.click()},{label:'Save · Ctrl/⌘ S',action:()=>void save()},{label:'Save As…',action:beginSaveAs},{label:'Download editable backup',action:()=>downloadProject(doc)},{label:'Recover snapshot…',action:()=>void showSnapshots()},{label:'Rename project…',action:()=>{setName(doc.name);setModal('rename');}},{label:'Export PNG',action:showExport},{label:'Export animation PNG sequence…',action:()=>setModal('sequence')}],
   Select:[{label:'Stroke Select · S',action:()=>chooseTool('stroke-select')},{label:'Lasso · L',action:()=>chooseTool('lasso')},{label:'Rectangle · M',action:()=>chooseTool('rectangle')},{label:'Select All · Ctrl/⌘ A',action:()=>void editing('all')},{label:'Deselect · Ctrl/⌘ D',action:()=>void editing('deselect')}],
   Tools:[{label:'Brush · B',action:()=>chooseTool('brush')},{label:'Vector Pen · N',action:()=>chooseTool('vector')},{label:'Eraser · E',action:()=>chooseTool('eraser')},{label:'Fill · G',action:()=>chooseTool('fill')},{label:'Eyedropper · I',action:()=>chooseTool('eyedropper')}],
   Transform:[{label:'Free Transform · T',action:()=>chooseTool('transform')},{label:'Move · V',action:()=>chooseTool('transform')},{label:'Multi-Cel Transform · Shift+T',action:openBatchTransform}],
@@ -1228,7 +1270,8 @@ export function App(){
   {renameId&&<div className="modal-backdrop"><form className="modal small" role="dialog" aria-modal="true" aria-labelledby="rename-heading" onSubmit={e=>{e.preventDefault();if(renameValue.trim())commit(editLayer(doc,renameId,{name:renameValue.trim()}));setRenameId('');}}><h2 id="rename-heading">Rename layer</h2><input aria-label="Layer name" autoFocus maxLength={100} value={renameValue} onChange={e=>setRenameValue(e.target.value)}/><div className="modal-actions"><button type="button" onClick={()=>setRenameId('')}>Cancel</button><button className="accent-button">Rename</button></div></form></div>}
   {modal&&<div className="modal-backdrop"><div className={'modal '+(['new','saveas','rename'].includes(modal)?'small':'')} role="dialog" aria-modal="true" aria-labelledby="dialog-title"><button className="modal-close" aria-label="Close dialog" onClick={closeModal}><X size={18}/></button>
    {['new','saveas','rename'].includes(modal)?<form onSubmit={e=>{e.preventDefault();void submitProject();}}><span className="eyebrow">SOLO ANIME STUDIO</span><h2 id="dialog-title">{modal==='new'?'A fresh canvas.':modal==='saveas'?'Save a new copy.':'Name your scene.'}</h2><label className="form-label">Project name<input aria-label="Project name" autoFocus maxLength={100} value={name} onChange={e=>setName(e.target.value)} required/></label>{modal==='new'&&<label className="form-label">Resolution<select aria-label="Project resolution" value={resolution} onChange={e=>setResolution(e.target.value)}><option value="1920x1080">1920 × 1080 · Full HD</option><option value="1280x720">1280 × 720 · HD</option><option value="1080x1080">1080 × 1080 · Square</option><option value="2048x2048">2048 × 2048 · Square</option></select></label>}<div className="modal-actions"><button type="button" onClick={closeModal}>Cancel</button><button className="accent-button" type="submit">{modal==='new'?'Create project':modal==='saveas'?'Save copy':'Rename'}</button></div></form>:null}
-   {['open','recover'].includes(modal)&&<><span className="eyebrow">ON THIS DEVICE</span><h2 id="dialog-title">{modal==='recover'?'Welcome back.':'Open a project.'}</h2><p className="modal-intro">{modal==='recover'?'Your saved work is here, including the latest successful autosaves.':'Choose a local project or import an editable .solo.json backup.'}</p><div className="project-list">{records.length?records.map(r=><div className="project-row" key={r.id}><button className="project-open" disabled={deletingProjects} onClick={()=>void openProject(r.project)}><span className="project-list-icon"><Folder size={19}/></span><span><strong>{r.project.name}</strong><small>{r.project.width} × {r.project.height} · {r.project.layers.length} layers · {r.kind==='autosave'?'Autosaved':'Saved'} {new Date(r.savedAt).toLocaleString()}</small></span><ChevronRight size={15}/></button>{r.id===doc.id?<span className="project-current" title="Switch to a different project before deleting this one">OPEN</span>:<label className="project-delete-choice" title={`Select ${r.project.name} for deletion`}><input type="checkbox" aria-label={`Select ${r.project.name} for deletion`} checked={deleteSelection.includes(r.id)} disabled={deletingProjects} onChange={event=>toggleProjectForDeletion(r.id,event.target.checked)}/></label>}</div>):<p className="hint">No saved projects yet. Save your scene to find it here.</p>}</div>{records.length>0&&<div className="project-delete-actions"><span>Select old projects to remove. Your open project is protected.</span><button type="button" className="project-delete-button" disabled={!deleteSelection.length||deletingProjects} onClick={()=>void deleteSelectedProjects()}><Trash2 size={14}/>{deletingProjects?'Deleting…':`Delete selected (${deleteSelection.length})`}</button></div>}<div className="modal-actions"><button onClick={()=>fileInput.current?.click()}>Import backup…</button><button className="accent-button" onClick={closeModal}>{modal==='recover'?'Start with blank canvas':'Close'}</button></div></>}
+   {modal==='recover'&&<ProjectHome records={records} open={project=>void openProject(project)} create={createHomeScene} importBackup={()=>fileInput.current?.click()}/>}
+   {modal==='open'&&<><span className="eyebrow">ON THIS DEVICE</span><h2 id="dialog-title">Manage saved scenes</h2><p className="modal-intro">Choose a saved scene or import an editable backup.</p><div className="project-list">{records.length?records.map(r=><div className="project-row" key={r.id}><button className="project-open" disabled={deletingProjects} onClick={()=>void openProject(r.project)}><span className="project-list-icon"><Folder size={19}/></span><span><strong>{r.project.name}</strong><small>{r.project.width} × {r.project.height} · {r.project.layers.length} layers · {r.kind==='autosave'?'Autosaved':'Saved'} {new Date(r.savedAt).toLocaleString()}</small></span><ChevronRight size={15}/></button>{r.id===doc.id?<span className="project-current" title="Switch to a different project before deleting this one">OPEN</span>:<label className="project-delete-choice" title={`Select ${r.project.name} for deletion`}><input type="checkbox" aria-label={`Select ${r.project.name} for deletion`} checked={deleteSelection.includes(r.id)} disabled={deletingProjects} onChange={event=>toggleProjectForDeletion(r.id,event.target.checked)}/></label>}</div>):<p className="hint">No saved projects yet. Save your scene to find it here.</p>}</div>{records.length>0&&<div className="project-delete-actions"><span>Select old projects to remove. Your open project is protected.</span><button type="button" className="project-delete-button" disabled={!deleteSelection.length||deletingProjects} onClick={()=>void deleteSelectedProjects()}><Trash2 size={14}/>{deletingProjects?'Deleting…':`Delete selected (${deleteSelection.length})`}</button></div>}<div className="modal-actions"><button onClick={()=>fileInput.current?.click()}>Import backup…</button><button className="accent-button" onClick={closeModal}>Close</button></div></>}
    {modal==='snapshots'&&<><span className="eyebrow">RECOVERY</span><h2 id="dialog-title">Saved snapshots.</h2><p className="modal-intro">The last 10 successful saves for this project. Restoring can be undone only by reopening a newer snapshot.</p><div className="project-list">{snapshots.map(s=><button key={s.key} onClick={()=>void openProject(s.project)}><Clock size={18}/><span><strong>{new Date(s.savedAt).toLocaleString()}</strong><small>{s.kind} · {s.project.layers.reduce((n,l)=>n+l.operations.length,0)} drawing operations</small></span><ChevronRight size={14}/></button>)}{!snapshots.length&&<p>No snapshots yet. Save this project first.</p>}</div></>}
    {modal==='export'&&<PngExport project={doc} cameraFrame={cameraExposure} onExport={options=>void exportPng(options)}/>}
    {modal==='sequence'&&<><SequenceExport project={doc} fps={fps} busy={sequenceBusy} onExport={options=>void exportSequence(options)}/>{sequenceBusy&&<div className="sequence-progress" role="status">{sequenceProgress?.phase??'Preparing'} · {sequenceProgress?.finished??0}/{sequenceProgress?.total??0}<button onClick={()=>sequenceAbort.current?.abort()}>Cancel export</button></div>}</>}
