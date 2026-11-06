@@ -1,0 +1,17 @@
+{
+  "src/ui/App.tsx": {
+    "before": "40f70c0d64b6928c8f78c4cd799af152293972ca31c85af53b0f6c5bbd54e687",
+    "after": "76645ce20e38ec495f985b6400c20a000b6cbe2c95af920df75e539aef468e81",
+    "reason": "Enable direct move, scale and rotation for selected strokes."
+  },
+  "src/engine/StudioEngine.ts": {
+    "before": "9f9fe03fd2312ff956ce359e7fd62fe6b0c883e7ab540ed2edf34d7858c316a2",
+    "after": "ceeabc955197f6c606352007270afaa6cf63fe6562aa4b3a563da7ae876ffb77",
+    "reason": "Enable direct move, scale and rotation for selected strokes."
+  },
+  "src/core/buildInfo.ts": {
+    "before": "c6c6307261f541637046065e15b2c68e907ef14422ebbd3122f0218349604588",
+    "after": "ef368ea059073cd2069fffec409b6541c09cc01a35f4eb29f62bf2785603d272",
+    "reason": "Enable direct move, scale and rotation for selected strokes."
+  }
+}

@@ -312,6 +312,9 @@ export class StudioEngine {
  selectAllStrokes(){this.setStrokeIds(this.selectableLayers().flatMap(l=>selectable(l).map(o=>o.id)));}
  setStrokeShape(shape:'rectangle'|'lasso'){this.strokeShape=shape;}
  startVanishingPoint(){this.pickVanishingPoint=true;this.notify('Click the drawing to set the perspective vanishing point.');}
+ private get activeStrokeMode(){
+  return this.strokeIds.length&&(this.strokeMode==='select'||this.strokeMode==='lasso')?'freeform':this.strokeMode;
+ }
  private selectedOperations(){const ids=new Set(this.strokeIds);return this.selectableLayers().flatMap(l=>selectable(l).filter(o=>ids.has(o.id)));}
  private setStrokeIds(ids:string[]){
   const set=new Set(ids),ops=this.selectableLayers().flatMap(l=>selectable(l).filter(o=>set.has(o.id)));
@@ -322,10 +325,10 @@ export class StudioEngine {
   this.onSelection(this.selection.length>=3);this.onStrokeSelection(this.strokeIds.length);this.request();
  }
  /** Real saved stroke operations, never a pixel crop. */
- private commitSelectedStrokes(){
+ private commitSelectedStrokes(nextMode:'select'|'lasso'='select'){
   const p=this.store.getSnapshot();if(!this.strokeIds.length)return;
   const m=this.matrix(),h=this.projectiveMatrix();if(this.warpQuad&&!h){this.notify('Perspective corners overlap. Adjust the corners to a valid shape.');return;}
-  if(m.every((v,i)=>Math.abs(v-IDENTITY[i])<1e-8)&&!this.warpQuad){this.setStrokeMode('select');return;}
+  if(m.every((v,i)=>Math.abs(v-IDENTITY[i])<1e-8)&&!this.warpQuad){this.setStrokeMode(nextMode);return;}
   const ids=new Set(this.strokeIds);
   const layers=p.layers.map(layer=>{
    if(layer.locked||!layer.visible||layer.reference||!layer.operations.some(o=>ids.has(o.id)))return layer;
@@ -336,7 +339,7 @@ export class StudioEngine {
   // Artist-moved bound parts control the motion path too; unrelated strokes never enter this branch.
   this.store.commit(followBoundSelectionTransform(p,transformed,selected),'Transform selected strokes');
   // Re-select the transformed identities so their real ink remains highlighted.
-  this.setStrokeIds(selected);this.setStrokeMode('select');
+  this.setStrokeIds(selected);this.setStrokeMode(nextMode);
  }
 
  /** Delete chosen strokes or clear the current raster layer inside a traditional lasso/rectangle.
@@ -424,9 +427,10 @@ export class StudioEngine {
   if(this.tool==='stroke-select'){
    if(this.pickVanishingPoint){this.vanishingPoint={x:p.x,y:p.y};this.pickVanishingPoint=false;this.request();return;}
    const selecting=this.strokeMode==='select'||this.strokeMode==='lasso';
-   if(!selecting&&this.strokeIds.length&&this.selection.length){
+   const mode=selecting&&e.shiftKey?this.strokeMode:this.activeStrokeMode;
+   if(!['select','lasso'].includes(mode)&&this.strokeIds.length&&this.selection.length){
     const c=controls(this.selection,this.transform,this.view.zoom),corners=this.displayedCorners(),near=(q:XY)=>Math.hypot(q.x-p.x,q.y-p.y)<10/this.view.zoom,idx=corners.findIndex(near);
-    if(this.strokeMode==='freeform'){
+    if(mode==='freeform'){
      const perspective=this.freeformCornerMode==='perspective'||e.ctrlKey||e.metaKey;
      const hit=freeformHit(p,corners,c.rotation,c.center,c.top,this.view.zoom,perspective);
      if(hit.kind==='corner'){
@@ -437,15 +441,15 @@ export class StudioEngine {
      }
      if(hit.kind==='rotation'){this.drag={...p,settings:{...this.transform},kind:'rotate',center:c.center};return;}
     }else{
-     if((this.strokeMode==='scale'||this.strokeMode==='perspective')&&idx>=0){
-      this.drag={...p,settings:{...this.transform},kind:this.strokeMode==='perspective'?'perspective':'scale',center:c.center,anchor:corners[(idx+2)%4],corner:idx,startQuad:this.warpQuad?this.warpQuad.map(q=>({...q})):this.selection.map(q=>({x:q.x,y:q.y}))};return;
+     if((mode==='scale'||mode==='perspective')&&idx>=0){
+      this.drag={...p,settings:{...this.transform},kind:mode==='perspective'?'perspective':'scale',center:c.center,anchor:corners[(idx+2)%4],corner:idx,startQuad:this.warpQuad?this.warpQuad.map(q=>({...q})):this.selection.map(q=>({x:q.x,y:q.y}))};return;
      }
-     if(this.strokeMode==='rotate'&&(near(c.rotation)||Math.abs(Math.hypot(p.x-c.center.x,p.y-c.center.y)-rotationRadius(c.center,c.top,this.view.zoom,corners))<8/this.view.zoom)){this.drag={...p,settings:{...this.transform},kind:'rotate',center:c.center};return;}
+     if(mode==='rotate'&&(near(c.rotation)||Math.abs(Math.hypot(p.x-c.center.x,p.y-c.center.y)-rotationRadius(c.center,c.top,this.view.zoom,corners))<8/this.view.zoom)){this.drag={...p,settings:{...this.transform},kind:'rotate',center:c.center};return;}
     }
     // A selected group may contain clear gaps. Transforming any location within
-    // the selection hull should work, but never while in stroke-picking mode.
-    if(['move','freeform','perspective-move'].includes(this.strokeMode)&&nearSelection(p,corners.map(q=>({...q,p:1})),3/this.view.zoom)){
-     this.drag={...p,settings:{...this.transform},kind:this.strokeMode==='perspective-move'?'perspective-move':'move',center:c.center};return;
+    // the selection hull works even between the selected strokes.
+    if(['move','freeform','perspective-move'].includes(mode)&&nearSelection(p,corners.map(q=>({...q,p:1})),3/this.view.zoom)){
+     this.drag={...p,settings:{...this.transform},kind:mode==='perspective-move'?'perspective-move':'move',center:c.center};return;
     }
    }
    if(this.strokeMode==='lasso'){this.strokePending={x:p.x,y:p.y,shift:e.shiftKey};this.lasso=undefined;return;}
@@ -455,7 +459,6 @@ export class StudioEngine {
    if(hit){
     if(e.shiftKey)this.setStrokeIds(this.strokeIds.includes(hit.id)?this.strokeIds.filter(id=>id!==hit.id):[...this.strokeIds,hit.id]);
     else if(!this.strokeIds.includes(hit.id))this.setStrokeIds([hit.id]);
-    // A plain click NEVER begins a transform. Choose a transform icon first.
     return;
    }
    this.strokePending={x:p.x,y:p.y,shift:e.shiftKey};this.lasso=undefined;return;
@@ -494,7 +497,7 @@ export class StudioEngine {
    this.canvas.style.cursor=this.areaTransformMode==='rotate'?'grab':this.areaTransformMode==='scale'?(index<0?'crosshair':index%2===0?'nwse-resize':'nesw-resize'):'move';
   }
   if(this.pointerId===undefined&&this.tool==='stroke-select'&&this.strokeIds.length&&this.cursor){
-   if(this.strokeMode==='freeform'){const c=controls(this.selection,this.transform,this.view.zoom),h=freeformHit(this.cursor,this.displayedCorners(),c.rotation,c.center,c.top,this.view.zoom,this.freeformCornerMode==='perspective'||e.ctrlKey||e.metaKey);this.canvas.style.cursor=h.kind==='rotation'?'grab':h.kind==='corner'?(this.freeformCornerMode==='perspective'||e.ctrlKey||e.metaKey?'crosshair':(h.index??0)%2===0?'nwse-resize':'nesw-resize'):h.kind==='edge'?((h.index??0)%2===0?'ns-resize':'ew-resize'):'move';}
+   if(this.activeStrokeMode==='freeform'){const c=controls(this.selection,this.transform,this.view.zoom),h=freeformHit(this.cursor,this.displayedCorners(),c.rotation,c.center,c.top,this.view.zoom,this.freeformCornerMode==='perspective'||e.ctrlKey||e.metaKey);this.canvas.style.cursor=h.kind==='rotation'?'grab':h.kind==='corner'?(this.freeformCornerMode==='perspective'||e.ctrlKey||e.metaKey?'crosshair':(h.index??0)%2===0?'nwse-resize':'nesw-resize'):h.kind==='edge'?((h.index??0)%2===0?'ns-resize':'ew-resize'):nearSelection(this.cursor,this.displayedCorners().map(q=>({...q,p:1})),3/this.view.zoom)?'move':'crosshair';}
    else if(this.strokeMode==='scale'||this.strokeMode==='perspective'){
     const corners=this.displayedCorners(),near=corners.findIndex(q=>Math.hypot(q.x-this.cursor!.x,q.y-this.cursor!.y)<11/this.view.zoom);
     this.canvas.style.cursor=near<0?'crosshair':this.strokeMode==='perspective'?'crosshair':near%2===0?'nwse-resize':'nesw-resize';
@@ -520,7 +523,8 @@ export class StudioEngine {
   if(this.navigation){if(this.tool==='zoom'&&!this.navigation.moved)this.zoomTo(this.view.zoom*(this.navigation.alt?.8:1.25));this.navigation=undefined;}
   const stroke=this.finalizeStroke(this.stroke),target=this.strokeTarget;this.recorder.event('gesture-end',{reason:'release',id:this.capture?.gestureId,pointerId:this.pointerId,sourcePoints:stroke?.points.length??this.lasso?.length??0,captured:this.capture?.count});this.diagnostics.finish('release',stroke,this.lasso,this.audit());this.stroke=undefined;this.strokeTarget=undefined;this.liveGeometry=undefined;this.liveTip=undefined;
   if(this.strokePending){const pending=this.strokePending;if(this.lasso&&this.lasso.length>=3){const found=this.marqueeStrokeIds(this.lasso);this.setStrokeIds(pending.shift?[...new Set([...this.strokeIds,...found])]:found);}else if(!pending.shift)this.clearSelection();this.lasso=undefined;this.strokePending=undefined;}else this.finishSelection();
-  this.pan=undefined;this.drag=undefined;this.canvas.style.cursor='';this.paintCursor();this.releaseCapture();const committed=this.commitStroke(stroke,target);if(stroke)this.diagnostics.committed(stroke.id,committed);this.request();
+  const directTransform=!!this.drag&&this.tool==='stroke-select'&&(this.strokeMode==='select'||this.strokeMode==='lasso');
+  this.pan=undefined;this.drag=undefined;this.canvas.style.cursor='';this.paintCursor();this.releaseCapture();if(directTransform)this.commitSelectedStrokes(this.strokeMode==='lasso'?'lasso':'select');const committed=this.commitStroke(stroke,target);if(stroke)this.diagnostics.committed(stroke.id,committed);this.request();
  };
  private cancel=(e:PointerEvent)=>{if(e.pointerId===this.pointerId&&e.timeStamp>=(this.capture?.started??0)){this.consume(e,true);this.finishGesture('pointercancel');}};private lostCapture=(e:PointerEvent)=>{this.diagnostics.record(e,[],false);if(e.pointerId===this.pointerId&&e.timeStamp>=(this.capture?.started??0)&&!this.canvas.hasPointerCapture(e.pointerId)&&this.drawing)this.finishGesture('lostpointercapture');};private leave=()=>{if(!this.drawing){this.cursor=undefined;this.paintCursor();}};
  private wheel=(e:WheelEvent)=>{e.preventDefault();if(this.drawing||this.busy)return;const next=wheelZoom(this.view,this.local(e),e.deltaY,e.deltaMode,this.height,this.minimumZoom);if(next===this.view)return;this.setView(next,true,true);};
@@ -700,14 +704,14 @@ export class StudioEngine {
    }
    ctx.restore();
   }
-  if(this.selection.length&&(this.tool==='transform'||this.tool==='stroke-select'&&['scale','rotate','perspective','freeform'].includes(this.strokeMode))){
+  if(this.selection.length&&(this.tool==='transform'||this.tool==='stroke-select'&&['scale','rotate','perspective','freeform'].includes(this.activeStrokeMode))){
    const c=controls(this.selection,this.transform,this.view.zoom),corners=this.strokeIds.length?this.displayedCorners():c.corners,size=4.5/this.view.zoom;
    ctx.save();ctx.strokeStyle='#55d9c4aa';ctx.fillStyle='#e5faf6';ctx.lineWidth=.7/this.view.zoom;
    ctx.beginPath();corners.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));ctx.closePath();ctx.stroke();
-   if(this.tool==='transform'&&['freeform','rotate'].includes(this.areaTransformMode)||this.tool==='stroke-select'&&['rotate','freeform'].includes(this.strokeMode)){
+   if(this.tool==='transform'&&['freeform','rotate'].includes(this.areaTransformMode)||this.tool==='stroke-select'&&['rotate','freeform'].includes(this.activeStrokeMode)){
     ctx.beginPath();ctx.moveTo(c.top.x,c.top.y);ctx.lineTo(c.rotation.x,c.rotation.y);ctx.stroke();
     ctx.beginPath();ctx.arc(c.rotation.x,c.rotation.y,size*.85,0,Math.PI*2);ctx.fill();ctx.stroke();
-    if(this.tool==='stroke-select'&&(this.strokeMode==='rotate'||this.strokeMode==='freeform')){
+    if(this.tool==='stroke-select'&&(this.activeStrokeMode==='rotate'||this.activeStrokeMode==='freeform')){
      // An unobtrusive turntable guide and live degree indicator. Kept entirely
      // on the overlay, so no document geometry is written until Apply.
      const radius=rotationRadius(c.center,c.top,this.view.zoom,corners);
@@ -722,9 +726,9 @@ export class StudioEngine {
      ctx.fillStyle='#b6fff0';ctx.fillText(label,0,0);ctx.restore();
     }
    }
-   if(this.tool==='transform'&&['freeform','scale'].includes(this.areaTransformMode)||this.tool==='stroke-select'&&['scale','perspective','freeform'].includes(this.strokeMode))for(const pt of corners){ctx.fillRect(pt.x-size/2,pt.y-size/2,size,size);ctx.strokeRect(pt.x-size/2,pt.y-size/2,size,size);}
-   if(this.tool==='stroke-select'&&this.strokeMode==='freeform'&&this.freeformCornerMode==='scale'){for(const pt of edgeHandles(corners)){ctx.fillRect(pt.x-size/2,pt.y-size/2,size,size);ctx.strokeRect(pt.x-size/2,pt.y-size/2,size,size);}}
-   if(this.tool==='stroke-select'&&this.strokeMode==='freeform'){const r=4/this.view.zoom;ctx.strokeStyle='#55d9c4b0';ctx.beginPath();ctx.moveTo(c.center.x-r,c.center.y);ctx.lineTo(c.center.x+r,c.center.y);ctx.moveTo(c.center.x,c.center.y-r);ctx.lineTo(c.center.x,c.center.y+r);ctx.stroke();}
+   if(this.tool==='transform'&&['freeform','scale'].includes(this.areaTransformMode)||this.tool==='stroke-select'&&['scale','perspective','freeform'].includes(this.activeStrokeMode))for(const pt of corners){ctx.fillRect(pt.x-size/2,pt.y-size/2,size,size);ctx.strokeRect(pt.x-size/2,pt.y-size/2,size,size);}
+   if(this.tool==='stroke-select'&&this.activeStrokeMode==='freeform'&&this.freeformCornerMode==='scale'){for(const pt of edgeHandles(corners)){ctx.fillRect(pt.x-size/2,pt.y-size/2,size,size);ctx.strokeRect(pt.x-size/2,pt.y-size/2,size,size);}}
+   if(this.tool==='stroke-select'&&this.activeStrokeMode==='freeform'){const r=4/this.view.zoom;ctx.strokeStyle='#55d9c4b0';ctx.beginPath();ctx.moveTo(c.center.x-r,c.center.y);ctx.lineTo(c.center.x+r,c.center.y);ctx.moveTo(c.center.x,c.center.y-r);ctx.lineTo(c.center.x,c.center.y+r);ctx.stroke();}
    ctx.restore();
   }
   if(this.tool==='stroke-select'&&this.strokeMode==='perspective-move'&&this.strokeIds.length){
