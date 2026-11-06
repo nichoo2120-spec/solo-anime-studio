@@ -287,7 +287,7 @@ export class StudioEngine {
  }
  zoomTo(zoom:number){zoom=Math.max(this.minimumZoom,Math.min(8,zoom));const pivot={x:this.width/2,y:this.height/2},p=toProject(pivot,this.view),v={...this.view,zoom};const s=toScreen(p,v);this.setView({...v,x:v.x+pivot.x-s.x,y:v.y+pivot.y-s.y},false,true);}
  rotate(deg:number){const pivot={x:this.width/2,y:this.height/2},p=toProject(pivot,this.view),v={...this.view,rotation:deg*Math.PI/180};const s=toScreen(p,v);this.setView({...v,x:v.x+pivot.x-s.x,y:v.y+pivot.y-s.y});}
- setInput(t:Tool,brush:BrushSettings,preset?:{id:string;name:string}){const next=preset?{...preset}:{id:brush.brushKind??'custom',name:brush.brushKind??'Custom brush'},changed=t!==this.tool,presetChanged=next.id!==this.preset.id||brush.brushKind!==this.brush.brushKind;if((changed||presetChanged&&!this.drawing)&&this.pointerId!==undefined)this.finishGesture(changed?'tool-change':'preset-change');if(this.recorder.recording)this.recorder.event(changed?'tool-change':presetChanged?'preset-change':'brush-settings',{tool:t,preset:next,settings:structuredClone(brush)});if(changed&&(t==='stroke-select'||this.tool==='stroke-select'))this.clearSelection();this.preset=next;this.tool=t;this.canvas.style.cursor='';this.brush=structuredClone(brush);if(t==='brush'&&(this.brush.nativeMixEnabled||workerBlendEligible({...this.brush,...brushStrokeMetadata(this.brush),tool:'brush'})))this.blendWorker.warm();this.paintCursor();this.request();}
+ setInput(t:Tool,brush:BrushSettings,preset?:{id:string;name:string}){const next=preset?{...preset}:{id:brush.brushKind??'custom',name:brush.brushKind??'Custom brush'},changed=t!==this.tool,presetChanged=next.id!==this.preset.id||brush.brushKind!==this.brush.brushKind;if((changed||presetChanged&&!this.drawing)&&this.pointerId!==undefined)this.finishGesture(changed?'tool-change':'preset-change');if(this.recorder.recording)this.recorder.event(changed?'tool-change':presetChanged?'preset-change':'brush-settings',{tool:t,preset:next,settings:structuredClone(brush)});if(changed&&t!=='transform'&&(t==='stroke-select'||this.tool==='stroke-select'))this.clearSelection();this.preset=next;this.tool=t;this.canvas.style.cursor='';this.brush=structuredClone(brush);if(t==='brush'&&(this.brush.nativeMixEnabled||workerBlendEligible({...this.brush,...brushStrokeMetadata(this.brush),tool:'brush'})))this.blendWorker.warm();this.paintCursor();this.request();}
  setTool(t:Tool){this.setInput(t,this.brush);}
  clearSelection(){const changed=!!(this.selection.length||this.strokeIds.length||this.warpQuad||this.transform.dx||this.transform.dy||this.transform.angle||this.transform.scale!==1||(this.transform.scaleX??1)!==1||(this.transform.scaleY??1)!==1);if(this.canvas)this.canvas.style.cursor='';this.selection=[];this.strokeIds=[];this.strokeExact.clear();this.warpQuad=undefined;this.transform={dx:0,dy:0,scale:1,angle:0};if(changed){this.onSelection(false);this.onStrokeSelection(0);}if(this.vectors.selectedId!==null)this.vectors.select(null);this.smoothing.cancel();this.request();}
  setTransform(settings:Partial<TransformSettings>){this.transform={...this.transform,...settings};this.onTransform(this.transform);this.request();}
@@ -312,9 +312,6 @@ export class StudioEngine {
  selectAllStrokes(){this.setStrokeIds(this.selectableLayers().flatMap(l=>selectable(l).map(o=>o.id)));}
  setStrokeShape(shape:'rectangle'|'lasso'){this.strokeShape=shape;}
  startVanishingPoint(){this.pickVanishingPoint=true;this.notify('Click the drawing to set the perspective vanishing point.');}
- private get activeStrokeMode(){
-  return this.strokeIds.length&&(this.strokeMode==='select'||this.strokeMode==='lasso')?'freeform':this.strokeMode;
- }
  private selectedOperations(){const ids=new Set(this.strokeIds);return this.selectableLayers().flatMap(l=>selectable(l).filter(o=>ids.has(o.id)));}
  private setStrokeIds(ids:string[]){
   const set=new Set(ids),ops=this.selectableLayers().flatMap(l=>selectable(l).filter(o=>set.has(o.id)));
@@ -427,7 +424,7 @@ export class StudioEngine {
   if(this.tool==='stroke-select'){
    if(this.pickVanishingPoint){this.vanishingPoint={x:p.x,y:p.y};this.pickVanishingPoint=false;this.request();return;}
    const selecting=this.strokeMode==='select'||this.strokeMode==='lasso';
-   const mode=selecting&&e.shiftKey?this.strokeMode:this.activeStrokeMode;
+   const mode=this.strokeMode;
    if(!['select','lasso'].includes(mode)&&this.strokeIds.length&&this.selection.length){
     const c=controls(this.selection,this.transform,this.view.zoom),corners=this.displayedCorners(),near=(q:XY)=>Math.hypot(q.x-p.x,q.y-p.y)<10/this.view.zoom,idx=corners.findIndex(near);
     if(mode==='freeform'){
@@ -497,7 +494,7 @@ export class StudioEngine {
    this.canvas.style.cursor=this.areaTransformMode==='rotate'?'grab':this.areaTransformMode==='scale'?(index<0?'crosshair':index%2===0?'nwse-resize':'nesw-resize'):'move';
   }
   if(this.pointerId===undefined&&this.tool==='stroke-select'&&this.strokeIds.length&&this.cursor){
-   if(this.activeStrokeMode==='freeform'){const c=controls(this.selection,this.transform,this.view.zoom),h=freeformHit(this.cursor,this.displayedCorners(),c.rotation,c.center,c.top,this.view.zoom,this.freeformCornerMode==='perspective'||e.ctrlKey||e.metaKey);this.canvas.style.cursor=h.kind==='rotation'?'grab':h.kind==='corner'?(this.freeformCornerMode==='perspective'||e.ctrlKey||e.metaKey?'crosshair':(h.index??0)%2===0?'nwse-resize':'nesw-resize'):h.kind==='edge'?((h.index??0)%2===0?'ns-resize':'ew-resize'):nearSelection(this.cursor,this.displayedCorners().map(q=>({...q,p:1})),3/this.view.zoom)?'move':'crosshair';}
+   if(this.strokeMode==='freeform'){const c=controls(this.selection,this.transform,this.view.zoom),h=freeformHit(this.cursor,this.displayedCorners(),c.rotation,c.center,c.top,this.view.zoom,this.freeformCornerMode==='perspective'||e.ctrlKey||e.metaKey);this.canvas.style.cursor=h.kind==='rotation'?'grab':h.kind==='corner'?(this.freeformCornerMode==='perspective'||e.ctrlKey||e.metaKey?'crosshair':(h.index??0)%2===0?'nwse-resize':'nesw-resize'):h.kind==='edge'?((h.index??0)%2===0?'ns-resize':'ew-resize'):nearSelection(this.cursor,this.displayedCorners().map(q=>({...q,p:1})),3/this.view.zoom)?'move':'crosshair';}
    else if(this.strokeMode==='scale'||this.strokeMode==='perspective'){
     const corners=this.displayedCorners(),near=corners.findIndex(q=>Math.hypot(q.x-this.cursor!.x,q.y-this.cursor!.y)<11/this.view.zoom);
     this.canvas.style.cursor=near<0?'crosshair':this.strokeMode==='perspective'?'crosshair':near%2===0?'nwse-resize':'nesw-resize';
@@ -523,8 +520,7 @@ export class StudioEngine {
   if(this.navigation){if(this.tool==='zoom'&&!this.navigation.moved)this.zoomTo(this.view.zoom*(this.navigation.alt?.8:1.25));this.navigation=undefined;}
   const stroke=this.finalizeStroke(this.stroke),target=this.strokeTarget;this.recorder.event('gesture-end',{reason:'release',id:this.capture?.gestureId,pointerId:this.pointerId,sourcePoints:stroke?.points.length??this.lasso?.length??0,captured:this.capture?.count});this.diagnostics.finish('release',stroke,this.lasso,this.audit());this.stroke=undefined;this.strokeTarget=undefined;this.liveGeometry=undefined;this.liveTip=undefined;
   if(this.strokePending){const pending=this.strokePending;if(this.lasso&&this.lasso.length>=3){const found=this.marqueeStrokeIds(this.lasso);this.setStrokeIds(pending.shift?[...new Set([...this.strokeIds,...found])]:found);}else if(!pending.shift)this.clearSelection();this.lasso=undefined;this.strokePending=undefined;}else this.finishSelection();
-  const directTransform=!!this.drag&&this.tool==='stroke-select'&&(this.strokeMode==='select'||this.strokeMode==='lasso');
-  this.pan=undefined;this.drag=undefined;this.canvas.style.cursor='';this.paintCursor();this.releaseCapture();if(directTransform)this.commitSelectedStrokes(this.strokeMode==='lasso'?'lasso':'select');const committed=this.commitStroke(stroke,target);if(stroke)this.diagnostics.committed(stroke.id,committed);this.request();
+  this.pan=undefined;this.drag=undefined;this.canvas.style.cursor='';this.paintCursor();this.releaseCapture();const committed=this.commitStroke(stroke,target);if(stroke)this.diagnostics.committed(stroke.id,committed);this.request();
  };
  private cancel=(e:PointerEvent)=>{if(e.pointerId===this.pointerId&&e.timeStamp>=(this.capture?.started??0)){this.consume(e,true);this.finishGesture('pointercancel');}};private lostCapture=(e:PointerEvent)=>{this.diagnostics.record(e,[],false);if(e.pointerId===this.pointerId&&e.timeStamp>=(this.capture?.started??0)&&!this.canvas.hasPointerCapture(e.pointerId)&&this.drawing)this.finishGesture('lostpointercapture');};private leave=()=>{if(!this.drawing){this.cursor=undefined;this.paintCursor();}};
  private wheel=(e:WheelEvent)=>{e.preventDefault();if(this.drawing||this.busy)return;const next=wheelZoom(this.view,this.local(e),e.deltaY,e.deltaMode,this.height,this.minimumZoom);if(next===this.view)return;this.setView(next,true,true);};
@@ -704,14 +700,14 @@ export class StudioEngine {
    }
    ctx.restore();
   }
-  if(this.selection.length&&(this.tool==='transform'||this.tool==='stroke-select'&&['scale','rotate','perspective','freeform'].includes(this.activeStrokeMode))){
+  if(this.selection.length&&(this.tool==='transform'||this.tool==='stroke-select'&&['scale','rotate','perspective','freeform'].includes(this.strokeMode))){
    const c=controls(this.selection,this.transform,this.view.zoom),corners=this.strokeIds.length?this.displayedCorners():c.corners,size=4.5/this.view.zoom;
    ctx.save();ctx.strokeStyle='#55d9c4aa';ctx.fillStyle='#e5faf6';ctx.lineWidth=.7/this.view.zoom;
    ctx.beginPath();corners.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));ctx.closePath();ctx.stroke();
-   if(this.tool==='transform'&&['freeform','rotate'].includes(this.areaTransformMode)||this.tool==='stroke-select'&&['rotate','freeform'].includes(this.activeStrokeMode)){
+   if(this.tool==='transform'&&['freeform','rotate'].includes(this.areaTransformMode)||this.tool==='stroke-select'&&['rotate','freeform'].includes(this.strokeMode)){
     ctx.beginPath();ctx.moveTo(c.top.x,c.top.y);ctx.lineTo(c.rotation.x,c.rotation.y);ctx.stroke();
     ctx.beginPath();ctx.arc(c.rotation.x,c.rotation.y,size*.85,0,Math.PI*2);ctx.fill();ctx.stroke();
-    if(this.tool==='stroke-select'&&(this.activeStrokeMode==='rotate'||this.activeStrokeMode==='freeform')){
+    if(this.tool==='stroke-select'&&(this.strokeMode==='rotate'||this.strokeMode==='freeform')){
      // An unobtrusive turntable guide and live degree indicator. Kept entirely
      // on the overlay, so no document geometry is written until Apply.
      const radius=rotationRadius(c.center,c.top,this.view.zoom,corners);
@@ -726,9 +722,9 @@ export class StudioEngine {
      ctx.fillStyle='#b6fff0';ctx.fillText(label,0,0);ctx.restore();
     }
    }
-   if(this.tool==='transform'&&['freeform','scale'].includes(this.areaTransformMode)||this.tool==='stroke-select'&&['scale','perspective','freeform'].includes(this.activeStrokeMode))for(const pt of corners){ctx.fillRect(pt.x-size/2,pt.y-size/2,size,size);ctx.strokeRect(pt.x-size/2,pt.y-size/2,size,size);}
-   if(this.tool==='stroke-select'&&this.activeStrokeMode==='freeform'&&this.freeformCornerMode==='scale'){for(const pt of edgeHandles(corners)){ctx.fillRect(pt.x-size/2,pt.y-size/2,size,size);ctx.strokeRect(pt.x-size/2,pt.y-size/2,size,size);}}
-   if(this.tool==='stroke-select'&&this.activeStrokeMode==='freeform'){const r=4/this.view.zoom;ctx.strokeStyle='#55d9c4b0';ctx.beginPath();ctx.moveTo(c.center.x-r,c.center.y);ctx.lineTo(c.center.x+r,c.center.y);ctx.moveTo(c.center.x,c.center.y-r);ctx.lineTo(c.center.x,c.center.y+r);ctx.stroke();}
+   if(this.tool==='transform'&&['freeform','scale'].includes(this.areaTransformMode)||this.tool==='stroke-select'&&['scale','perspective','freeform'].includes(this.strokeMode))for(const pt of corners){ctx.fillRect(pt.x-size/2,pt.y-size/2,size,size);ctx.strokeRect(pt.x-size/2,pt.y-size/2,size,size);}
+   if(this.tool==='stroke-select'&&this.strokeMode==='freeform'&&this.freeformCornerMode==='scale'){for(const pt of edgeHandles(corners)){ctx.fillRect(pt.x-size/2,pt.y-size/2,size,size);ctx.strokeRect(pt.x-size/2,pt.y-size/2,size,size);}}
+   if(this.tool==='stroke-select'&&this.strokeMode==='freeform'){const r=4/this.view.zoom;ctx.strokeStyle='#55d9c4b0';ctx.beginPath();ctx.moveTo(c.center.x-r,c.center.y);ctx.lineTo(c.center.x+r,c.center.y);ctx.moveTo(c.center.x,c.center.y-r);ctx.lineTo(c.center.x,c.center.y+r);ctx.stroke();}
    ctx.restore();
   }
   if(this.tool==='stroke-select'&&this.strokeMode==='perspective-move'&&this.strokeIds.length){
