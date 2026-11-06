@@ -1,0 +1,12 @@
+{
+  "src/ui/App.tsx": {
+    "before": "7fb0d9d1c3fed9ed3a7afb95e9993fe93b4c5ff698831aadaa21c913aa3fb2a6",
+    "after": "24af3b47d889a3ee0bdd75fd925dc3d0e59b02eb1235e1faca3a7611904070a9",
+    "reason": "Project home and save before closing for v0.5.188."
+  },
+  "src/core/buildInfo.ts": {
+    "before": "68215178a463fbd3618b5dd6681764b0972e75711293543289d5dedeb8663e0b",
+    "after": "14f63c80c5d9498bbfdaf2fabb53a46b016af04c0cd44f8d5ec060f51d453a92",
+    "reason": "Project home and save before closing for v0.5.188."
+  }
+}

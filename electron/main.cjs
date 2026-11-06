@@ -49,6 +49,9 @@ const manualCheck = () => updates.check();
 
 ipcMain.on('sas-version', (e) => { e.returnValue = app.getVersion(); });
 ipcMain.handle('sas-check-updates', () => manualCheck());
+ipcMain.on('sas-close-after-save', event => {
+  if (win && event.sender === win.webContents && event.senderFrame === win.webContents.mainFrame) win.close();
+});
 
 function createWindow() {
   win = new BrowserWindow({
@@ -68,9 +71,16 @@ function createWindow() {
   win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith(`${ORIGIN}/`)) { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); } });
   // The page blocks closing while there are unsaved changes (beforeunload). Ask like a browser would.
   win.webContents.on('will-prevent-unload', (e) => {
-    const c = dialog.showMessageBoxSync(win, { type: 'warning', buttons: ['Stay', 'Close anyway'], defaultId: 0, cancelId: 0, title: 'Unsaved changes',
-      message: 'You have unsaved changes.', detail: 'Click "Stay" and save (Ctrl+S) first, or "Close anyway" to lose the latest changes.' });
-    if (c === 1) e.preventDefault(); else updates.cancelRestart();
+    const choice = dialog.showMessageBoxSync(win, {
+      type: 'warning', buttons: ['Save', "Don't Save", 'Cancel'], defaultId: 0, cancelId: 2,
+      title: 'Unsaved changes', message: 'Save your changes before closing Studio?',
+    });
+    if (choice === 1) {
+      e.preventDefault();
+      return;
+    }
+    updates.cancelRestart();
+    if (choice === 0) win.webContents.send('sas-save-before-close');
   });
   // Ctrl+Shift+U = check for updates (no menu bar, so a key is used); F12 = dev tools only when not packaged
   win.webContents.on('before-input-event', async (e, input) => {
