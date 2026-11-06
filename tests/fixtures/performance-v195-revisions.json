@@ -11,12 +11,12 @@
   },
   "src/engine/strokeGeometry.ts": {
     "before": "6bddf7bc60fda73eb62d599f0cc38f5608ccf58f98d5548a0d2984589db7eca5",
-    "after": "ae8e0140779ad7780c48d2819a2f8d1d0e4cb1282742b0772fc0fd2590a604ef",
+    "after": "5f1048f058cd7af8a6443d3869bb2b8303b7068289d38baccdd9dd6e006ca37e",
     "reason": "Add project scene actions, image placement, and pointer-following ink preview."
   },
   "src/engine/strokeProcessing.ts": {
     "before": "c917ca87ca56ed185f5aaf9c3972c04e044d810085de9024f97523a2fe09a1d2",
-    "after": "154f93992c77d03da238e8ad4247ee0086f0a260f3d3fe2b79670b5166dbd930",
+    "after": "98eea24c0da4e8592b8c255a4195855ee1eb80269ce3991ecc372588b90efb72",
     "reason": "Add project scene actions, image placement, and pointer-following ink preview."
   },
   "src/core/buildInfo.ts": {

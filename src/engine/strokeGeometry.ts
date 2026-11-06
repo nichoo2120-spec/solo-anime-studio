@@ -70,7 +70,7 @@ function screenSpaceGeometry(stroke:Stroke,phase:'live'|'final',calculate:(sourc
  // Keep the newest live preview and the finished stroke at the captured
  // endpoint, including when converting back from reference screen units.
  if(points.length){points[0]={...stroke.points[0]};
-  if(phase==='final'||(stroke.liveRefinementVersion??0)>=2||(stroke.stabilization??0)===0)points[points.length-1]={...stroke.points.at(-1)!};
+  if(phase==='final'||stroke.liveRefinementVersion===3||(stroke.stabilization??0)===0)points[points.length-1]={...stroke.points.at(-1)!};
  }
  const cubics=geometry.cubics.map(c=>({a:project(c.a),c1:project(c.c1),c2:project(c.c2),b:project(c.b)}));
  if(cubics.length){cubics[0].a={...points[0]};cubics[cubics.length-1].b={...points.at(-1)!};}
@@ -78,7 +78,7 @@ function screenSpaceGeometry(stroke:Stroke,phase:'live'|'final',calculate:(sourc
 }
 export function strokeGeometry(stroke:Stroke,phase:'live'|'final'='final'){
  if(stroke.engineVersion===6||stroke.engineVersion===7||stroke.engineVersion===8||stroke.engineVersion===9||stroke.engineVersion===10){
-  const calculation=(source:Point[])=>structuralGeometry(source,stroke.stabilization??0,stroke.smoothness??0,phase,stroke.brushKind==='mapping'?Math.min(24,Math.max(2,stroke.size*1.5))*(stroke.stabilization??0)**2:Infinity,!!stroke.liveRefinementVersion,(stroke.liveRefinementVersion??0)>=2,stroke.liveRefinementVersion!==3);
+  const calculation=(source:Point[])=>structuralGeometry(source,stroke.stabilization??0,stroke.smoothness??0,phase,stroke.brushKind==='mapping'?Math.min(24,Math.max(2,stroke.size*1.5))*(stroke.stabilization??0)**2:Infinity,!!stroke.liveRefinementVersion,(stroke.liveRefinementVersion??0)>=2,stroke.liveRefinementVersion!==3,stroke.liveRefinementVersion===3);
   return screenSpaceGeometry(stroke,phase,calculation);
  }
  if(stroke.engineVersion===5)return structuralGeometry(stroke.points,stroke.stabilization??0,stroke.smoothness??0,phase);
