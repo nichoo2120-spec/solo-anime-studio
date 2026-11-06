@@ -1,0 +1,17 @@
+{
+  "src/engine/StudioEngine.ts": {
+    "before": "f8e9a14b191c2bf7d4886b3293f5589b7c19d3151dc9194d1a416b993ea8e4f9",
+    "after": "9f9fe03fd2312ff956ce359e7fd62fe6b0c883e7ab540ed2edf34d7858c316a2",
+    "reason": "Restore and finalize only the affected paint region while retaining canonical pixel output."
+  },
+  "src/engine/SparseStrokeTiles.ts": {
+    "before": "447c424a84f1414277bc0c6400b221e444775dd25222c63830065987dc52ec49",
+    "after": "183f5b8ce535b2f88a4bbfe4043cbd6cc9140eee27f7dc7b7191ce5645966718",
+    "reason": "Reuse the unchanged portion of active Solid/Soft Paint strokes in bounded live tile caches."
+  },
+  "src/core/buildInfo.ts": {
+    "before": "e7d28cc4e2b96f2b638ac69c6d4933d625bfc690429ab0d601cba6bc642f4a02",
+    "after": "68215178a463fbd3618b5dd6681764b0972e75711293543289d5dedeb8663e0b",
+    "reason": "Release v0.5.187."
+  }
+}
