@@ -6,6 +6,7 @@ import {RasterSceneDisplay} from './RasterSceneDisplay';
 import {EditingSceneSnapshot} from './EditingSceneSnapshot';
 import {mirrorMatrix,mirrorPivot,reflectedStroke} from './symmetry';
 import {compositePaintStroke,strokeRasterBounds,strokeRasterExtent} from './paintCompositing';
+import {drawModernStroke} from './brushRaster';
 import {commitBandRegion,strokeBand,type BandFrame} from './commitBand';
 import {watercolorShapePath} from './watercolorShapes';
 import {watercolorVelocity} from './watercolorPigment';
@@ -42,7 +43,7 @@ import {DrawingBugRecorder} from './DrawingBugRecorder';
 import {wheelZoom} from '../core/wheelZoom';
 import {InkDisplay,displayCleanInk} from './InkDisplay';
 import {CanvasBackdrop} from './CanvasBackdrop';
-import {LiveStrokeRaster} from './liveRaster';
+import {LiveStrokeRaster,type RasterRegion} from './liveRaster';
 import {OnionSkinOverlay} from './OnionSkinOverlay';
 import type {OnionSettings} from '../animation/onionSkin';
 import {FlipbookOverlay} from './FlipbookOverlay';
@@ -80,7 +81,9 @@ export class StudioEngine {
  renderer=new LayerRenderer();private scratch=makeCanvas(1920,1080);private stroke?:Stroke;private pickup?:Pickup;private lasso?:Point[];
  private pan?:{x:number;y:number;vx:number;vy:number};private drag?:{x:number;y:number;settings:TransformSettings;kind:'move'|'scale'|'rotate'|'perspective-move'|'perspective';center:{x:number;y:number};anchor?:{x:number;y:number};corner?:number;edge?:number;startQuad?:XY[]};private cursor?:Point;private navigation?:{x:number;y:number;view:View;alt:boolean;moved:boolean};private rectangleStart?:Point;
  private blendWorker=new LiveBlendWorker(()=>this.request());private blendSource?:HTMLCanvasElement;private finalBlendResult?:{stroke:Stroke;base:HTMLCanvasElement;preview:HTMLCanvasElement;done:Promise<HTMLCanvasElement|undefined>};
- private finalLayerResult?:{stroke:Stroke;base:HTMLCanvasElement;canvas:HTMLCanvasElement};
+ private finalLayerResult?:{stroke:Stroke;base:HTMLCanvasElement;canvas:HTMLCanvasElement;bounds?:RasterRegion};
+ private previewFootprint?:RasterRegion;
+ private previewRestore?:{base:HTMLCanvasElement;operations:Project['layers'][number]['operations'];bounds:RasterRegion};
  private mirrorSurface?:HTMLCanvasElement;private previewStrokeId='';private previewBase?:HTMLCanvasElement;private previewBaseOperations?:Project['layers'][number]['operations'];
  private lastExactFrame?:BandFrame;lastCommitBand?:{x:number;y:number;width:number;height:number}; private cachedLayerIds:string[]=[];private frame=0;private width=1;private height=1;private observer:ResizeObserver;private unsubscribe:()=>void;private lastLayer='';private lastFrame?:string;private geometricDuplicates=0;private device='unknown';preset={id:'custom',name:'Custom brush'};private disposed=false;private worker?:Worker;private pointerId?:number;private strokeDirty=false;private previewSurface=makeCanvas(1,1);private cursorOverlay:HTMLCanvasElement;private previousCursor?:{x:number;y:number;r:number};private loadGeneration=0;private explicitLoad=false;private sampleTime=0;private capture?:PointerPath;private pressureRequested=false;private initialPressurePending=false;private strokeTarget?:{project:string;layer:string};
  onView:(v:View)=>void=()=>{};onSelection:(has:boolean)=>void=()=>{};onBusy:(busy:boolean)=>void=()=>{};
@@ -162,21 +165,53 @@ export class StudioEngine {
   const geometry=finalGeometry(snapshot),pencil=!!snapshot.brushKind?.startsWith('graphite-');
   if(!this.mirrorDrawing.enabled&&pencil){const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===this.strokeTarget?.layer);if(layer)this.renderer.deferPencil(snapshot,this.scratch,layer,doc,()=>this.request());}
   if(snapshot.liveRefinementVersion===3&&!this.displayInk(snapshot)){
-   if(snapshot.brushKind==='airbrush'&&snapshot.paintTipVersion!==2){const sc=this.scratch.getContext('2d')!;sc.clearRect(0,0,this.scratch.width,this.scratch.height);drawStroke(sc,snapshot,'final',geometry);}else this.liveRaster.paint(this.scratch.getContext('2d')!,snapshot,geometry);
-   const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===this.strokeTarget?.layer);
+   const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===this.strokeTarget?.layer),bounds=this.pigmentPreviewBounds(snapshot,doc,geometry);
+   const sc=this.scratch.getContext('2d')!;
+   if(bounds){
+    sc.clearRect(bounds.x,bounds.y,bounds.width,bounds.height);
+    if(bounds.width&&bounds.height)drawModernStroke(sc,snapshot,'final',geometry,bounds);
+   }else if(snapshot.brushKind==='airbrush'&&snapshot.paintTipVersion!==2){sc.clearRect(0,0,this.scratch.width,this.scratch.height);drawStroke(sc,snapshot,'final',geometry);}
+   else this.liveRaster.paint(sc,snapshot,geometry);
    if(!pencil&&!this.strokeMirror&&layer){
     const base=this.renderer.get(layer,doc),preview=this.previewSurface;if(preview.width!==doc.width)preview.width=doc.width;if(preview.height!==doc.height)preview.height=doc.height;
-    const pc=preview.getContext('2d')!;pc.resetTransform();pc.globalAlpha=1;pc.globalCompositeOperation='source-over';pc.clearRect(0,0,doc.width,doc.height);pc.drawImage(base,0,0);
+    const pc=preview.getContext('2d')!;pc.resetTransform();pc.globalAlpha=1;pc.globalCompositeOperation='source-over';
+    const prior=this.previewStrokeId===snapshot.id&&this.previewBase===base&&this.previewBaseOperations===layer.operations?this.previewFootprint:undefined;
+    if(prior&&bounds){
+     const restored=this.previewUnion(prior,bounds);
+     pc.clearRect(restored.x,restored.y,restored.width,restored.height);
+     if(restored.width&&restored.height)pc.drawImage(base,restored.x,restored.y,restored.width,restored.height,restored.x,restored.y,restored.width,restored.height);
+     compositePaintStroke(pc,this.scratch,snapshot,0,0,bounds,base);
+    }else{
+     pc.clearRect(0,0,doc.width,doc.height);pc.drawImage(base,0,0);
+     compositePaintStroke(pc,this.scratch,snapshot,0,0,bounds,base);
+    }
     // Use the known source identity, preserving the same final pigment math
     // without matching/readback and a second canonical layer simulation.
-    compositePaintStroke(pc,this.scratch,snapshot,0,0,undefined,base);this.finalLayerResult={stroke:snapshot,base,canvas:preview};
+    this.finalLayerResult={stroke:snapshot,base,canvas:preview,bounds};
    }else this.renderer.rememberStrokeRaster(snapshot,this.scratch);
   }
   if(this.strokeMirror&&snapshot.liveRefinementVersion!==3){const sc=this.scratch.getContext('2d')!;sc.clearRect(0,0,this.scratch.width,this.scratch.height);drawStroke(sc,snapshot,'final',geometry);this.renderer.rememberStrokeRaster(snapshot,this.scratch);}
   const ms=performance.now()-start;this.performance.record('finalProcessingMs',ms);this.diagnostics.timing('finalProcessingMs',ms);return snapshot;
  }
  private displayInk(stroke:Stroke){return !stroke.transform&&displayCleanInk(stroke)&&!this.mirrorDrawing.enabled&&!this.selection.length&&!this.strokeIds.length;}
- private commitStroke(stroke:Stroke|undefined,target:typeof this.strokeTarget){const ready=this.finalLayerResult,async=this.finalBlendResult;this.finalLayerResult=undefined;this.finalBlendResult=undefined;if(!stroke||!target)return false;const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===target.layer);if(doc.id!==target.project||!layer||layer.locked||!layer.visible){this.notify('Stroke canceled because its target layer changed.');return false;}let next=appendOperation({...doc,activeLayerId:target.layer},stroke);if(this.strokeMirror){const other=strokeSnapshot(reflectedStroke(stroke,this.strokeMirror.matrix,this.strokeMirror.id)),c=makeCanvas(doc.width,doc.height),cc=c.getContext('2d')!;cc.transform(...this.strokeMirror.matrix);cc.drawImage(this.scratch,0,0);this.renderer.rememberStrokeRaster(other,c);c.width=c.height=0;next=appendOperation(next,other);}this.strokeMirror=undefined;this.store.commit({...next,activeLayerId:doc.activeLayerId});if(async?.stroke===stroke){const p=this.store.getSnapshot(),layer=p.layers.find(l=>l.id===target.layer);if(layer)this.renderer.deferLayerResult(layer,p,stroke,async.base,async.preview,async.done,()=>this.request());}if(ready?.stroke===stroke){const p=this.store.getSnapshot(),layer=p.layers.find(l=>l.id===target.layer),old=layer&&this.renderer.adoptLayerResult(layer,p,stroke,ready.base,ready.canvas);if(old){this.previewSurface=old;this.previewStrokeId='';this.previewBase=undefined;this.previewBaseOperations=undefined;}else this.renderer.rememberStrokeRaster(stroke,this.scratch);}return true;}
+ private pigmentPreviewBounds(stroke:Stroke,p:Project,geometry:ReturnType<typeof finalGeometry>){
+  if(this.strokeMirror||stroke.nativeMixVersion||stroke.mixStops?.length||stroke.paintTipVersion!==2||stroke.coloringEngine!==1||
+     (stroke.brushTip!=='color-solid'&&stroke.brushTip!=='color-soft'))return undefined;
+  return strokeRasterBounds(stroke,p.width,p.height,geometry);
+ }
+ private previewUnion(a:RasterRegion,b:RasterRegion):RasterRegion{
+  if(!a.width||!a.height)return b;
+  if(!b.width||!b.height)return a;
+  const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);
+  return {x,y,width:Math.max(a.x+a.width,b.x+b.width)-x,height:Math.max(a.y+a.height,b.y+b.height)-y};
+ }
+ private paintPreviewRegion(ctx:CanvasRenderingContext2D,base:HTMLCanvasElement,stroke:Stroke,region:RasterRegion){
+  const {x,y,width,height}=region;
+  if(!width||!height)return;
+  ctx.clearRect(x,y,width,height);ctx.drawImage(base,x,y,width,height,x,y,width,height);
+  compositePaintStroke(ctx,this.scratch,stroke,0,0,region,base);
+ }
+ private commitStroke(stroke:Stroke|undefined,target:typeof this.strokeTarget){const ready=this.finalLayerResult,async=this.finalBlendResult;this.finalLayerResult=undefined;this.finalBlendResult=undefined;if(!stroke||!target)return false;const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===target.layer);if(doc.id!==target.project||!layer||layer.locked||!layer.visible){this.notify('Stroke canceled because its target layer changed.');return false;}let next=appendOperation({...doc,activeLayerId:target.layer},stroke);if(this.strokeMirror){const other=strokeSnapshot(reflectedStroke(stroke,this.strokeMirror.matrix,this.strokeMirror.id)),c=makeCanvas(doc.width,doc.height),cc=c.getContext('2d')!;cc.transform(...this.strokeMirror.matrix);cc.drawImage(this.scratch,0,0);this.renderer.rememberStrokeRaster(other,c);c.width=c.height=0;next=appendOperation(next,other);}this.strokeMirror=undefined;this.store.commit({...next,activeLayerId:doc.activeLayerId});if(async?.stroke===stroke){const p=this.store.getSnapshot(),layer=p.layers.find(l=>l.id===target.layer);if(layer)this.renderer.deferLayerResult(layer,p,stroke,async.base,async.preview,async.done,()=>this.request());}if(ready?.stroke===stroke){const p=this.store.getSnapshot(),layer=p.layers.find(l=>l.id===target.layer),old=layer&&this.renderer.adoptLayerResult(layer,p,stroke,ready.base,ready.canvas);if(old){this.previewSurface=old;this.previewRestore=ready.bounds&&layer?{base:ready.canvas,operations:layer.operations,bounds:ready.bounds}:undefined;this.previewStrokeId='';this.previewBase=undefined;this.previewBaseOperations=undefined;}else this.renderer.rememberStrokeRaster(stroke,this.scratch);}return true;}
  finishGesture(reason='interrupted'){const stroke=this.finalizeStroke(this.stroke),target=this.strokeTarget;this.recorder.event('gesture-end',{reason,id:this.capture?.gestureId,pointerId:this.pointerId,sourcePoints:stroke?.points.length??this.lasso?.length??0,captured:this.capture?.count});this.diagnostics.finish(reason,stroke,this.lasso,this.audit());if(this.strokePending){this.lasso=undefined;this.strokePending=undefined;}else this.finishSelection();const mirror=this.strokeMirror;this.cancelGesture();this.strokeMirror=mirror;const committed=this.commitStroke(stroke,target);if(stroke)this.diagnostics.committed(stroke.id,committed);}
  private paintCursor(){
   const c=this.cursorOverlay,ctx=c.getContext('2d');if(!ctx)return;
@@ -608,13 +643,15 @@ export class StudioEngine {
    let c=this.renderer.getDisplay(displayed,p);
    if(!selectionStable&&displayed.operations.some(o=>selectedStrokeIds.has(o.id))){ctx.globalAlpha=l.opacity;ctx.drawImage(this.exactStrokePreview(displayed,p),0,0);continue;}
    const workerPreview=denseStroke&&l.id===this.strokeTarget?.layer&&!this.strokeMirror&&workerBlendEligible(denseStroke)?this.blendWorker.preview(denseStroke,c,this.liveGeometry):undefined;
-   if(workerPreview){this.blendSource=c;c=workerPreview;}else if(denseStroke?l.id===this.strokeTarget?.layer:l.id===p.activeLayerId&&this.selection.length&&!selectionStable){const preview=this.previewSurface;if(preview.width!==p.width){preview.width=p.width;this.previewStrokeId='';}if(preview.height!==p.height){preview.height=p.height;this.previewStrokeId='';}const pc=preview.getContext('2d')!,samePreview=denseStroke&&this.previewStrokeId===denseStroke.id&&this.previewBase===c&&this.previewBaseOperations===displayed.operations;
-    const dirty=samePreview&&livePainted&&!this.strokeMirror?this.liveRaster.lastRegion:undefined;
+   if(workerPreview){this.blendSource=c;c=workerPreview;}else if(denseStroke?l.id===this.strokeTarget?.layer:l.id===p.activeLayerId&&this.selection.length&&!selectionStable){const preview=this.previewSurface;if(preview.width!==p.width){preview.width=p.width;this.previewStrokeId='';this.previewRestore=undefined;}if(preview.height!==p.height){preview.height=p.height;this.previewStrokeId='';this.previewRestore=undefined;}const pc=preview.getContext('2d')!,samePreview=denseStroke&&this.previewStrokeId===denseStroke.id&&this.previewBase===c&&this.previewBaseOperations===displayed.operations;
+    const bounds=denseStroke&&this.liveGeometry?this.pigmentPreviewBounds(denseStroke,p,this.liveGeometry):undefined,restore=this.previewRestore;
+    const dirty=samePreview&&livePainted&&!this.strokeMirror?this.liveRaster.lastRegion:
+     bounds&&restore?.base===c&&restore.operations===displayed.operations?this.previewUnion(restore.bounds,bounds):undefined;
     if(!samePreview||livePainted){
      pc.globalCompositeOperation='source-over';pc.globalAlpha=1;
-     if(dirty){const {x,y,width,height}=dirty;
-      if(width>0&&height>0){pc.clearRect(x,y,width,height);pc.drawImage(c,x,y,width,height,x,y,width,height);compositePaintStroke(pc,this.scratch,denseStroke!,0,0,dirty,c);}
-     }else{
+     this.previewRestore=undefined;
+     if(dirty&&denseStroke){this.paintPreviewRegion(pc,c,denseStroke,dirty);}
+     else{
       pc.clearRect(0,0,p.width,p.height);pc.drawImage(c,0,0);
       if(denseStroke){compositePaintStroke(pc,this.scratch,denseStroke,0,0,undefined,c);if(this.strokeMirror){const reflected=this.mirrorSurface??=makeCanvas(p.width,p.height);if(reflected.width!==p.width)reflected.width=p.width;if(reflected.height!==p.height)reflected.height=p.height;const rc=reflected.getContext('2d')!;rc.clearRect(0,0,p.width,p.height);rc.save();rc.transform(...this.strokeMirror.matrix);rc.drawImage(this.scratch,0,0);rc.restore();compositePaintStroke(pc,reflected,reflectedStroke(denseStroke,this.strokeMirror.matrix,this.strokeMirror.id));}}
       else if(this.selection.length)applyTransform(preview,this.selection,this.matrix());
@@ -622,6 +659,7 @@ export class StudioEngine {
     }
     if(denseStroke){this.previewStrokeId=denseStroke.id;this.previewBase=c;this.previewBaseOperations=displayed.operations;}
     else{this.previewStrokeId='';this.previewBase=undefined;this.previewBaseOperations=undefined;}
+    this.previewFootprint=bounds;
     c=preview;}
    ctx.globalAlpha=l.opacity;ctx.drawImage(c,0,0);
   }if(snapshotPending&&snapshotPassed){this.editingSnapshot.capture(ctx,snapshotKey!);snapshotPending=false;}

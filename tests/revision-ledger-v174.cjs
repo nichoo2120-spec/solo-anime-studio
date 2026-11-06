@@ -17,6 +17,7 @@ const fixture183=path.join(root,'tests/fixtures/performance-v183-revisions.json'
 const fixture184=path.join(root,'tests/fixtures/performance-v184-revisions.json'),rows184=fs.existsSync(fixture184)?JSON.parse(fs.readFileSync(fixture184,'utf8')):{};
 const fixture185=path.join(root,'tests/fixtures/performance-v185-revisions.json'),rows185=fs.existsSync(fixture185)?JSON.parse(fs.readFileSync(fixture185,'utf8')):{};
 const fixture186=path.join(root,'tests/fixtures/performance-v186-revisions.json'),rows186=fs.existsSync(fixture186)?JSON.parse(fs.readFileSync(fixture186,'utf8')):{};
+const fixture187=path.join(root,'tests/fixtures/performance-v187-revisions.json'),rows187=fs.existsSync(fixture187)?JSON.parse(fs.readFileSync(fixture187,'utf8')):{};
 module.exports=function ledger(file,expected){
  const rel=path.isAbsolute(file)?path.relative(root,file):file,row=rows[rel];
  let r=expected;if(row&&(row.before===expected||(row.alsoBefore??[]).includes(expected)))r=row.after;
@@ -31,5 +32,7 @@ module.exports=function ledger(file,expected){
  const row184=rows184[rel];if(row184&&row184.before===r)r=row184.after;
  const row185=rows185[rel];if(row185&&row185.before===r)r=row185.after;
  const row186=rows186[rel];if(row186&&row186.before===r)r=row186.after;
+ const row187=rows187[rel];if(row187&&row187.before===r)r=row187.after;
  return r;
 };
+
