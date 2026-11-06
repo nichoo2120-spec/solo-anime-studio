@@ -643,6 +643,9 @@
 .timeline .timeline-cel .cel-select{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:3px;padding:0 2px}
 .timeline-pinned .onion-settings,.timeline-pinned .light-table-panel{display:none}
 .timeline .audio-track{max-height:64px;overflow:auto}
+.timeline-tools-popup .layer-cel-commandbar{flex:1 1 220px;min-width:0;display:flex;flex-wrap:wrap;overflow:visible}
+.timeline-tools-popup .layer-cel-commandbar button{flex:none;white-space:nowrap}
+.radial-options{max-height:min(65vh,420px);overflow-y:auto}
 .timeline .cel-hold,.timeline .cel-art{font-size:8px}
 .timeline .timeline-track>.layer-track-heading{height:31px;min-height:31px;font-size:8px}
 .timeline .layer-track-name,.timeline .layer-cel-row{height:23px;min-height:23px}
