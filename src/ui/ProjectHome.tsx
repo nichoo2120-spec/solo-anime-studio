@@ -1,6 +1,7 @@
 import {useRef,useState,type DragEvent} from 'react';
 import {readPreference,writePreference} from './preferences';
 import {uid,type Project} from '../core/model';
+import {buildInfo} from '../core/buildInfo';
 
 type Episode={id:string;name:string;scenes:string[]};
 type Production={id:string;name:string;episodes:Episode[]};
@@ -30,6 +31,17 @@ export function ProjectHome({records,open,create,importBackup,activeId,deleteSce
  const [selecting,setSelecting]=useState(false);
  const [selected,setSelected]=useState<string[]>([]);
  const [photo,setPhoto]=useState<File>();
+ const [checkingUpdate,setCheckingUpdate]=useState(false);
+ const [updateStatus,setUpdateStatus]=useState('');
+ const desktop=(window as Window&{soloDesktop?:{version?:string;checkForUpdates?:()=>Promise<string>}}).soloDesktop;
+ async function checkForUpdates(){
+  if(checkingUpdate||!desktop?.checkForUpdates)return;
+  setCheckingUpdate(true);
+  setUpdateStatus('');
+  try{setUpdateStatus(await desktop.checkForUpdates());}
+  catch{setUpdateStatus('Could not check for updates. Try again in a moment.');}
+  finally{setCheckingUpdate(false);}
+ }
  const project=projects.find(item=>item.id===projectId);
  const episode=project?.episodes.find(item=>item.id===episodeId);
  const label=episode?'Scene':project?'Episode':'Project';
@@ -111,6 +123,10 @@ export function ProjectHome({records,open,create,importBackup,activeId,deleteSce
  const scenes=(list:Record[])=>list.length?list.map(({id,project,savedAt})=><button className="startup-row" key={id} type="button" disabled={busy||selecting&&id===activeId} aria-pressed={selecting?selected.includes(id):undefined} draggable={!busy&&!selecting} onDragStart={event=>{event.dataTransfer.setData(sceneDragType,id);event.dataTransfer.effectAllowed='copy';}} onDragOver={allowDrop} onDrop={event=>void dropOnScene(event,project)} onClick={()=>selecting?toggle(id):open(project)}><strong>{selecting?(selected.includes(id)?'☑ ':'☐ '):''}{project.name}</strong><span>{scenePaths.get(id)??'Standalone scene'}</span><span>{new Date(savedAt).toLocaleDateString()}</span></button>):<p className="startup-empty">Saved scenes will appear here.</p>;
  return <div className="project-home">
   <header className="startup-bar"><strong><span aria-hidden="true">◩</span> Solo Anime Studio</strong><small>WORKSPACE</small></header>
+  {desktop?.checkForUpdates&&<div className="startup-update">
+   <button type="button" disabled={checkingUpdate} onClick={()=>void checkForUpdates()}>v{desktop.version??buildInfo.version} · {checkingUpdate?'Checking…':'Check for updates'}</button>
+   <span role="status">{updateStatus}</span>
+  </div>}
   <div className="startup-content">
    <small>HOME</small>
    <h1 id="dialog-title">{episode?.name??project?.name??'Project workspace'}</h1>
