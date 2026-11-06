@@ -1,0 +1,17 @@
+{
+  "src/ui/App.tsx": {
+    "before": "76645ce20e38ec495f985b6400c20a000b6cbe2c95af920df75e539aef468e81",
+    "after": "02284a578eaf154c2e3cdc99b42a13871b013d27e80b4db94ae5ea2066d55600",
+    "reason": "Hand off stroke selection to the existing Transform tool."
+  },
+  "src/engine/StudioEngine.ts": {
+    "before": "ceeabc955197f6c606352007270afaa6cf63fe6562aa4b3a563da7ae876ffb77",
+    "after": "9d8a57588d90dcc4949ad7f02094b488f6776834ffa2462a7626be623b6ff88c",
+    "reason": "Hand off stroke selection to the existing Transform tool."
+  },
+  "src/core/buildInfo.ts": {
+    "before": "ef368ea059073cd2069fffec409b6541c09cc01a35f4eb29f62bf2785603d272",
+    "after": "eeabe8afab7411d71015f103acc80eedd54882c65c1fe63641a0cfd4be765739",
+    "reason": "Hand off stroke selection to the existing Transform tool."
+  }
+}
