@@ -593,3 +593,29 @@
 .scene-camera-panel .camera-keys button.active{outline:1px solid #ff9f1c}
 .scene-camera-panel .camera-help{font-size:10px;opacity:.7;margin:0}
 .scene-camera-panel .camera-check{display:flex;gap:6px;align-items:center;font-size:10px}
+
+.modal-backdrop.startup-backdrop{background:#141e24;padding:0;display:block}
+.modal.startup-modal{position:relative;width:100%;max-width:none;height:100dvh;max-height:none;overflow:auto;padding:0;border:0;border-radius:0;background:#141e24;color:#dbe8ee}
+.startup-bar{height:58px;padding:0 32px;display:flex;align-items:center;justify-content:space-between;background:#19262d;border-bottom:1px solid #34464e}
+.startup-bar strong span{color:#64d6c8;margin-right:8px}
+.startup-bar small,.startup-content>small{color:#91a8b3;font-size:12px;letter-spacing:.09em}
+.startup-modal:has(.modal-close) .startup-bar{padding-right:72px}
+.startup-content{max-width:1216px;margin:54px auto;padding:0 32px 40px}
+.startup-content h1{font-size:33px;font-weight:600;margin:9px 0}
+.startup-content>p,.startup-empty{color:#a1b5be}
+.startup-actions{display:flex;gap:10px;margin:24px 0 34px}
+.startup-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:22px;align-items:start}
+.startup-panel{background:#19262d;border:1px solid #34464e;border-radius:7px;overflow:hidden}
+.startup-panel h2{font-size:16px;margin:0;padding:17px 20px;border-bottom:1px solid #34464e}
+.startup-row,.startup-folder{width:100%;min-width:0;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) 100px;gap:10px;text-align:left;align-items:center;padding:15px 20px;border:0;border-bottom:1px solid #30424b;border-radius:0;background:transparent;color:#dbe8ee}
+.startup-row span{color:#a1b5be}.startup-row>*{overflow-wrap:anywhere}
+.startup-row:last-child,.startup-folder:last-child{border-bottom:0}
+.startup-columns{background:#172228;font-size:11px;letter-spacing:.04em}
+.startup-folder{display:block}
+.startup-row:hover:not(.startup-columns),.startup-folder:hover{background:#243740}
+.startup-empty{padding:16px 20px;margin:0}.startup-library{margin-top:18px}
+.startup-form{padding:16px 20px 20px}
+.startup-form fieldset{border:0;margin:0;padding:0;min-width:0}
+.startup-form .accent-button{margin-top:12px;width:100%}
+.startup-form .accent-button:disabled{opacity:.46;cursor:default}
+@media(max-width:820px){.startup-grid{grid-template-columns:1fr}.startup-content{margin-top:28px;padding-inline:20px}}

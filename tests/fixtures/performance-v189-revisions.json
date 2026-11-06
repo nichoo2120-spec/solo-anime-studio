@@ -1,0 +1,17 @@
+{
+  "src/ui/App.tsx": {
+    "before": "24af3b47d889a3ee0bdd75fd925dc3d0e59b02eb1235e1faca3a7611904070a9",
+    "after": "eef060b394e519284c2178c9c5d5e7981e57bbd1074125593a5ca42b9ebd4387",
+    "reason": "Use the approved full-window startup workspace and validate scene setup."
+  },
+  "src/styles.css": {
+    "before": "813ec242c9aa88274881860b1c462254e30d6c938103f5895099574d42c03a8d",
+    "after": "803f7e0dbfa6c095cd8d22bc364499dd9d3dd7a2951660b390a92d39d5a238e1",
+    "reason": "Use the approved full-window startup workspace and validate scene setup."
+  },
+  "src/core/buildInfo.ts": {
+    "before": "14f63c80c5d9498bbfdaf2fabb53a46b016af04c0cd44f8d5ec060f51d453a92",
+    "after": "e7d1fc1b58f9dccaff413356006518675a15613a3065fedd837421dc61d5054e",
+    "reason": "Use the approved full-window startup workspace and validate scene setup."
+  }
+}
