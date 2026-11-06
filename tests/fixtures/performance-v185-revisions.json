@@ -46,12 +46,17 @@
   },
   "src/engine/strokeSelection.ts": {
     "before": "7394cc5367f693981e6c5c7f521bc45bf9aa3968c1115b1222a63778e56b2685",
-    "after": "931b2c44a0ba3c81372b5c4eef0f1309f82c7e54830f08a21741818878ff9501",
-    "why": "Pan, zoom and draw outside the shot with tiles allocated where marks exist."
+    "after": "337ee44574af3965d17783727a1eab6c1a3c2578faa3922d6224c326cf38c628",
+    "why": "Preserve outside artwork during layer operations that use the original raster page."
   },
   "src/ui/App.tsx": {
     "before": "d29a5714a7726878d260f03d1ff1263296d58670fc94e22c295d434dd8603ebe",
     "after": "7fb0d9d1c3fed9ed3a7afb95e9993fe93b4c5ff698831aadaa21c913aa3fb2a6",
     "why": "Pan, zoom and draw outside the shot with tiles allocated where marks exist."
+  },
+  "src/engine/EditingController.ts": {
+    "before": "5503adde583631c833b1f44ce4770a088d43b6488d5b74e2114093ad6bb47110",
+    "after": "326f513d7d5f52d074830b9f7ad51a03468cb10509df1bcd69416a73badd1df2",
+    "why": "Preserve outside artwork during layer operations that use the original raster page."
   }
 }
