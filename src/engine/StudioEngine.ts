@@ -638,7 +638,7 @@ export class StudioEngine {
   if(!snapshotPreview&&p.settings.guides){const guide=p.version>=5?shotFrame(p):{x:0,y:0,width:p.width,height:p.height};ctx.strokeStyle='#8cabb845';ctx.lineWidth=1/this.view.zoom;const inset=Math.min(guide.width,guide.height)*.035;ctx.strokeRect(guide.x+inset,guide.y+inset,guide.width-inset*2,guide.height-inset*2);ctx.setLineDash([8/this.view.zoom,8/this.view.zoom]);ctx.beginPath();ctx.moveTo(guide.x+guide.width/2,guide.y);ctx.lineTo(guide.x+guide.width/2,guide.y+18/this.view.zoom);ctx.moveTo(guide.x,guide.y+guide.height/2);ctx.lineTo(guide.x+18/this.view.zoom,guide.y+guide.height/2);ctx.stroke();ctx.setLineDash([]);}
   ctx.restore();ctx.save();ctx.translate(this.view.x,this.view.y);ctx.rotate(this.view.rotation);ctx.scale(this.view.zoom,this.view.zoom);
   if(world){
-   const live=this.stroke?.worldStroke&&!(this.initialPressurePending&&this.stroke.points.length===1)?strokeSnapshot(this.stroke):undefined;
+   const live=this.stroke?.worldStroke&&!(this.initialPressurePending&&this.stroke.points.length===1)?this.stroke:undefined;
    for(const layer of [...p.layers].reverse())if(layer.visible){ctx.globalAlpha=layer.opacity;ctx.globalCompositeOperation=blendOperation(layer.blend);this.renderer.paintOutside(ctx,layer,p,layer.id===this.strokeTarget?.layer?live:undefined);}
    ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
   }
