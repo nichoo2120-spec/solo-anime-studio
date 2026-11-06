@@ -36,6 +36,7 @@ jobs:
       - run: npm test -- --maxWorkers=2
       - run: node --test tests/desktop-update.test.cjs tests/desktop-release.test.cjs
       - run: npx playwright install chromium
+      - run: node tests/offscreen-drawing-v186.mjs
       - uses: actions/checkout@v4
         with:
           ref: v0.5.178

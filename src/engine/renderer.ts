@@ -77,9 +77,9 @@ export class LayerRenderer {
   if(!entry||entry.width!==p.width||entry.height!==p.height){entry?.tiles.dispose();entry={width:p.width,height:p.height,tiles:new SparseStrokeTiles(p)};}
   this.outsideLayers.delete(layer.id);this.outsideLayers.set(layer.id,entry);
   if(this.outsideLayers.size>6){const first=this.outsideLayers.keys().next().value!;this.outsideLayers.get(first)!.tiles.dispose();this.outsideLayers.delete(first);}
-  entry.tiles.synchronize(live?[...strokes,live]:strokes);
+  entry.tiles.synchronize(strokes);
   ctx.save();ctx.beginPath();ctx.rect(x,y,right-x,bottom-y);ctx.rect(0,0,p.width,p.height);ctx.clip('evenodd');
-  entry.tiles.paint(ctx,{x,y,width:right-x,height:bottom-y});ctx.restore();
+  entry.tiles.paint(ctx,{x,y,width:right-x,height:bottom-y},live);ctx.restore();
  }
  displayRevision=0;
  private pendingLayer?:{layer:Layer;project:Project;stroke:Stroke;base:HTMLCanvasElement;preview:HTMLCanvasElement;done:Promise<HTMLCanvasElement|undefined>};

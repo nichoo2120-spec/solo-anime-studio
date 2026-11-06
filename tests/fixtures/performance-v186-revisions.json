@@ -1,0 +1,22 @@
+{
+  "src/core/buildInfo.ts": {
+    "before": "b588c9028e7ab1beee3a897543d5b3aa7a1364d4858836cef14e17004fe222c7",
+    "after": "e7d28cc4e2b96f2b638ac69c6d4933d625bfc690429ab0d601cba6bc642f4a02",
+    "why": "Keep committed outside tiles cached during a live stroke preview."
+  },
+  "src/engine/SparseStrokeTiles.ts": {
+    "before": "5d9cae13fd7fab776a92c434132ac6ff7d9a0c053214edccdf41283e9c53a34c",
+    "after": "447c424a84f1414277bc0c6400b221e444775dd25222c63830065987dc52ec49",
+    "why": "Keep committed outside tiles cached during a live stroke preview."
+  },
+  "src/engine/StudioEngine.ts": {
+    "before": "e15bdbc8f89fe6396ec90241e4852736ae2aa18d8ac6b0559618492b9dd5bd89",
+    "after": "f8e9a14b191c2bf7d4886b3293f5589b7c19d3151dc9194d1a416b993ea8e4f9",
+    "why": "Keep committed outside tiles cached during a live stroke preview."
+  },
+  "src/engine/renderer.ts": {
+    "before": "88ced842ce688dd2721778594ddce11c4c501b77526221760685d9f7237d499e",
+    "after": "c4fb7a5def72b96e51c602ac042ca52c5706fb8da46bb989a9e9fe2df7d75349",
+    "why": "Keep committed outside tiles cached during a live stroke preview."
+  }
+}
