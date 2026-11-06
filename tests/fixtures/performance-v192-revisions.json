@@ -1,7 +1,7 @@
 {
   "src/ui/App.tsx": {
     "before": "c14b3d2376653c329ee5df09e2edd38a211af04770540c0dacf37cb68dc44273",
-    "after": "04880e410b83afc62284a87c229d910c402275d0ce83b9e11a03b3dced7c95ff",
+    "after": "40f70c0d64b6928c8f78c4cd799af152293972ca31c85af53b0f6c5bbd54e687",
     "reason": "Show keyboard shortcuts on hover and allow Tool Wheel slot customization."
   },
   "src/styles.css": {
