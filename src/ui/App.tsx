@@ -115,7 +115,13 @@ export function App(){
  const [selectedFrames,setSelectedFrames]=useState<ItemSelection>({ids:[],anchor:null});
  const [batchCanvasMode,setBatchCanvasMode]=useState<BatchCanvasMode|'depth'|null>(null);
  const [selectedLayers,setSelectedLayers]=useState<ItemSelection>({ids:[],anchor:null});
- const [audioTrackOpen,setAudioTrackOpen]=useState(true),[audioMuted,setAudioMuted]=useState(()=>readPreference('audio-muted',false)),[audioBusy,setAudioBusy]=useState(false);
+ const [audioTrackOpen,setAudioTrackOpen]=useState(false),[audioMuted,setAudioMuted]=useState(()=>readPreference('audio-muted',false)),[audioBusy,setAudioBusy]=useState(false);
+ const [timelinePins,setTimelinePins]=useState(()=>readPreference<string[]>('timeline-toolbar-pins',[]));
+ const timelineMenu=useRef<HTMLDetailsElement>(null);
+ function pinTimelineTool(id:string,pinned:boolean){
+  setTimelinePins(current=>pinned?[...current,id]:current.filter(item=>item!==id));
+ }
+ useEffect(()=>writePreference('timeline-toolbar-pins',timelinePins),[timelinePins]);
  const audioElement=useRef<HTMLAudioElement|null>(null);
  // Stable callbacks stop the 512-bar audio waveform controls from re-rendering
  // on every pen commit. Delegates are refreshed each App render so actions
@@ -173,7 +179,7 @@ export function App(){
  const [areaTransformMode,setAreaTransformMode]=useState<'freeform'|'move'|'scale'|'rotate'>('freeform');
  const [strokeCount,setStrokeCount]=useState(0),[strokeMode,setStrokeMode]=useState<'select'|'lasso'|'move'|'scale'|'rotate'|'perspective-move'|'perspective'|'freeform'>('select'),[freeformCornerMode,setFreeformCornerMode]=useState<'scale'|'perspective'>('scale'),[strokePickMode,setStrokePickMode]=useState<'touch'|'enclose'>('touch'),[strokeShape,setStrokeShape]=useState<'rectangle'|'lasso'>('lasso'),[strokeScope,setStrokeScope]=useState<'current'|'visible'>('current');
  const [hasSelection,setHasSelection]=useState(false),[busy,setBusy]=useState(false),[transform,setTransform]=useState<TransformSettings>({dx:0,dy:0,scale:1,angle:0});
- const [layout,setLayout]=useState<Layout>(()=>{const p=readPreference<Layout>('layout',{left:232,right:280,bottom:184,leftClosed:false,rightClosed:false,bottomClosed:false});const migrated=readPreference<boolean>('workspace-compact-initialized',false);return {...p,left:Math.max(180,Math.min(300,Number(p.left)||232)),right:Math.max(240,Math.min(340,Number(p.right)||280)),bottom:migrated?Math.max(110,Math.min(500,Number(p.bottom)||184)):184};});
+ const [layout,setLayout]=useState<Layout>(()=>{const p=readPreference<Layout>('layout',{left:232,right:280,bottom:160,leftClosed:false,rightClosed:false,bottomClosed:false});const migrated=readPreference<boolean>('workspace-compact-initialized',false);return {...p,left:Math.max(180,Math.min(300,Number(p.left)||232)),right:Math.max(240,Math.min(340,Number(p.right)||280)),bottom:migrated?Math.max(110,Math.min(500,Number(p.bottom)||160)):160};});
  const [shortcuts,setShortcuts]=useState(()=>normalizeShortcuts(readPreference('shortcuts',initialShortcuts)));
  const [fillSettings,setFillSettings]=useState<FillSettings>(()=>{const s=readPreference<FillSettings>('fill-settings',{reference:'current',lineLayerId:'',gap:0,expansion:0});return {reference:['current','visible','line'].includes(s.reference)?s.reference:'current',lineLayerId:typeof s.lineLayerId==='string'?s.lineLayerId:'',gap:Math.max(0,Math.min(10,s.gap||0)),expansion:Math.max(0,Math.min(5,s.expansion||0))};});
  const [fillQuestion,setFillQuestion]=useState<{message:string;resolve:(answer:boolean)=>void}|null>(null);
@@ -612,6 +618,7 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
  function toggleReferencePin(){const p=store.getSnapshot(),frame=frameList(p)[currentFrameIndex(p)],pins=sanitizeLightTablePins(p,lightTablePins);if(!pins.some(pin=>pin.frameId===frame.id)&&pins.length>=MAX_LIGHT_TABLE_PINS){notify('The light table supports up to five pinned drawings.');return;}setLightTablePins(toggleLightTablePin(p,pins,frame.id));}
  function toggleLightTablePanel(){
   setWorkspaceMode('ANIMATE');setFocusMode(false);setOnionSettingsOpen(false);
+  if(!lightTableOpen&&timelineMenu.current)timelineMenu.current.open=true;
   setLayout(old=>({...old,bottomClosed:false}));setLightTableOpen(old=>!old);
  }
  function resizeXsheetDock(e:React.PointerEvent<HTMLDivElement>){
@@ -867,7 +874,10 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
  const selectedVector=layer.operations.find(o=>o.kind==='vector'&&o.id===vectorId) as VectorLine|undefined;
  const displayStatus=documentDirty(doc,saved.current)&&!['Saving…','Save failed'].includes(status)?'Unsaved changes':status;
  audioActionDelegates.current={
-  toggle:()=>setAudioTrackOpen(o=>!o),importClip:file=>{void addSceneAudio(file);},
+  toggle:()=>{
+   if(!audioTrackOpen)setLayout(old=>({...old,bottomClosed:false}));
+   setAudioTrackOpen(o=>!o);
+  },importClip:file=>{void addSceneAudio(file);},
   remove:removeSceneAudio,mute:setAudioMuted,seek:seekSceneAudio
  };
  panelDelegates.current={brushChange:setBrushLibrary,choose:chooseTool,notice:notify};
@@ -984,12 +994,82 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
   Tools:[{label:'Brush · B',action:()=>chooseTool('brush')},{label:'Vector Pen · N',action:()=>chooseTool('vector')},{label:'Eraser · E',action:()=>chooseTool('eraser')},{label:'Fill · G',action:()=>chooseTool('fill')},{label:'Eyedropper · I',action:()=>chooseTool('eyedropper')}],
   Transform:[{label:'Free Transform · T',action:()=>chooseTool('transform')},{label:'Move · V',action:()=>chooseTool('transform')},{label:'Multi-Cel Transform · Shift+T',action:openBatchTransform}],
   Edit:[{label:'Undo · Ctrl/⌘ Z',action:undo,disabled:!store.canUndo},{label:'Redo · Ctrl/⌘ Shift Z / Y',action:redo,disabled:!store.canRedo},...([['Select All · Ctrl/⌘ A','all'],['Deselect · Ctrl/⌘ D','deselect'],['Cut · Ctrl/⌘ X','cut'],['Copy · Ctrl/⌘ C','copy'],['Paste · Ctrl/⌘ V','paste']] as const).map(([label,command])=>({label,action:()=>void editing(command)})),...allTools.map(t=>({label:t.name+' · '+shortcuts[t.id].toUpperCase(),action:()=>chooseTool(t.id)})),{label:'Keyboard shortcuts…',action:()=>setModal('settings')}],
-  View:[{label:outsideFrameLabel,action:toggleOutsideFrame,disabled:busy||sequenceBusy},{label:(focusMode?'Exit Canvas Focus Mode':'Canvas Focus Mode')+' · F9',action:()=>{setFocusMode(v=>!v);setOnionSettingsOpen(false);}},{label:'Compact timeline',action:()=>{setFocusMode(false);setLayout(old=>({...old,bottomClosed:false,bottom:184}));}},{label:'Fit canvas · F',action:()=>engine.current?.fit()},{label:'Reset rotation · Shift+R',action:()=>engine.current?.rotate(0)},{label:'Reset view · 100%',action:()=>engine.current?.reset()},{label:(doc.settings.guides?'Hide':'Show')+' frame guides',action:()=>commit({...doc,settings:{...doc.settings,guides:!doc.settings.guides}})},{label:'Toggle left panel',action:()=>setLayout({...layout,leftClosed:!layout.leftClosed})},{label:'Toggle inspector',action:()=>setLayout({...layout,rightClosed:!layout.rightClosed})},{label:'Toggle timeline region',action:()=>setLayout({...layout,bottomClosed:!layout.bottomClosed})}],
+  View:[{label:outsideFrameLabel,action:toggleOutsideFrame,disabled:busy||sequenceBusy},{label:(focusMode?'Exit Canvas Focus Mode':'Canvas Focus Mode')+' · F9',action:()=>{setFocusMode(v=>!v);setOnionSettingsOpen(false);}},{label:'Compact timeline',action:()=>{setFocusMode(false);setLayout(old=>({...old,bottomClosed:false,bottom:160}));}},{label:'Fit canvas · F',action:()=>engine.current?.fit()},{label:'Reset rotation · Shift+R',action:()=>engine.current?.rotate(0)},{label:'Reset view · 100%',action:()=>engine.current?.reset()},{label:(doc.settings.guides?'Hide':'Show')+' frame guides',action:()=>commit({...doc,settings:{...doc.settings,guides:!doc.settings.guides}})},{label:'Toggle left panel',action:()=>setLayout({...layout,leftClosed:!layout.leftClosed})},{label:'Toggle inspector',action:()=>setLayout({...layout,rightClosed:!layout.rightClosed})},{label:'Toggle timeline region',action:()=>setLayout({...layout,bottomClosed:!layout.bottomClosed})}],
   Layer:[{label:'Add layer',action:()=>{if(doc.layers.length>=100){notify('Projects support up to 100 layers.');return;}const l=newLayer('Layer '+(doc.layers.length+1));commit({...doc,layers:[l,...doc.layers],activeLayerId:l.id});}},{label:'Rename layer',action:()=>{setRenameId(layer.id);setRenameValue(layer.name);}},{label:'Duplicate layer',action:()=>commit(duplicateLayer(doc,layer.id))},{label:'Delete layer…',action:()=>{if(window.confirm('Delete “'+layer.name+'”? You can undo this.'))commit(removeLayer(doc,layer.id));},disabled:doc.layers.length===1},{label:'Merge Down',action:()=>void editing('merge'),disabled:doc.layers.at(-1)?.id===layer.id||layer.locked||frameList(doc).length>1},{label:'Clear Layer',action:()=>void editing('clear'),disabled:layer.locked}],
   Animation:[{label:(timelineView==='xsheet'?'Hide side Xsheet':'Show side Xsheet')+' · '+shortcuts.xsheet.toUpperCase(),action:toggleXsheetView},{label:'New blank frame · F6',action:()=>animationAction('add')},{label:'Duplicate current frame · F7',action:()=>animationAction('duplicate')},{label:'Delete selected frame · Delete/⌫ (when frame focused) or Shift+F7',action:()=>animationAction('delete'),disabled:frameList(doc).length<=1},{label:'Previous frame · Page Up',action:()=>stepDrawingFrame(-1)},{label:'Next frame · Page Down',action:()=>stepDrawingFrame(1)},{label:'Flip previous · ,',action:()=>toggleFlipPreview(-1)},{label:'Flip next · .',action:()=>toggleFlipPreview(1)},{label:'Drawing Substitution Shelf · '+shortcuts.substitutionShelf.toUpperCase(),action:openSubstitutionShelf},{label:'Linked Drawings & Cycles · '+shortcuts.reuseShelf.toUpperCase(),action:openReuseShelf},{label:'Link current drawing · '+shortcuts.linkCel.toUpperCase(),action:linkDrawingShortcut},{label:'Unlink current drawing · '+shortcuts.unlinkCel.toUpperCase(),action:unlinkDrawing},{label:'Timing Notes & Motion Path Assist · '+shortcuts.motionPlanning.toUpperCase(),action:openMotionPlanning},{label:'Multi-Cel Transform · '+shortcuts.batchTransform.toUpperCase(),action:openBatchTransform},{label:'Toggle onion skin · O',action:()=>{/* onion toggle */}},{label:'Audio waveform · '+shortcuts.audioTrack.toUpperCase(),action:()=>{setAudioTrackOpen(o=>!o);setWorkspaceMode('ANIMATE');setLayout(old=>({...old,bottomClosed:false}));}},{label:'Advanced Light Table · '+shortcuts.lightTable.toUpperCase(),action:toggleLightTablePanel},{label:'Pin / unpin current drawing · '+shortcuts.pinLightTable.toUpperCase(),action:pinLightTableFromShortcut},],
-  Window:[{label:'Keyboard & workspace settings…',action:()=>setModal('settings')},{label:'History panel',action:()=>{setRightTab('history');setLayout({...layout,rightClosed:false});}},{label:'Pop out / return Tool Wheel · Shift+W',action:()=>window.dispatchEvent(new Event('solo:wheel-popout-toggle'))},{label:'Reset panel layout',action:()=>{setFocusMode(false);setLayout({left:232,right:280,bottom:184,leftClosed:false,rightClosed:false,bottomClosed:false});}}],
+  Window:[{label:'Keyboard & workspace settings…',action:()=>setModal('settings')},{label:'History panel',action:()=>{setRightTab('history');setLayout({...layout,rightClosed:false});}},{label:'Pop out / return Tool Wheel · Shift+W',action:()=>window.dispatchEvent(new Event('solo:wheel-popout-toggle'))},{label:'Reset panel layout',action:()=>{setFocusMode(false);setLayout({left:232,right:280,bottom:160,leftClosed:false,rightClosed:false,bottomClosed:false});}}],
   Help:[{label:'Drawing Bug Recorder',action:()=>{setRightTab('recorder');setLayout(old=>({...old,rightClosed:false}));}},{label:'Drawing Diagnostics (developer)…',action:()=>{setRightTab('diagnostics');setLayout(old=>({...old,rightClosed:false}));}},{label:'Drawing studio guide',action:()=>setModal('help')},{label:'Welcome / recovery…',action:()=>void showOnboarding()},{label:'Milestone roadmap',action:()=>setModal('roadmap')},{label:'About Solo Anime Studio',action:()=>setModal('about')}]
  };
+ const timelineTools=[
+  {id:"Navigation",control:<div className="timeline-actions"><IconButton label="Previous drawing frame (Page Up)" disabled={busy||currentFrameIndex(doc)===0} onClick={()=>stepDrawingFrame(-1)}><SkipBack size={15}/></IconButton><IconButton label="Next drawing frame (Page Down)" disabled={busy||currentFrameIndex(doc)===frameList(doc).length-1} onClick={()=>stepDrawingFrame(1)}><SkipForward size={15}/></IconButton><IconButton label="Duplicate current drawing frame (F7)" disabled={busy||frameList(doc).length>=MAX_DRAWING_FRAMES} onClick={()=>animationAction('duplicate')}><Copy size={14}/></IconButton><IconButton label="Delete current drawing frame (Delete/⌫ after clicking the frame, or Shift+F7)" disabled={busy||frameList(doc).length<=1} onClick={()=>animationAction('delete')}><Trash2 size={14}/></IconButton><IconButton label="Stop playback and return to active drawing" disabled={playbackUpdate.state==='stopped'} onClick={stopPlayback}><Square size={13}/></IconButton></div>},
+  {id:"FPS & Loop",control:<div className="playback-controls">
+   <label className="playback-fps-label">FPS
+    <input key={fps} type="number" min={PLAYBACK_FPS_MIN} max={PLAYBACK_FPS_MAX} step="1" defaultValue={fps} aria-label="Playback frames per second"
+     onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}else if(e.key==='Escape'){e.stopPropagation();e.currentTarget.value=String(fps);e.currentTarget.blur();}}}
+     onBlur={e=>{const value=Number(e.currentTarget.value);if(Number.isInteger(value)&&value>=PLAYBACK_FPS_MIN&&value<=PLAYBACK_FPS_MAX)setFps(value);else e.currentTarget.value=String(fps);}}/>
+   </label>
+   <label className="playback-loop-label"><input type="checkbox" checked={loop} onChange={e=>setLoop(e.target.checked)}/> Loop</label>
+  </div>},
+  {id:"Hold length",control:<div className="exposure-controls" aria-label="Frame hold duration controls">
+      <span className="exposure-label">HOLD</span>
+      <IconButton label="Reduce hold by one frame (Shift+[)" disabled={busy||frameHold(frameList(doc)[currentFrameIndex(doc)])<=1} onClick={()=>changeHold(frameHold(frameList(doc)[currentFrameIndex(doc)])-1)}>−</IconButton>
+      <input key={frameList(doc)[currentFrameIndex(doc)].id+':'+frameHold(frameList(doc)[currentFrameIndex(doc)])}
+       type="number" min="1" max={MAX_FRAME_HOLD} step="1"
+       aria-label="Hold current drawing for N frames" title="How many frames to show this drawing (1–24)"
+       defaultValue={frameHold(frameList(doc)[currentFrameIndex(doc)])}
+       disabled={busy}
+       onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}else if(e.key==='Escape'){e.stopPropagation();e.currentTarget.value=String(frameHold(frameList(doc)[currentFrameIndex(doc)]));e.currentTarget.blur();}}}
+       onBlur={e=>{const value=Number(e.currentTarget.value);if(Number.isInteger(value)&&value>=1&&value<=MAX_FRAME_HOLD)changeHold(value);else e.currentTarget.value=String(frameHold(frameList(doc)[currentFrameIndex(doc)]));}}/>
+      <IconButton label="Increase hold by one frame (Shift+])" disabled={busy||frameHold(frameList(doc)[currentFrameIndex(doc)])>=MAX_FRAME_HOLD} onClick={()=>changeHold(frameHold(frameList(doc)[currentFrameIndex(doc)])+1)}>+</IconButton>
+      <span className="exposure-unit">frames</span>
+     </div>},
+  {id:"Flip preview",control:<div className="flipbook-controls" aria-label="Flipbook quick previews">
+      <span className="flipbook-label">FLIP</span>
+      <IconButton label="Flipbook: click to toggle previous drawing; hold comma (,) to preview" active={flipPreview===-1} disabled={busy||currentFrameIndex(doc)===0} onClick={()=>toggleFlipPreview(-1)}><ChevronsLeft size={15}/></IconButton>
+      <IconButton label="Flipbook: click to toggle next drawing; hold period (.) to preview" active={flipPreview===1} disabled={busy||currentFrameIndex(doc)===frameList(doc).length-1} onClick={()=>toggleFlipPreview(1)}><ChevronsRight size={15}/></IconButton>
+      {flipPreview!==null&&<span className="flipbook-status">PREVIEW</span>}
+     </div>},
+  {id:"Onion Skin",control:<div className="onion-controls" aria-label="Onion skin controls">
+      <IconButton label={onionSettings.enabled?'Hide onion skin (O)':'Show onion skin (O)'} active={onionSettings.enabled} onClick={()=>setOnionSettings(s=>({...s,enabled:!s.enabled}))}>{onionSettings.enabled?<Eye size={15}/>:<EyeOff size={15}/>}</IconButton>
+      <IconButton label="Onion skin settings" active={onionSettingsOpen} onClick={()=>{if(!onionSettingsOpen&&timelineMenu.current)timelineMenu.current.open=true;setOnionSettingsOpen(o=>!o);}}><SlidersHorizontal size={14}/></IconButton>
+      {onionSettingsOpen&&<div className="onion-settings" role="group" aria-label="Onion skin settings">
+       <strong>ONION SKIN</strong><p>Ghosts are only guides. They are never saved into your drawings.</p>
+       <label className="onion-check"><input type="checkbox" checked={onionSettings.previous} onChange={e=>setOnionSettings(s=>({...s,previous:e.target.checked}))}/><span className="onion-swatch previous"/> Previous drawing</label>
+       <label className="onion-count-row">Previous frames <select aria-label="Number of previous onion skin frames" value={onionSettings.previousCount} onChange={e=>setOnionSettings(s=>({...s,previousCount:+e.target.value}))}>{[0,1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select></label>
+       <Range label="Previous opacity" value={onionSettings.previousOpacity} unit="%" onChange={previousOpacity=>setOnionSettings(s=>({...s,previousOpacity}))}/>
+       <label className="onion-check"><input type="checkbox" checked={onionSettings.next} onChange={e=>setOnionSettings(s=>({...s,next:e.target.checked}))}/><span className="onion-swatch next"/> Next drawing</label>
+       <label className="onion-count-row">Next frames <select aria-label="Number of next onion skin frames" value={onionSettings.nextCount} onChange={e=>setOnionSettings(s=>({...s,nextCount:+e.target.value}))}>{[0,1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select></label>
+       <Range label="Next opacity" value={onionSettings.nextOpacity} unit="%" onChange={nextOpacity=>setOnionSettings(s=>({...s,nextOpacity}))}/>
+       <label className="onion-check"><input type="checkbox" checked={onionSettings.currentLayerOnly} onChange={e=>setOnionSettings(s=>({...s,currentLayerOnly:e.target.checked}))}/> Current drawing layer only</label>
+       <small>Press O to toggle. Color ghosts follow the canvas when you zoom or pan.</small>
+      </div>}
+     </div>},
+  {id:"Light Table",control:<div className="light-table-controls" aria-label="Light table controls">
+      <IconButton label={'Pin or unpin current drawing as a read-only light-table reference ('+shortcuts.pinLightTable.toUpperCase()+')'} active={lightTablePins.some(pin=>pin.frameId===frameList(doc)[currentFrameIndex(doc)].id)} onClick={pinLightTableFromShortcut}><Plus size={13}/></IconButton>
+      <button className={'light-table-toggle'+(lightTablePins.length?' light-table-pinned':'')} type="button" title={'Toggle Advanced Light Table ('+shortcuts.lightTable.toUpperCase()+')'} onClick={toggleLightTablePanel} aria-expanded={lightTableOpen}>LIGHT TABLE ({lightTablePins.length}) <kbd>{shortcuts.lightTable.toUpperCase()}</kbd></button>
+      {lightTableOpen&&<div className="light-table-panel" role="group" aria-label="Pinned light table drawings">
+       <strong>PINNED DRAWINGS</strong><p>Pin up to five drawings, including non-adjacent poses. Overlays are never exported or painted onto the cel.</p>
+       <button className="light-table-add" disabled={lightTablePins.length>=MAX_LIGHT_TABLE_PINS&&!lightTablePins.some(pin=>pin.frameId===frameList(doc)[currentFrameIndex(doc)].id)} onClick={pinLightTableFromShortcut}>{lightTablePins.some(pin=>pin.frameId===frameList(doc)[currentFrameIndex(doc)].id)?'Unpin current drawing':'Pin current drawing'} <kbd>{shortcuts.pinLightTable.toUpperCase()}</kbd></button>
+       {sanitizeLightTablePins(doc,lightTablePins).map(pin=>{const index=frameList(doc).findIndex(f=>f.id===pin.frameId);return <div className="light-table-entry" key={pin.frameId}>
+        <div><strong>Drawing {index+1}</strong><button title="Jump to pinned drawing" onClick={()=>goToDrawingFrame(pin.frameId)}>Go to</button><button title="Remove pinned drawing" onClick={()=>setLightTablePins(old=>old.filter(v=>v.frameId!==pin.frameId))}><X size={13}/></button></div>
+        <label>Opacity {pin.opacity}%<input type="range" min="0" max="100" step="1" value={pin.opacity} onChange={e=>updateReferencePin(pin.frameId,{opacity:+e.target.value})}/></label>
+        <label>Tint<select value={pin.tint} onChange={e=>updateReferencePin(pin.frameId,{tint:e.target.value as LightTablePin['tint']})}><option value="original">Original colors</option><option value="teal">Teal</option><option value="red">Red</option></select></label>
+        <label>Scale {Math.round(pin.scale*100)}%<input type="range" min="25" max="250" step="5" value={Math.round(pin.scale*100)} onChange={e=>updateReferencePin(pin.frameId,{scale:+e.target.value/100})}/></label>
+        <label>Rotation {pin.angle}°<input type="range" min="-180" max="180" step="5" value={pin.angle} onChange={e=>updateReferencePin(pin.frameId,{angle:+e.target.value})}/></label>
+        <div className="light-table-nudge"><span>Shift guide</span><button onClick={()=>updateReferencePin(pin.frameId,{dx:pin.dx-5})}>←</button><button onClick={()=>updateReferencePin(pin.frameId,{dx:pin.dx+5})}>→</button><button onClick={()=>updateReferencePin(pin.frameId,{dy:pin.dy-5})}>↑</button><button onClick={()=>updateReferencePin(pin.frameId,{dy:pin.dy+5})}>↓</button><button onClick={()=>updateReferencePin(pin.frameId,{dx:0,dy:0,scale:1,angle:0})}>Reset</button></div>
+       </div>;})}
+       {!lightTablePins.length&&<small>No pinned drawings yet. Select a drawing in the timeline and pin it here.</small>}
+      </div>}
+     </div>},
+  {id:"Xsheet",control:<button className="xsheet-switch" aria-pressed={timelineView==='xsheet'} title={'Show / hide side Xsheet ('+shortcuts.xsheet.toUpperCase()+')'} onClick={toggleXsheetView}>{timelineView==='xsheet'?'HIDE XSHEET':'SHOW XSHEET'} <kbd>{shortcuts.xsheet.toUpperCase()}</kbd></button>},
+  {id:"Layer keys",control:<div className="layer-cel-commandbar">
+     <span><Layers size={12}/> Independent layer cels</span>
+     <button disabled={busy} title="Create a new key drawing from the held picture at this frame (Alt+K)" onClick={()=>newLayerKey(true)}>New layer key <kbd>Alt+K</kbd></button>
+     <button disabled={busy} title="Create a blank drawing only on the current layer (Alt+Shift+K)" onClick={()=>newLayerKey(false)}>Blank layer key</button>
+     <button disabled={busy} title="Extend selected layer drawing by one frame (Alt+])" onClick={()=>stepLayerHold(1)}>Hold +</button>
+     <button disabled={busy} title="Shorten selected layer drawing by one frame (Alt+[)" onClick={()=>stepLayerHold(-1)}>Hold −</button>
+    </div>},
+ ];
  return <div className="studio">
   <header className="app-header"><div className="brand"><svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M5 17 19 3M5 26 27 4M15 28 28 15" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/><circle cx="27" cy="27" r="2" fill="currentColor"/></svg><strong>Solo Anime Studio</strong><span className="version-badge" title={"Solo Anime Studio "+buildInfo.version}>v{buildInfo.version}</span></div><nav className="main-menu" aria-label="Main menu">{Object.keys(menus).map(m=><div className="menu-wrap" key={m}><button className={menu===m?'menu-active':''} aria-expanded={menu===m} onClick={e=>{const r=e.currentTarget.getBoundingClientRect();menuButton.current=e.currentTarget;setMenuAnchor({left:Math.max(8,Math.min(r.left,window.innerWidth-288)),top:r.bottom+6});setMenu(menu===m?'':m);}}>{m}</button>{menu===m&&createPortal(<div className="main-menu-layer"><button className="menu-dismiss" aria-label="Close menu" onClick={()=>{setMenu('');menuButton.current?.focus();}}/><div ref={menuPopup} className="dropdown main-menu-popup" aria-label={m+' menu'} style={{left:menuAnchor.left,top:menuAnchor.top,maxHeight:'calc(100dvh - '+(menuAnchor.top+8)+'px)'}} onKeyDown={e=>{const items=Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));const i=items.indexOf(document.activeElement as HTMLButtonElement);if(e.key==='Escape'){e.preventDefault();e.stopPropagation();setMenu('');menuButton.current?.focus();}else if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();e.stopPropagation();const index=e.key==='Home'?0:e.key==='End'?items.length-1:(i+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;items[index]?.focus();}}}>{menus[m].map(item=><button key={item.label} disabled={item.disabled||busy} onClick={()=>{setMenu('');item.action();}}>{item.label}</button>)}</div></div>,document.body)}</div>)}</nav><div className="header-actions"><span className={'save-status '+(displayStatus==='Save failed'?'error':'')}><i/>{displayStatus}</span><IconButton label="Settings and shortcuts" onClick={()=>setModal('settings')}><Settings size={17}/></IconButton><button className="export-button" onClick={showExport} disabled={busy}><Download size={15}/>Export PNG</button></div></header>
   <div className="workspace-bar"><div className="workspace-tabs"><button className={workspaceMode==='DRAW'?'active':''} aria-pressed={workspaceMode==='DRAW'} title="Draw workspace: artwork tools and a larger canvas; your selected animation cel is not changed" onClick={()=>{stopPlayback();clearFlipPreview();setOnionSettingsOpen(false);setFocusMode(false);setWorkspaceMode('DRAW');}}>DRAW<span/></button><button className={workspaceMode==='ANIMATE'?'active':''} aria-pressed={workspaceMode==='ANIMATE'} title="Animate workspace: drawing tools plus layer cels, holds, onion skin, flipbook and playback" onClick={()=>{setWorkspaceMode('ANIMATE');setFocusMode(false);setLayout(old=>({...old,bottomClosed:false}));}}>ANIMATE<span/></button><button type="button" className={'workspace-focus-button'+(focusMode?' selected':'')} title={focusMode?'Show Timeline and panels again · F9':'Hide Timeline and panels for more drawing space · F9'} aria-label={focusMode?'Exit Canvas Focus Mode (F9)':'Focus Canvas (F9)'} aria-pressed={focusMode} onClick={()=>{setFocusMode(v=>!v);setOnionSettingsOpen(false);}}>{focusMode?<Minimize2 size={14}/>:<Maximize2 size={14}/>}<span>{focusMode?'EXIT FOCUS':'FOCUS CANVAS'}</span><kbd>F9</kbd></button>{['CHARACTERS','CLEANUP','COMPOSE'].map(t=><button disabled key={t} title="Planned in a later milestone">{t}<span className="planned-dot"/></button>)}</div><div className="scene-info"><Folder size={13}/><span>{doc.name}</span><ChevronDown size={12}/><span className="vertical-divider"/><button title="New project resolution" onClick={startNew}>{frameSize.width} × {frameSize.height}<ChevronDown size={12}/></button></div><span className="milestone-label">MILESTONE 02 <span>Layer Cels</span></span></div>
@@ -1134,91 +1214,29 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
     </>}
    </aside>
    <section className="timeline" aria-label="Animation timeline">
-    <div className="timeline-resizer" role="separator" aria-label="Resize timeline: drag to make more or less drawing space" title="Drag to resize timeline · double-click to compact" onDoubleClick={()=>setLayout(old=>({...old,bottom:184,bottomClosed:false}))} onPointerDown={e=>resizePanel(e,'bottom')}/>
-    <div className="timeline-header"><div><Film size={14}/><strong>TIMELINE</strong><span className="planned-badge">HOLD DRAG</span></div><button className="xsheet-switch" aria-pressed={timelineView==='xsheet'} title={'Show / hide side Xsheet ('+shortcuts.xsheet.toUpperCase()+')'} onClick={toggleXsheetView}>{timelineView==='xsheet'?'HIDE XSHEET':'SHOW XSHEET'} <kbd>{shortcuts.xsheet.toUpperCase()}</kbd></button>
-     <span className="timeline-note" title="Select a frame cell then press Delete / ⌫ to delete it (or Shift+F7)">Cel {currentFrameIndex(doc)+1}/{frameList(doc).length} · F{currentExposureRange(doc).start}{currentExposureRange(doc).hold>1?'–'+currentExposureRange(doc).end:''}/{totalExposureFrames(doc)}</span><span className="timeline-multiselect-help" title="Shift-click: select a range. Option-click: select non-adjacent frames or layers.">{frameSelectionSet.size>1||layerSelectionSet.size>1?`${frameSelectionSet.size} frames · ${layerSelectionSet.size} layers selected`:'Shift = range · Option = separate'}</span>
-     <div className="timeline-actions" aria-label="Drawing frame actions">
-      <IconButton label="Previous drawing frame (Page Up)" disabled={busy||currentFrameIndex(doc)===0} onClick={()=>stepDrawingFrame(-1)}><SkipBack size={15}/></IconButton>
-      <IconButton label="Next drawing frame (Page Down)" disabled={busy||currentFrameIndex(doc)===frameList(doc).length-1} onClick={()=>stepDrawingFrame(1)}><SkipForward size={15}/></IconButton>
-      <IconButton label="Add blank drawing frame (F6)" disabled={busy||frameList(doc).length>=MAX_DRAWING_FRAMES} onClick={()=>animationAction('add')}><Plus size={15}/></IconButton>
-      <IconButton label="Duplicate current drawing frame (F7)" disabled={busy||frameList(doc).length>=MAX_DRAWING_FRAMES} onClick={()=>animationAction('duplicate')}><Copy size={14}/></IconButton>
-      <IconButton label="Delete current drawing frame (Delete/⌫ after clicking the frame, or Shift+F7)" disabled={busy||frameList(doc).length<=1} onClick={()=>animationAction('delete')}><Trash2 size={14}/></IconButton>
-     </div>
-     <div className="exposure-controls" aria-label="Frame hold duration controls">
-      <span className="exposure-label">HOLD</span>
-      <IconButton label="Reduce hold by one frame (Shift+[)" disabled={busy||frameHold(frameList(doc)[currentFrameIndex(doc)])<=1} onClick={()=>changeHold(frameHold(frameList(doc)[currentFrameIndex(doc)])-1)}>−</IconButton>
-      <input key={frameList(doc)[currentFrameIndex(doc)].id+':'+frameHold(frameList(doc)[currentFrameIndex(doc)])}
-       type="number" min="1" max={MAX_FRAME_HOLD} step="1"
-       aria-label="Hold current drawing for N frames" title="How many frames to show this drawing (1–24)"
-       defaultValue={frameHold(frameList(doc)[currentFrameIndex(doc)])}
-       disabled={busy}
-       onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}else if(e.key==='Escape'){e.stopPropagation();e.currentTarget.value=String(frameHold(frameList(doc)[currentFrameIndex(doc)]));e.currentTarget.blur();}}}
-       onBlur={e=>{const value=Number(e.currentTarget.value);if(Number.isInteger(value)&&value>=1&&value<=MAX_FRAME_HOLD)changeHold(value);else e.currentTarget.value=String(frameHold(frameList(doc)[currentFrameIndex(doc)]));}}/>
-      <IconButton label="Increase hold by one frame (Shift+])" disabled={busy||frameHold(frameList(doc)[currentFrameIndex(doc)])>=MAX_FRAME_HOLD} onClick={()=>changeHold(frameHold(frameList(doc)[currentFrameIndex(doc)])+1)}>+</IconButton>
-      <span className="exposure-unit">frames</span>
-     </div>
-     <div className="flipbook-controls" aria-label="Flipbook quick previews">
-      <span className="flipbook-label">FLIP</span>
-      <IconButton label="Flipbook: click to toggle previous drawing; hold comma (,) to preview" active={flipPreview===-1} disabled={busy||currentFrameIndex(doc)===0} onClick={()=>toggleFlipPreview(-1)}><ChevronsLeft size={15}/></IconButton>
-      <IconButton label="Flipbook: click to toggle next drawing; hold period (.) to preview" active={flipPreview===1} disabled={busy||currentFrameIndex(doc)===frameList(doc).length-1} onClick={()=>toggleFlipPreview(1)}><ChevronsRight size={15}/></IconButton>
-      {flipPreview!==null&&<span className="flipbook-status">PREVIEW</span>}
-     </div>
-     <div className="onion-controls" aria-label="Onion skin controls">
-      <IconButton label={onionSettings.enabled?'Hide onion skin (O)':'Show onion skin (O)'} active={onionSettings.enabled} onClick={()=>setOnionSettings(s=>({...s,enabled:!s.enabled}))}>{onionSettings.enabled?<Eye size={15}/>:<EyeOff size={15}/>}</IconButton>
-      <IconButton label="Onion skin settings" active={onionSettingsOpen} onClick={()=>setOnionSettingsOpen(o=>!o)}><SlidersHorizontal size={14}/></IconButton>
-      {onionSettingsOpen&&<div className="onion-settings" role="group" aria-label="Onion skin settings">
-       <strong>ONION SKIN</strong><p>Ghosts are only guides. They are never saved into your drawings.</p>
-       <label className="onion-check"><input type="checkbox" checked={onionSettings.previous} onChange={e=>setOnionSettings(s=>({...s,previous:e.target.checked}))}/><span className="onion-swatch previous"/> Previous drawing</label>
-       <label className="onion-count-row">Previous frames <select aria-label="Number of previous onion skin frames" value={onionSettings.previousCount} onChange={e=>setOnionSettings(s=>({...s,previousCount:+e.target.value}))}>{[0,1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select></label>
-       <Range label="Previous opacity" value={onionSettings.previousOpacity} unit="%" onChange={previousOpacity=>setOnionSettings(s=>({...s,previousOpacity}))}/>
-       <label className="onion-check"><input type="checkbox" checked={onionSettings.next} onChange={e=>setOnionSettings(s=>({...s,next:e.target.checked}))}/><span className="onion-swatch next"/> Next drawing</label>
-       <label className="onion-count-row">Next frames <select aria-label="Number of next onion skin frames" value={onionSettings.nextCount} onChange={e=>setOnionSettings(s=>({...s,nextCount:+e.target.value}))}>{[0,1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select></label>
-       <Range label="Next opacity" value={onionSettings.nextOpacity} unit="%" onChange={nextOpacity=>setOnionSettings(s=>({...s,nextOpacity}))}/>
-       <label className="onion-check"><input type="checkbox" checked={onionSettings.currentLayerOnly} onChange={e=>setOnionSettings(s=>({...s,currentLayerOnly:e.target.checked}))}/> Current drawing layer only</label>
-       <small>Press O to toggle. Color ghosts follow the canvas when you zoom or pan.</small>
-      </div>}
-     </div>
-     <div className="light-table-controls" aria-label="Light table controls">
-      <IconButton label={'Pin or unpin current drawing as a read-only light-table reference ('+shortcuts.pinLightTable.toUpperCase()+')'} active={lightTablePins.some(pin=>pin.frameId===frameList(doc)[currentFrameIndex(doc)].id)} onClick={pinLightTableFromShortcut}><Plus size={13}/></IconButton>
-      <button className={'light-table-toggle'+(lightTablePins.length?' light-table-pinned':'')} type="button" title={'Toggle Advanced Light Table ('+shortcuts.lightTable.toUpperCase()+')'} onClick={toggleLightTablePanel} aria-expanded={lightTableOpen}>LIGHT TABLE ({lightTablePins.length}) <kbd>{shortcuts.lightTable.toUpperCase()}</kbd></button>
-      {lightTableOpen&&<div className="light-table-panel" role="group" aria-label="Pinned light table drawings">
-       <strong>PINNED DRAWINGS</strong><p>Pin up to five drawings, including non-adjacent poses. Overlays are never exported or painted onto the cel.</p>
-       <button className="light-table-add" disabled={lightTablePins.length>=MAX_LIGHT_TABLE_PINS&&!lightTablePins.some(pin=>pin.frameId===frameList(doc)[currentFrameIndex(doc)].id)} onClick={pinLightTableFromShortcut}>{lightTablePins.some(pin=>pin.frameId===frameList(doc)[currentFrameIndex(doc)].id)?'Unpin current drawing':'Pin current drawing'} <kbd>{shortcuts.pinLightTable.toUpperCase()}</kbd></button>
-       {sanitizeLightTablePins(doc,lightTablePins).map(pin=>{const index=frameList(doc).findIndex(f=>f.id===pin.frameId);return <div className="light-table-entry" key={pin.frameId}>
-        <div><strong>Drawing {index+1}</strong><button title="Jump to pinned drawing" onClick={()=>goToDrawingFrame(pin.frameId)}>Go to</button><button title="Remove pinned drawing" onClick={()=>setLightTablePins(old=>old.filter(v=>v.frameId!==pin.frameId))}><X size={13}/></button></div>
-        <label>Opacity {pin.opacity}%<input type="range" min="0" max="100" step="1" value={pin.opacity} onChange={e=>updateReferencePin(pin.frameId,{opacity:+e.target.value})}/></label>
-        <label>Tint<select value={pin.tint} onChange={e=>updateReferencePin(pin.frameId,{tint:e.target.value as LightTablePin['tint']})}><option value="original">Original colors</option><option value="teal">Teal</option><option value="red">Red</option></select></label>
-        <label>Scale {Math.round(pin.scale*100)}%<input type="range" min="25" max="250" step="5" value={Math.round(pin.scale*100)} onChange={e=>updateReferencePin(pin.frameId,{scale:+e.target.value/100})}/></label>
-        <label>Rotation {pin.angle}°<input type="range" min="-180" max="180" step="5" value={pin.angle} onChange={e=>updateReferencePin(pin.frameId,{angle:+e.target.value})}/></label>
-        <div className="light-table-nudge"><span>Shift guide</span><button onClick={()=>updateReferencePin(pin.frameId,{dx:pin.dx-5})}>←</button><button onClick={()=>updateReferencePin(pin.frameId,{dx:pin.dx+5})}>→</button><button onClick={()=>updateReferencePin(pin.frameId,{dy:pin.dy-5})}>↑</button><button onClick={()=>updateReferencePin(pin.frameId,{dy:pin.dy+5})}>↓</button><button onClick={()=>updateReferencePin(pin.frameId,{dx:0,dy:0,scale:1,angle:0})}>Reset</button></div>
-       </div>;})}
-       {!lightTablePins.length&&<small>No pinned drawings yet. Select a drawing in the timeline and pin it here.</small>}
-      </div>}
-     </div>
-     <IconButton label="Compact timeline (184 px)" onClick={()=>{setFocusMode(false);setLayout(old=>({...old,bottom:184,bottomClosed:false}));}}><Minimize2 size={13}/></IconButton><button className="timeline-collapse" title="Collapse or expand timeline region" onClick={()=>{stopPlayback();setLayout({...layout,bottomClosed:!layout.bottomClosed});}}><ChevronDown size={14} style={{transform:layout.bottomClosed?'rotate(180deg)':''}}/></button>
-    </div>
-    {!layout.bottomClosed&&<div className="timeline-playback-strip">
-     <div className="playback-controls" aria-label="Animation playback controls">
-      <IconButton label={playbackUpdate.state==='playing'||playbackUpdate.state==='preparing'||playbackUpdate.state==='buffering'?'Pause animation (Shift+Space)':'Play animation (Shift+Space)'} active={playbackUpdate.state!=='stopped'} disabled={busy} onClick={togglePlayback}>
+    <div className="timeline-resizer" role="separator" aria-label="Resize timeline: drag to make more or less drawing space" title="Drag to resize timeline · double-click to compact" onDoubleClick={()=>setLayout(old=>({...old,bottom:160,bottomClosed:false}))} onPointerDown={e=>resizePanel(e,'bottom')}/>
+    <div className="timeline-header canvas-first-toolbar">
+     <strong>TIMELINE</strong>
+     <IconButton label={playbackUpdate.state==='playing'||playbackUpdate.state==='preparing'||playbackUpdate.state==='buffering'?'Pause animation (Shift+Space)':'Play animation (Shift+Space)'} active={playbackUpdate.state!=='stopped'} disabled={busy} onClick={togglePlayback}>
        {playbackUpdate.state==='playing'||playbackUpdate.state==='preparing'||playbackUpdate.state==='buffering'?<Pause size={14}/>:<Play size={14}/>}</IconButton>
-      <IconButton label="Stop playback and return to active drawing" disabled={playbackUpdate.state==='stopped'} onClick={stopPlayback}><Square size={13}/></IconButton>
-      <label className="playback-fps-label">FPS
-       <input key={'fps-'+fps} type="number" min={PLAYBACK_FPS_MIN} max={PLAYBACK_FPS_MAX} step="1" defaultValue={fps} aria-label="Playback frames per second"
-        onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}else if(e.key==='Escape'){e.stopPropagation();e.currentTarget.value=String(fps);e.currentTarget.blur();}}}
-        onBlur={e=>{const value=Number(e.currentTarget.value);if(Number.isInteger(value)&&value>=PLAYBACK_FPS_MIN&&value<=PLAYBACK_FPS_MAX)setFps(value);else e.currentTarget.value=String(fps);}}/>
-      </label>
-      <label className="playback-loop-label"><input type="checkbox" checked={loop} onChange={e=>setLoop(e.target.checked)}/> Loop</label>
-      {playbackUpdate.state!=='stopped'&&<span className="playback-exposure" aria-live="off">F{playbackUpdate.exposure}/{totalExposureFrames(doc)} · {playbackUpdate.state==='preparing'?'Preparing':playbackUpdate.state==='buffering'?'Buffering':playbackUpdate.state==='paused'?'Paused':'Playing'}</span>}
-     </div>
-    </div>}
-    {!layout.bottomClosed&&<AudioTrack audio={doc.audio} expanded={audioTrackOpen} shortcut={shortcuts.audioTrack} muted={audioMuted} busy={busy||audioBusy} exposure={playbackUpdate.state==='stopped'?currentExposureRange(doc).start:playbackUpdate.exposure} fps={fps} total={totalExposureFrames(doc)} onToggle={audioActionCallbacks.current.toggle} onImport={audioActionCallbacks.current.importClip} onRemove={audioActionCallbacks.current.remove} onMute={audioActionCallbacks.current.mute} onSeek={audioActionCallbacks.current.seek}/>}
-    {!layout.bottomClosed&&<div className="layer-cel-commandbar">
-     <span><Layers size={12}/> Independent layer cels</span>
-     <button disabled={busy} title="Create a new key drawing from the held picture at this frame (Alt+K)" onClick={()=>newLayerKey(true)}>New layer key <kbd>Alt+K</kbd></button>
-     <button disabled={busy} title="Create a blank drawing only on the current layer (Alt+Shift+K)" onClick={()=>newLayerKey(false)}>Blank layer key</button>
-     <button disabled={busy} title="Extend selected layer drawing by one frame (Alt+])" onClick={()=>stepLayerHold(1)}>Hold +</button>
-     <button disabled={busy} title="Shorten selected layer drawing by one frame (Alt+[)" onClick={()=>stepLayerHold(-1)}>Hold −</button>
-    </div>}
+     <button className="timeline-add-cel" title="Add blank drawing frame (F6)" disabled={busy||frameList(doc).length>=MAX_DRAWING_FRAMES} onClick={()=>animationAction('add')}>＋ Cel</button>
+     <span className="timeline-current-frame" aria-label="Current frame">F {String(playbackUpdate.state==='stopped'?currentExposureRange(doc).start:playbackUpdate.exposure).padStart(3,'0')}</span>
+     <div className="timeline-pinned">{timelineTools.filter(tool=>timelinePins.includes(tool.id)).map(tool=><div key={tool.id}>{tool.control}</div>)}</div>
+     <button aria-pressed={audioTrackOpen} onClick={audioActionCallbacks.current.toggle}>♫ Audio</button>
+     <details className="timeline-more" ref={timelineMenu}>
+      <summary aria-label="Customize timeline toolbar">•••</summary>
+      <div className="timeline-tools-popup">
+       <strong>Customize Toolbar</strong>
+       <p>Pin the controls you use most.</p>
+       {timelineTools.map(tool=><div className="timeline-tool-row" key={tool.id}>
+        <label><input type="checkbox" checked={timelinePins.includes(tool.id)} onChange={e=>pinTimelineTool(tool.id,e.target.checked)}/>{tool.id}</label>
+        {tool.control}
+       </div>)}
+      </div>
+     </details>
+     <button className="timeline-collapse" title="Collapse or expand timeline region" onClick={()=>{stopPlayback();setLayout({...layout,bottomClosed:!layout.bottomClosed});}}><ChevronDown size={14} style={{transform:layout.bottomClosed?'rotate(180deg)':''}}/></button>
+    </div>
+    {!layout.bottomClosed&&audioTrackOpen&&<AudioTrack audio={doc.audio} expanded={audioTrackOpen} shortcut={shortcuts.audioTrack} muted={audioMuted} busy={busy||audioBusy} exposure={playbackUpdate.state==='stopped'?currentExposureRange(doc).start:playbackUpdate.exposure} fps={fps} total={totalExposureFrames(doc)} onToggle={audioActionCallbacks.current.toggle} onImport={audioActionCallbacks.current.importClip} onRemove={audioActionCallbacks.current.remove} onMute={audioActionCallbacks.current.mute} onSeek={audioActionCallbacks.current.seek}/>}
     {!layout.bottomClosed&&<div className="timeline-body">
       <div ref={timelineTrack} className="timeline-track"><span className="layer-track-heading"><Layers size={13}/>DRAWING FRAMES<br/> & LAYER CELS</span>{doc.layers.map(l=><button key={l.id} className={'layer-track-name '+(l.id===layer.id?'active':'')+(layerSelectionSet.has(l.id)?' multi-selected':'')} title={'Select '+l.name+' · Shift-click range · Option-click separate layers'} onClick={e=>{selectLayerWithModifier(l.id,e.shiftKey,e.altKey);stopPlayback();store.select(l.id);}}><span className={'track-dot '+(l.id===layer.id?'active':'')}/><span className="layer-name-text">{l.name}</span>{l.locked&&<Lock size={10}/>}</button>)}</div>
       <div className="timeline-grid" role="group" aria-label="Drawing frames" onScroll={e=>{if(timelineTrack.current)timelineTrack.current.scrollTop=e.currentTarget.scrollTop;}}>
