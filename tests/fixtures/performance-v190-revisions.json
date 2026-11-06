@@ -1,0 +1,12 @@
+{
+  "src/ui/App.tsx": {
+    "before": "eef060b394e519284c2178c9c5d5e7981e57bbd1074125593a5ca42b9ebd4387",
+    "after": "889332dc46714f8cff54aca04fadcf77857cfc9adab12e347042a752222edcca",
+    "reason": "Add portrait canvas presets and release Ink Sweep desktop icon."
+  },
+  "src/core/buildInfo.ts": {
+    "before": "e7d1fc1b58f9dccaff413356006518675a15613a3065fedd837421dc61d5054e",
+    "after": "cc1b8bcbf15d7830c4a81089af163c81208fe322df594c201dfd1ee0644accf5",
+    "reason": "Add portrait canvas presets and release Ink Sweep desktop icon."
+  }
+}
