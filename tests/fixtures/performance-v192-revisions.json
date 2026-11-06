@@ -1,0 +1,27 @@
+{
+  "src/ui/App.tsx": {
+    "before": "c14b3d2376653c329ee5df09e2edd38a211af04770540c0dacf37cb68dc44273",
+    "after": "04880e410b83afc62284a87c229d910c402275d0ce83b9e11a03b3dced7c95ff",
+    "reason": "Show keyboard shortcuts on hover and allow Tool Wheel slot customization."
+  },
+  "src/styles.css": {
+    "before": "4ef58467d491a8bb3b92bd7a853ff5bd9cad1db521333636ee959ed10ec72a62",
+    "after": "1c71c3e6a2defc5b6346f4a00b7e8090ed5aee10e4b604649a59422d8ca09da2",
+    "reason": "Show keyboard shortcuts on hover and allow Tool Wheel slot customization."
+  },
+  "src/ui/RadialToolbar.tsx": {
+    "before": "47f6a9af100e6754432d4faf86294aac60f5c6bf49f4f2a08a8837a0658b1d93",
+    "after": "2b53743dea8e3ee7d0a57c31c80b3c243cbb0a39946950e77262d601aa237d1b",
+    "reason": "Show keyboard shortcuts on hover and allow Tool Wheel slot customization."
+  },
+  "src/ui/AudioTrack.tsx": {
+    "before": "426d46dcd4c8e53e58e327233f03e85c994be47ea28c2067d88183605614922b",
+    "after": "3beec55938501136cfe40e7b2f10e7befdb9ae8494cb33224a7513cef493a329",
+    "reason": "Show keyboard shortcuts on hover and allow Tool Wheel slot customization."
+  },
+  "src/core/buildInfo.ts": {
+    "before": "46d65cb595015e0a60e02e7a1a636649e770e58394a36e382e30010777c379d4",
+    "after": "c6c6307261f541637046065e15b2c68e907ef14422ebbd3122f0218349604588",
+    "reason": "Show keyboard shortcuts on hover and allow Tool Wheel slot customization."
+  }
+}

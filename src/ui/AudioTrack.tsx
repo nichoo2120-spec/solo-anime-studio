@@ -13,7 +13,7 @@ export const AudioTrack=memo(function AudioTrack({audio,expanded,shortcut,muted,
  const position=audio?Math.min(100,secondsAtExposure(exposure,fps)/audio.duration*100):0;
  return <div className="audio-track" aria-label="Animation audio track">
   <div className="audio-track-header">
-   <button type="button" className="audio-track-toggle" onClick={onToggle} title={'Show or hide Audio track ('+shortcut.toUpperCase()+')'} aria-expanded={expanded}><Music2 size={13}/> AUDIO <kbd>{shortcut.toUpperCase()}</kbd></button>
+   <button type="button" className="audio-track-toggle" onClick={onToggle} title={'Audio · '+shortcut.toUpperCase()} aria-expanded={expanded}><Music2 size={13}/> AUDIO</button>
    {audio&&<span className="audio-track-filename" title={audio.name}>{audio.name}</span>}
    <button type="button" disabled={busy} onClick={()=>picker.current?.click()}><Upload size={12}/>{audio?'Replace':'Import'}</button>
    {audio&&<><button type="button" title={muted?'Unmute audio':'Mute audio'} aria-label={muted?'Unmute audio':'Mute audio'} onClick={()=>onMute(!muted)}>{muted?<VolumeX size={14}/>:<Volume2 size={14}/>}</button><button type="button" disabled={busy} aria-label="Remove scene audio" title="Remove audio (Undo available)" onClick={onRemove}><X size={14}/></button></>}
