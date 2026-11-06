@@ -12,7 +12,7 @@ export const IDENTITY:Matrix=[1,0,0,1,0,0];
 export function mul(a:Matrix,b:Matrix):Matrix{return [a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];}
 export function mapPoint(p:{x:number;y:number},m:Matrix){return {x:m[0]*p.x+m[2]*p.y+m[4],y:m[1]*p.x+m[3]*p.y+m[5]};}
 export function scaleOf(m:Matrix){return Math.sqrt(Math.max(0.0001,Math.abs(m[0]*m[3]-m[1]*m[2])));}
-export function selectable(layer:Layer):Selectable[]{return layer.operations.filter((o):o is Selectable=>o.kind==='vector'||o.kind==='stroke'&&o.tool==='brush');}
+export function selectable(layer:Layer):Selectable[]{return layer.operations.filter((o):o is Selectable=>o.kind==='vector'||o.kind==='stroke'&&o.tool==='brush'&&!o.worldStroke);}
 const pathCache=new WeakMap<Selectable,{x:number;y:number}[]>();
 export function polyline(op:Selectable):{x:number;y:number}[]{
  const cached=pathCache.get(op);if(cached)return cached;
@@ -64,11 +64,13 @@ export function inMarquee(op:Selectable,poly:{x:number;y:number}[],mode:PickMode
 export function idsInMarquee(layer:Layer,poly:Point[],mode:PickMode){return selectable(layer).filter(o=>inMarquee(o,poly,mode)).map(o=>o.id);}
 export function nearSelection(p:{x:number;y:number},poly:Point[],tol=0){if(inPoly(p,poly))return true;for(let i=0;i<poly.length;i++)if(segmentDistance(p.x,p.y,poly[i],poly[(i+1)%poly.length])<=tol)return true;return false;}
 export function transformedStroke(op:Stroke,m:Matrix):Stroke{
+ if(op.worldStroke)return op;
  const {inShot:_inShot,inPreviousStage:_inPreviousStage,...editable}=op as Stroke&ArtworkOrigin;
  return op.perspective?{...editable,perspective:multiplyH(affineH(m),op.perspective)}:{...editable,transform:mul(m,op.transform??IDENTITY)};
 }
 /** Apply a fresh projective change outside all previously committed transforms. */
 export function projectiveStroke(op:Stroke,h:H):Stroke{
+ if(op.worldStroke)return op;
  const {inShot:_inShot,inPreviousStage:_inPreviousStage,...editable}=op as Stroke&ArtworkOrigin;
  return {...editable,transform:undefined,perspective:multiplyH(h,op.perspective??affineH(op.transform??IDENTITY))};
 }

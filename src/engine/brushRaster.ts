@@ -22,18 +22,18 @@ const littleEndian=new Uint8Array(new Uint32Array([1]).buffer)[0]===1;
 function documentSafeCanvas(w:number,h:number){const c=document.createElement('canvas');c.width=w;c.height=h;return c;}
 /** New strokes use curves; legacy operations retain their original renderer. */
 let mixedBase:HTMLCanvasElement|undefined;
-export function drawModernStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|'final'='final',geometry?:ReturnType<typeof strokeGeometry>,region?:RasterRegion,pass?:PaintPass){
- if(!stroke.mixStops?.length||pass?.append){drawBaseStroke(ctx,stroke,phase,geometry,region,pass);return;}
+export function drawModernStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|'final'='final',geometry?:ReturnType<typeof strokeGeometry>,region?:RasterRegion,pass?:PaintPass,origin?:{x:number;y:number}){
+ if(!stroke.mixStops?.length||pass?.append){drawBaseStroke(ctx,stroke,phase,geometry,region,pass,origin);return;}
  const c=mixedBase??=document.createElement('canvas');if(c.width!==ctx.canvas.width)c.width=ctx.canvas.width;if(c.height!==ctx.canvas.height)c.height=ctx.canvas.height;const cc=c.getContext('2d')!;cc.clearRect(0,0,c.width,c.height);drawBaseStroke(cc,{...stroke,mixStops:undefined},phase,geometry,undefined,pass);ctx.drawImage(c,0,0);tintMix(ctx,stroke);
 }
-function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|'final'='final',geometry?:ReturnType<typeof strokeGeometry>,region?:RasterRegion,pass?:PaintPass){
+function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|'final'='final',geometry?:ReturnType<typeof strokeGeometry>,region?:RasterRegion,pass?:PaintPass,origin?:{x:number;y:number}){
  const resolved=geometry??(phase==='final'?finalGeometry(stroke):strokeGeometry(stroke,phase));
  if(stroke.dryBristleVersion===3){drawDryBristleV3(ctx,stroke,resolved,region,pass);return;}
  if(stroke.dryBristleVersion===2){drawDryBristleV2(ctx,stroke,resolved,region,pass);return;}
  if(stroke.dryBristleVersion===1){drawDryBristle(ctx,stroke,resolved,region,pass);return;}
  if(stroke.paintTipVersion===2){drawPainting(ctx,stroke,resolved,region,pass);return;}
  if(stroke.paintTipVersion===1){drawTexturedPaint(ctx,stroke,resolved,region,pass);return;}
- if(stroke.engineVersion===9&&isDryMediaV9(stroke.brushKind)){drawDryMediaV9(ctx,stroke,resolved,region,pass);return;}
+ if(stroke.engineVersion===9&&isDryMediaV9(stroke.brushKind)){drawDryMediaV9(ctx,stroke,resolved,region,pass,origin);return;}
  if(stroke.engineVersion===8){if(stroke.brushKind==='airbrush'){drawAirbrushV8(ctx,stroke,resolved,region);return;}if(stroke.brushKind==='dry-grain'||stroke.brushKind==='watercolor'){drawTexturedPaintV8(ctx,stroke,resolved,region,pass);return;}}
  if(stroke.engineVersion===7&&['dry-grain','airbrush'].includes(stroke.brushKind??'')){drawPaintStroke(ctx,stroke,resolved,region);return;}
  if(stroke.flatNibVersion===1&&drawFlatInk(ctx,stroke,resolved,region))return;

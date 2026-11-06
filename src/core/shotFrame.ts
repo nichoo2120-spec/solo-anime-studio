@@ -7,6 +7,11 @@ export function shotFrame(project:Pick<Project,'width'|'height'|'shotFrame'>):Sh
  return project.shotFrame??{x:0,y:0,width:project.width,height:project.height};
 }
 
+/** Existing raster pixels keep their original coordinates and dimensions. */
+export function openInfiniteWorkspace(project:Project):Project{
+ return project.version===6?project:{...project,version:6,shotFrame:shotFrame(project)};
+}
+
 function offsetArtwork(x:number,y:number){
  const shift:Matrix=[1,0,0,1,x,y],forward=affineH(shift);
  const point=<T extends {x:number;y:number}>(p:T):T=>({...p,x:p.x+x,y:p.y+y});

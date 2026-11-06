@@ -3,9 +3,34 @@ import {cameraAt,cameraMatrix,newSceneCamera} from '../src/animation/sceneCamera
 import {activeLayer,appendOperation,MAX_STAGE_PIXELS,MAX_STAGE_SIDE,newProject,validateProject,type Operation,type Project} from '../src/core/model';
 import {coverView,toProject} from '../src/core/geometry';
 import {DocumentStore} from '../src/core/history';
-import {artworkAtOrigin,expandPasteboard,shotFrame} from '../src/core/shotFrame';
+import {artworkAtOrigin,expandPasteboard,openInfiniteWorkspace,shotFrame} from '../src/core/shotFrame';
+import {wheelZoom} from '../src/core/wheelZoom';
 
 describe('drawing outside the shot frame',()=>{
+ it('opens an infinite workspace without moving the original shot or raster layer',()=>{
+  const original=newProject('Original shot',1920,1080);
+  const legacy=expandPasteboard(original,1490,915);
+  for(const project of [original,legacy]){
+   const opened=validateProject(openInfiniteWorkspace(project));
+   expect([opened.version,opened.width,opened.height]).toEqual([6,project.width,project.height]);
+   expect(opened.layers).toBe(project.layers);
+   expect(shotFrame(opened)).toEqual(shotFrame(project));
+   expect(openInfiniteWorkspace(opened)).toBe(opened);
+  }
+ });
+
+ it('saves a signed-coordinate stroke and lets the view zoom down to a thumbnail',()=>{
+  const opened=openInfiniteWorkspace(newProject());
+  const mark:Operation={id:'off-camera',kind:'stroke',tool:'brush',worldStroke:true,points:[{x:-1_250_000,y:412_000,p:.6}],size:12,opacity:1,color:'#123456',pressure:true,response:1};
+  const edited=appendOperation(opened,mark);
+  expect(activeLayer(validateProject(JSON.parse(JSON.stringify(edited)))).operations).toEqual([mark]);
+  const view={x:70_000,y:-12_000,zoom:.03,rotation:0};
+  const anchor={x:120,y:400},out=wheelZoom(view,anchor,180,0,800,.025);
+  expect(out.zoom).toBe(.025);
+  expect(toProject(anchor,out).x).toBeCloseTo(toProject(anchor,view).x,6);
+  expect(toProject(anchor,out).y).toBeCloseTo(toProject(anchor,view).y,6);
+ });
+
  it('keeps existing art, holds and fills in the original shot on reopen',()=>{
   const project=newProject('Shot',640,360),layer=activeLayer(project);
   const operations:Operation[]=[

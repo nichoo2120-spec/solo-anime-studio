@@ -13,6 +13,7 @@ import {finalGeometry} from './geometryCache';
 import {mapPoint,scaleOf} from './strokeSelection';
 import {projectPoint} from './perspectiveWarp';
 import {flattenCubic} from './strokeGeometry';
+import {SparseStrokeTiles,supportsSparseStroke} from './SparseStrokeTiles';
 export const makeCanvas=(w:number,h:number)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
 export const context=(c:HTMLCanvasElement)=>c.getContext('2d',{willReadFrequently:true})!;
 export const blendOperation=(mode:Layer['blend']):GlobalCompositeOperation=>mode==='add'?'lighter':mode&&mode!=='normal'?mode:'source-over';
@@ -56,6 +57,30 @@ export function applyTransform(canvas:HTMLCanvasElement,polygon:Point[],matrix:M
  ctx.save();ctx.transform(...matrix);ctx.drawImage(selection,0,0);ctx.restore();
 }
 export class LayerRenderer {
+ private strokeMeetsPage(stroke:Stroke,p:Project){
+  const bounds=strokeRasterBounds(stroke,p.width,p.height);
+  return bounds.width>0&&bounds.height>0;
+ }
+ private readonly outsideLayers=new Map<string,{width:number;height:number;tiles:SparseStrokeTiles}>();
+ private readonly outsideOps=new WeakMap<Layer['operations'],Stroke[]>();
+ paintOutside(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,live?:Stroke){
+  if(p.version!==6)return;
+  let strokes=this.outsideOps.get(layer.operations);
+  if(!strokes){strokes=layer.operations.filter((op):op is Stroke&{worldStroke:true}=>op.kind==='stroke'&&op.worldStroke===true&&supportsSparseStroke(op));this.outsideOps.set(layer.operations,strokes);}
+  if(!strokes.length&&!live)return;
+  const inverse=ctx.getTransform().inverse(),w=ctx.canvas.width,h=ctx.canvas.height;
+  const points=[inverse.transformPoint({x:0,y:0}),inverse.transformPoint({x:w,y:0}),inverse.transformPoint({x:0,y:h}),inverse.transformPoint({x:w,y:h})];
+  const x=Math.floor(Math.min(...points.map(v=>v.x))),y=Math.floor(Math.min(...points.map(v=>v.y)));
+  const right=Math.ceil(Math.max(...points.map(v=>v.x))),bottom=Math.ceil(Math.max(...points.map(v=>v.y)));
+  if(x>=0&&y>=0&&right<=p.width&&bottom<=p.height)return;
+  let entry=this.outsideLayers.get(layer.id);
+  if(!entry||entry.width!==p.width||entry.height!==p.height){entry?.tiles.dispose();entry={width:p.width,height:p.height,tiles:new SparseStrokeTiles(p)};}
+  this.outsideLayers.delete(layer.id);this.outsideLayers.set(layer.id,entry);
+  if(this.outsideLayers.size>6){const first=this.outsideLayers.keys().next().value!;this.outsideLayers.get(first)!.tiles.dispose();this.outsideLayers.delete(first);}
+  entry.tiles.synchronize(live?[...strokes,live]:strokes);
+  ctx.save();ctx.beginPath();ctx.rect(x,y,right-x,bottom-y);ctx.rect(0,0,p.width,p.height);ctx.clip('evenodd');
+  entry.tiles.paint(ctx,{x,y,width:right-x,height:bottom-y});ctx.restore();
+ }
  displayRevision=0;
  private pendingLayer?:{layer:Layer;project:Project;stroke:Stroke;base:HTMLCanvasElement;preview:HTMLCanvasElement;done:Promise<HTMLCanvasElement|undefined>};
  private finalWorker?:Worker;private finalSerial=0;
@@ -121,7 +146,7 @@ export class LayerRenderer {
    this.bitmaps.set(o.png,image);
   }));
  }
- clear(){this.pendingLayer=undefined;this.cancelFinal();this.finalWorker?.terminate();this.finalWorker=undefined;for(const c of this.caches.values())c.canvas.width=c.canvas.height=0;this.caches.clear();while(this.celRasters.length){const {canvas}=this.releaseCelRaster(this.celRasters.length-1);canvas.width=canvas.height=0;}if(this.scratch)this.scratch.width=this.scratch.height=0;this.scratch=undefined;this.bitmaps.clear();while(this.strokeRasters.size)this.dropStroke();for(const c of this.checkpoints){c.canvas.width=0;c.canvas.height=0;}for(const d of this.deltas)d.patch.clear();this.checkpoints=[];this.checkpointBytes=0;this.deltas=[];this.deltaLookup.clear();this.deltaBytes=0;}
+ clear(){for(const entry of this.outsideLayers.values())entry.tiles.dispose();this.outsideLayers.clear();this.pendingLayer=undefined;this.cancelFinal();this.finalWorker?.terminate();this.finalWorker=undefined;for(const c of this.caches.values())c.canvas.width=c.canvas.height=0;this.caches.clear();while(this.celRasters.length){const {canvas}=this.releaseCelRaster(this.celRasters.length-1);canvas.width=canvas.height=0;}if(this.scratch)this.scratch.width=this.scratch.height=0;this.scratch=undefined;this.bitmaps.clear();while(this.strokeRasters.size)this.dropStroke();for(const c of this.checkpoints){c.canvas.width=0;c.canvas.height=0;}for(const d of this.deltas)d.patch.clear();this.checkpoints=[];this.checkpointBytes=0;this.deltas=[];this.deltaLookup.clear();this.deltaBytes=0;}
  private cancelFinal(){const job=this.pendingFinal;if(job){clearTimeout(job.timer);job.preview.clear();this.pendingFinal=undefined;job.resolve();this.displayRevision++;}}
  private failedFinal(){const request=this.pendingFinal?.request;this.cancelFinal();this.finalWorker?.terminate();this.finalWorker=undefined;request?.();}
  /** A temporary renderer serves only on-screen drawing. Canonical get(), PNG
@@ -203,7 +228,7 @@ export class LayerRenderer {
   const canvas=cached&&cached.canvas.width===p.width&&cached.canvas.height===p.height?cached.canvas:makeCanvas(p.width,p.height),ctx=context(canvas),capture=incremental||!cached&&layer.operations.length===1;let scratch:HTMLCanvasElement|undefined,start=incremental&&cached?cached.layer.operations.length:0;
   if(!incremental){const checkpoint=this.checkpoints.filter(c=>c.id===layer.id&&c.canvas.width===p.width&&c.canvas.height===p.height&&c.operations.length<=layer.operations.length&&c.operations.every((o,i)=>o===layer.operations[i])).sort((a,b)=>b.operations.length-a.operations.length)[0];ctx.clearRect(0,0,p.width,p.height);if(checkpoint){ctx.drawImage(checkpoint.canvas,0,0);start=checkpoint.operations.length;this.checkpoints.splice(this.checkpoints.indexOf(checkpoint),1);this.checkpoints.push(checkpoint);}}
   if(!incremental&&!start)start=this.paintOriginalBounds(ctx,layer,p);
-  for(let i=start;i<layer.operations.length;i++){const op=layer.operations[i];if(capture)this.beforeOperation(layer,canvas,i);else this.replayed++;if(op.kind==='stroke'){const ready=this.strokeRasters.get(op);let source:HTMLCanvasElement,sourceX=0,sourceY=0;if(ready&&ready.width===p.width&&ready.height===p.height){source=ready.canvas as HTMLCanvasElement;sourceX=ready.x;sourceY=ready.y;this.strokeRasters.delete(op);this.strokeRasters.set(op,ready);}else{scratch??=this.scratch??=makeCanvas(p.width,p.height);if(scratch.width!==p.width)scratch.width=p.width;if(scratch.height!==p.height)scratch.height=p.height;const sc=context(scratch);sc.clearRect(0,0,p.width,p.height);drawStroke(sc,op);source=scratch;}compositePaintStroke(ctx,source,op,sourceX,sourceY);}else if(op.kind==='fill'){const image=this.bitmaps.get(op.png);if(image){ctx.save();ctx.globalCompositeOperation=op.under?'destination-over':'source-over';const origin=bitmapOrigin(p,op);ctx.drawImage(image,origin?.x??0,origin?.y??0);ctx.restore();}}else if(op.kind==='image'){const image=this.bitmaps.get(op.png);if(image)ctx.drawImage(image,op.x,op.y,op.width,op.height);}else if(op.kind==='clear'){ctx.save();ctx.globalCompositeOperation='destination-out';polygonPath(ctx,op.polygon);ctx.fill();ctx.restore();}else if(op.kind==='vector')drawVector(ctx,op);else applyTransform(canvas,op.polygon,op.matrix);if(capture){this.afterOperation(layer,canvas,i);this.remember(layer,canvas,i+1);}}
+  for(let i=start;i<layer.operations.length;i++){const op=layer.operations[i];if(capture)this.beforeOperation(layer,canvas,i);else this.replayed++;if(op.kind==='stroke'&&op.worldStroke&&!this.strokeMeetsPage(op,p)){/* Stroke is outside the original page. */}else if(op.kind==='stroke'){const ready=this.strokeRasters.get(op);let source:HTMLCanvasElement,sourceX=0,sourceY=0;if(ready&&ready.width===p.width&&ready.height===p.height){source=ready.canvas as HTMLCanvasElement;sourceX=ready.x;sourceY=ready.y;this.strokeRasters.delete(op);this.strokeRasters.set(op,ready);}else{scratch??=this.scratch??=makeCanvas(p.width,p.height);if(scratch.width!==p.width)scratch.width=p.width;if(scratch.height!==p.height)scratch.height=p.height;const sc=context(scratch);sc.clearRect(0,0,p.width,p.height);drawStroke(sc,op);source=scratch;}compositePaintStroke(ctx,source,op,sourceX,sourceY);}else if(op.kind==='fill'){const image=this.bitmaps.get(op.png);if(image){ctx.save();ctx.globalCompositeOperation=op.under?'destination-over':'source-over';const origin=bitmapOrigin(p,op);ctx.drawImage(image,origin?.x??0,origin?.y??0);ctx.restore();}}else if(op.kind==='image'){const image=this.bitmaps.get(op.png);if(image)ctx.drawImage(image,op.x,op.y,op.width,op.height);}else if(op.kind==='clear'){ctx.save();ctx.globalCompositeOperation='destination-out';polygonPath(ctx,op.polygon);ctx.fill();ctx.restore();}else if(op.kind==='vector')drawVector(ctx,op);else applyTransform(canvas,op.polygon,op.matrix);if(capture){this.afterOperation(layer,canvas,i);this.remember(layer,canvas,i+1);}}
   if(!cached&&layer.operations.length>=(p.width*p.height*4>=4*1024*1024?24:8))this.remember(layer,canvas,layer.operations.length,true);
   this.caches.set(layer.id,{layer,canvas,frame});return canvas;
  }
@@ -218,7 +243,7 @@ export class LayerRenderer {
   const w=options.width??width,h=options.height??height;if(!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||w>8192||h>8192||w*h>16777216)throw Error('Export dimensions must be 1–8192 px and at most 16 megapixels.');
   const canvas=makeCanvas(w,h),ctx=context(canvas);if(!options.transparent){ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);}
   ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-  for(const l of [...p.layers].reverse())if((options.layerId?l.id===options.layerId:l.visible)&&(!l.reference||options.includeReferences===true||options.includeReferences===undefined&&l.exportReference)){const m=cameraMatrix(cam,width,height,layerDepth(p.camera,l.id),x,y);ctx.setTransform(w/width,0,0,h/height,0,0);ctx.transform(...m);ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=blendOperation(l.blend);ctx.drawImage(this.get(l,p),0,0);}
+  for(const l of [...p.layers].reverse())if((options.layerId?l.id===options.layerId:l.visible)&&(!l.reference||options.includeReferences===true||options.includeReferences===undefined&&l.exportReference)){const m=cameraMatrix(cam,width,height,layerDepth(p.camera,l.id),x,y);ctx.setTransform(w/width,0,0,h/height,0,0);ctx.transform(...m);ctx.globalAlpha=l.opacity;ctx.globalCompositeOperation=blendOperation(l.blend);ctx.drawImage(this.get(l,p),0,0);this.paintOutside(ctx,l,p);}
   ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';return canvas;
  }
  compositeShot(p:Project,options:ExportOptions={}){

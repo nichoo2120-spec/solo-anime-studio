@@ -1,0 +1,62 @@
+{
+  "src/core/buildInfo.ts": {
+    "before": "e0f73569cbd4bade167725eb081d2a6da16e858a86d0465e918a19bc7c8a751d",
+    "after": "b588c9028e7ab1beee3a897543d5b3aa7a1364d4858836cef14e17004fe222c7",
+    "why": "Pan, zoom and draw outside the shot with tiles allocated where marks exist."
+  },
+  "src/core/model.ts": {
+    "before": "9f86925c94a41d5b7b6b203c75781ffab9bf4bd3d876fc41aae1bcb44a1dee8d",
+    "after": "8a79e496ebb53b7efcdc15a9fef0fe8605d8d3beecdde5bfdceba7a36f2c1c1e",
+    "why": "Pan, zoom and draw outside the shot with tiles allocated where marks exist."
+  },
+  "src/core/shotFrame.ts": {
+    "before": "93ce11c3ff75d95286e59e9e44e0d21e9757b968749786f3dde92b79d0bef802",
+    "after": "7a138495441608aab8e3c16321de91dee872fe050b1f3b21b1d7b5eba68ee3cf",
+    "why": "Pan, zoom and draw outside the shot with tiles allocated where marks exist."
+  },
+  "src/core/wheelZoom.ts": {
+    "before": "e235b249423e86ca81f74a60adc1616a75421bcd11f6959f73974dac2970a173",
+    "after": "5570879f59bbca764eef7c26e837cff2764b10ce9e4168339327768e8aca2438",
+    "why": "Pan, zoom and draw outside the shot with tiles allocated where marks exist."
+  },
+  "src/engine/StudioEngine.ts": {
+    "before": "0e78deef5beb70d5d11fa45e85a940397621cbeca923940635b12a4bce1ecba2",
+    "after": "e15bdbc8f89fe6396ec90241e4852736ae2aa18d8ac6b0559618492b9dd5bd89",
+    "why": "Pan, zoom and draw outside the shot with tiles allocated where marks exist."
+  },
+  "src/engine/brushRaster.ts": {
+    "before": "13c96bde30dc31c632a91199c02bc966d687b51b46b6eca65ca5f4410f83812f",
+    "after": "6559cb77a81e3bf80e0542bbc90ee0207500db12953ad8be5c84d42639cd15ea",
+    "why": "Pan, zoom and draw outside the shot with tiles allocated where marks exist."
+  },
+  "src/engine/dryMediaV9.ts": {
+    "before": "97d478ef69a075eba3bce71a6fd5125eb081f206f9b85661e1b53f1327aa4161",
+    "after": "661104c1e9d804b51bc8ef403b0e80a4970c163a7c4acb9d7611ffc0a7d7b015",
+    "why": "Pan, zoom and draw outside the shot with tiles allocated where marks exist."
+  },
+  "src/engine/paintCompositing.ts": {
+    "before": "8223fa233fa2864f773cd100ecf35605614d262a9c802cbd120d67ad005dff89",
+    "after": "3c37ba5b2db6cb6eee57456dcba64602c20e25563c4035c7141c0c9d4150c18b",
+    "why": "Pan, zoom and draw outside the shot with tiles allocated where marks exist."
+  },
+  "src/engine/renderer.ts": {
+    "before": "763445086d24e5f98aea330c4aa258597e35ca7e957a11e3b9b9187f8667d8bf",
+    "after": "88ced842ce688dd2721778594ddce11c4c501b77526221760685d9f7237d499e",
+    "why": "Pan, zoom and draw outside the shot with tiles allocated where marks exist."
+  },
+  "src/engine/strokeSelection.ts": {
+    "before": "7394cc5367f693981e6c5c7f521bc45bf9aa3968c1115b1222a63778e56b2685",
+    "after": "337ee44574af3965d17783727a1eab6c1a3c2578faa3922d6224c326cf38c628",
+    "why": "Preserve outside artwork during layer operations that use the original raster page."
+  },
+  "src/ui/App.tsx": {
+    "before": "d29a5714a7726878d260f03d1ff1263296d58670fc94e22c295d434dd8603ebe",
+    "after": "7fb0d9d1c3fed9ed3a7afb95e9993fe93b4c5ff698831aadaa21c913aa3fb2a6",
+    "why": "Pan, zoom and draw outside the shot with tiles allocated where marks exist."
+  },
+  "src/engine/EditingController.ts": {
+    "before": "5503adde583631c833b1f44ce4770a088d43b6488d5b74e2114093ad6bb47110",
+    "after": "326f513d7d5f52d074830b9f7ad51a03468cb10509df1bcd69416a73badd1df2",
+    "why": "Preserve outside artwork during layer operations that use the original raster page."
+  }
+}

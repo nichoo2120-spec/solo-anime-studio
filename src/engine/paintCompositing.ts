@@ -10,12 +10,16 @@ import type {Stroke} from '../core/model';
 import {finalGeometry} from './geometryCache';
 import type {RasterRegion} from './liveRaster';
 /** Bounds include pressure envelopes, wet edges and transformed control points. */
-export function strokeRasterBounds(s:Stroke,width:number,height:number,g=finalGeometry(s)):RasterRegion{
+export function strokeRasterExtent(s:Stroke,g=finalGeometry(s)){
  let pad=(s.dryBristleVersion===1||s.dryBristleVersion===2||s.dryBristleVersion===3)?dryRasterPadding(s):s.brushKind==='airbrush'?s.size*1.4+9:s.size+8;let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
  for(const p of [...g.points,...g.cubics.flatMap(c=>[c.c1,c.c2])]){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);}
  if(s.transform||s.perspective){const [a,b,c,d,e,f]=s.transform??[1,0,0,1,0,0],trace=a*a+b*b+c*c+d*d,det=a*d-b*c;pad*=Math.max(1,Math.sqrt((trace+Math.sqrt(Math.max(0,trace*trace-4*det*det)))*.5));const corners=[{x:left,y:top},{x:right,y:top},{x:left,y:bottom},{x:right,y:bottom}].map(p=>s.perspective?projectPoint(p,s.perspective):({x:a*p.x+c*p.y+e,y:b*p.x+d*p.y+f}));left=Math.min(...corners.map(p=>p.x));right=Math.max(...corners.map(p=>p.x));top=Math.min(...corners.map(p=>p.y));bottom=Math.max(...corners.map(p=>p.y));}
- const x=Math.max(0,Math.min(width,Math.floor(left-pad))),y=Math.max(0,Math.min(height,Math.floor(top-pad)));
- return {x,y,width:Math.max(0,Math.min(width,Math.ceil(right+pad))-x),height:Math.max(0,Math.min(height,Math.ceil(bottom+pad))-y)};
+ return {left:Math.floor(left-pad),top:Math.floor(top-pad),right:Math.ceil(right+pad),bottom:Math.ceil(bottom+pad)};
+}
+export function strokeRasterBounds(s:Stroke,width:number,height:number,g=finalGeometry(s)):RasterRegion{
+ const {left,top,right,bottom}=strokeRasterExtent(s,g);
+ const x=Math.max(0,Math.min(width,left)),y=Math.max(0,Math.min(height,top));
+ return {x,y,width:Math.max(0,Math.min(width,right)-x),height:Math.max(0,Math.min(height,bottom)-y)};
 }
 /** The layer boundary owns opacity. New watercolor modes never alter coverage
  * inside a stroke. Historical strokes and ordinary brushes use Canvas unchanged. */

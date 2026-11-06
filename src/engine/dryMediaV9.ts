@@ -59,7 +59,7 @@ function coverageRow(kind:string,x:number,y:number,seed:number,texture:number){
  }
  return tile;
 }
-export function drawDryMediaV9(ctx:CanvasRenderingContext2D,stroke:Stroke,geometry:Geometry,region?:RasterRegion,pass?:PaintPass){
+export function drawDryMediaV9(ctx:CanvasRenderingContext2D,stroke:Stroke,geometry:Geometry,region?:RasterRegion,pass?:PaintPass,origin?:{x:number;y:number}){
  const kind=stroke.brushKind??'graphite-hb',pencil=isPencil(kind);
  const points:Point[]=pass?.samples.points??(geometry.cubics.length?geometry.cubics.flatMap((c,i)=>flattenCubic(c,pencil?.5:.8).slice(i?1:0)):geometry.points);
  if(!points.length)return;
@@ -105,7 +105,7 @@ export function drawDryMediaV9(ctx:CanvasRenderingContext2D,stroke:Stroke,geomet
  const key=stroke.id+':'+kind+':'+strength;if(key!==coverageKey){coverageKey=key;coverageTiles.clear();}
  for(let row=0;row<h;row++){let coverage:Float64Array|undefined,chunk=-1;for(let col=0;col<w;col++){
   const i=(row*w+col)*4,m=data[i];if(m<1){data[i+3]=0;continue;}
-  const px=x+col,py=y+row;
+  const px=x+col+(origin?.x??0),py=y+row+(origin?.y??0);
   if(size>=32&&(px>>6)!==chunk){coverage=coverageRow(kind,px,py,seed,strength);chunk=px>>6;}
   const grain=coverage?coverage[(py&63)*64+(px&63)]:cachedCoverage(kind,px,py,seed,strength);
   // A lightly scattered graphite line; a stronger deposition at high pressure.
