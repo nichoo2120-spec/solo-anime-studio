@@ -84,7 +84,7 @@ export function ProjectHome({records,open,create,importBackup}:{
         <label className="form-label">Episode name<input value={episodeName} onChange={event=>setEpisodeName(event.target.value)} required maxLength={100}/></label>
         <label className="form-label">Scene name<input value={sceneName} onChange={event=>setSceneName(event.target.value)} required maxLength={100}/></label>
        </>}
-       {(!project||episode)&&<label className="form-label">Canvas size<select value={size} onChange={event=>setSize(event.target.value)}><option value="1920x1080">1920 × 1080 · Full HD</option><option value="1280x720">1280 × 720 · HD</option><option value="1080x1080">1080 × 1080 · Square</option><option value="2048x2048">2048 × 2048 · Square</option></select></label>}
+       {(!project||episode)&&<label className="form-label">Canvas size<select value={size} onChange={event=>setSize(event.target.value)}><option value="1920x1080">1920 × 1080 · Full HD</option><option value="1280x720">1280 × 720 · HD</option><option value="1080x1080">1080 × 1080 · Square</option><option value="2048x2048">2048 × 2048 · Square</option><option value="720x1920">720 × 1920 · Tall portrait</option><option value="1080x1920">1080 × 1920 · Full HD portrait</option><option value="720x1280">720 × 1280 · HD portrait</option></select></label>}
        <button className="accent-button" disabled={!ready||busy} type="submit">{project&&!episode?'Create Episode':'Create Scene'}</button>
       </fieldset>
      </form>
