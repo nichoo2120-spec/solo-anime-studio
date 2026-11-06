@@ -162,9 +162,10 @@ export function structuralGeometry(source:Point[],stabilization:number,smoothnes
  const capture=lowLatencyBase?polishRawCapture(source,corners):source;
  const follower=new TrailingBrush(stabilization,limit,lowLatencyBase?5.5:12),stable=stabilization<=0?capture.map(p=>({...p})):capture.map((p,i)=>{if(corners.has(i)){follower.reset(p);return {...p};}return follower.push(p);});
  if(phase==='final'&&stable.length&&stabilization>0)stable[stable.length-1]={...source.at(-1)!};
+ // Give the neighboring sample the real tip as its smoothing target.
+ if(phase==='live'&&followLiveTip&&stable.length)stable[stable.length-1]={...source.at(-1)!};
  const liveCleaned=liveSmoothness?liveSmoothCapturedPath(stable,smoothness,corners):stable;
  const points=phase==='final'&&finalRefinement?refineCapturedPath(liveCleaned,smoothness,source,(_,i)=>corners.has(i)):liveCleaned;
- if(phase==='live'&&followLiveTip&&points.length)points[points.length-1]={...source.at(-1)!};
  // Restore structural vertices after refinement, which retains all source indices.
  for(const i of corners)points[i]={...source[i]};
  const cubics=interpolateCapturedPoints(points,(_,i)=>corners.has(i));

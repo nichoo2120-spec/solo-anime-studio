@@ -1,0 +1,17 @@
+{
+  "src/engine/strokeSelection.ts": {
+    "before": "337ee44574af3965d17783727a1eab6c1a3c2578faa3922d6224c326cf38c628",
+    "after": "b48dc149e1ce695acd7a7334fb4bd16d685cee23e17807de3661110daa7c96b2",
+    "reason": "Improve hit testing for stretched strokes and smooth the live ink tail."
+  },
+  "src/engine/strokeProcessing.ts": {
+    "before": "98eea24c0da4e8592b8c255a4195855ee1eb80269ce3991ecc372588b90efb72",
+    "after": "6585ee24bdadc5741f5219f83a4cbed2f7ee1ffad852bb7ebe31742a4e886324",
+    "reason": "Improve hit testing for stretched strokes and smooth the live ink tail."
+  },
+  "src/core/buildInfo.ts": {
+    "before": "227b536427cdba5b987dc9134a542a6f6a41e3db39c68191c06eb1b28538aa40",
+    "after": "bfdf09c5f886b4e1cd4500dc27fd6c74e33b2690e83365938eb658e3161029aa",
+    "reason": "Improve hit testing for stretched strokes and smooth the live ink tail."
+  }
+}
