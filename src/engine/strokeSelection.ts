@@ -17,16 +17,24 @@ const pathCache=new WeakMap<Selectable,{x:number;y:number}[]>();
 export function polyline(op:Selectable):{x:number;y:number}[]{
  const cached=pathCache.get(op);if(cached)return cached;
  if(op.kind==='stroke'){
-  const points=op.engineVersion?finalGeometry(op).points:op.points;
-  const result=op.perspective?points.map(p=>projectPoint(p,op.perspective!)):op.transform?points.map(p=>mapPoint(p,op.transform!)):points;pathCache.set(op,result);return result;
+  const geometry=op.engineVersion?finalGeometry(op):undefined;
+  const map=(p:Point):Point=>({...p,...(op.perspective?projectPoint(p,op.perspective):op.transform?mapPoint(p,op.transform):p)});
+  const points=geometry?.cubics.length?geometry.cubics.flatMap((curve,index)=>{
+   // Flatten after the affine transform so a stretched curve keeps its visible bends.
+   if(op.perspective)return flattenCubic(curve,.5).slice(index?1:0).map(map);
+   return flattenCubic({a:map(curve.a),b:map(curve.b),c1:map(curve.c1),c2:map(curve.c2)},.5).slice(index?1:0);
+  }):(geometry?.points??op.points).map(map);
+  pathCache.set(op,points);return points;
  }
  const curves=vectorCubics(op),out:{x:number;y:number}[]=[];
  for(const [i,c] of curves.entries())out.push(...flattenCubic(c,1.8).slice(i?1:0));
  const result=out.length?out:op.nodes;pathCache.set(op,result);return result;
 }
 export function boundsOf(ops:Selectable[]){let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
- for(const op of ops){const pad=(op.kind==='stroke'?op.size*scaleOf(op.transform??IDENTITY):op.width)/2;
-  for(const p of polyline(op)){minX=Math.min(minX,p.x-pad);minY=Math.min(minY,p.y-pad);maxX=Math.max(maxX,p.x+pad);maxY=Math.max(maxY,p.y+pad);}
+ for(const op of ops){const radius=(op.kind==='stroke'?op.size:op.width)/2;
+  const [a,b,c,d]=op.kind==='stroke'&&!op.perspective?op.transform??IDENTITY:IDENTITY;
+  const xPad=radius*Math.hypot(a,c),yPad=radius*Math.hypot(b,d);
+  for(const p of polyline(op)){minX=Math.min(minX,p.x-xPad);minY=Math.min(minY,p.y-yPad);maxX=Math.max(maxX,p.x+xPad);maxY=Math.max(maxY,p.y+yPad);}
  }
  return isFinite(minX)?{x:minX,y:minY,w:Math.max(1,maxX-minX),h:Math.max(1,maxY-minY)}:null;
 }
@@ -39,11 +47,22 @@ export function hitStroke(layer:Layer,p:{x:number;y:number},zoom:number):Selecta
  const ops=selectable(layer),tolerance=7/Math.max(.25,zoom);let winner:Selectable|undefined,best=Infinity;
  for(let i=ops.length-1;i>=0;i--){const op=ops[i];let b=hitBounds.get(op);if(b===undefined){b=boundsOf([op]);hitBounds.set(op,b);}if(!b)continue;
   if(p.x<b.x-tolerance||p.x>b.x+b.w+tolerance||p.y<b.y-tolerance||p.y>b.y+b.h+tolerance)continue;
-  const radius=(op.kind==='stroke'?op.size*scaleOf(op.transform??IDENTITY):op.width)/2;
+  const radius=(op.kind==='stroke'?op.size:op.width)/2;
   const points=polyline(op);let distance=Infinity;
+  const affine=op.kind==='stroke'&&!op.perspective?op.transform:undefined;
+  if(affine){
+   const [a,b,c,d,x,y]=affine,det=a*d-b*c;
+   if(Math.abs(det)>1e-8){
+    const local=(q:{x:number;y:number})=>({x:(d*(q.x-x)-c*(q.y-y))/det,y:(a*(q.y-y)-b*(q.x-x))/det});
+    const tip=local(p),origin=points.map(local);
+    let localDistance=origin.length===1?Math.hypot(tip.x-origin[0].x,tip.y-origin[0].y):Infinity;
+    for(let j=1;j<origin.length;j++)localDistance=Math.min(localDistance,segmentDistance(tip.x,tip.y,origin[j-1],origin[j]));
+    if(localDistance<=radius){const score=localDistance/Math.max(radius,1);if(score<best){best=score;winner=op;}if(best<.0001)break;continue;}
+   }
+  }
   if(points.length===1)distance=Math.hypot(p.x-points[0].x,p.y-points[0].y);
   for(let j=1;j<points.length;j++)distance=Math.min(distance,segmentDistance(p.x,p.y,points[j-1],points[j]));
-  if(distance>radius+tolerance)continue;
+  if(distance>(affine?0:radius)+tolerance)continue;
   const score=distance/Math.max(radius,1);if(score<best-1e-6){best=score;winner=op;}
   if(best<.0001)break; // Exact hit on the uppermost matching stroke.
  }
