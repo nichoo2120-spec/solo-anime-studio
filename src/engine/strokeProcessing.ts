@@ -150,7 +150,7 @@ export function polishRawCapture(points:Point[],corners:Set<number>):Point[]{
 
 /** Revision 5 changes only verified sparse structural cases. Dense filtering
  * and revision 4 saved artwork continue to use the accepted algorithms above. */
-export function structuralGeometry(source:Point[],stabilization:number,smoothness:number,phase:'live'|'final'='final',maximumLag=Infinity,liveSmoothness=false,lowLatencyBase=false,finalRefinement=true){
+export function structuralGeometry(source:Point[],stabilization:number,smoothness:number,phase:'live'|'final'='final',maximumLag=Infinity,liveSmoothness=false,lowLatencyBase=false,finalRefinement=true,followLiveTip=false){
  const turns=source.length<=8?source.slice(1,-1).map((b,j)=>{const a=source[j],c=source[j+2],l=distance(a,b),r=distance(b,c);return {cos:l*r?((b.x-a.x)*(c.x-b.x)+(b.y-a.y)*(c.y-b.y))/(l*r):1,sign:Math.sign((b.x-a.x)*(c.y-b.y)-(b.y-a.y)*(c.x-b.x))};}):[],zig=source.length<=8&&turns.some((t,i)=>i>0&&t.cos<.5&&turns[i-1].cos<.5&&t.sign*turns[i-1].sign<0);
  const corners=new Set<number>();
  for(let i=1;i<source.length-1;i++){const a=source[i-1],b=source[i],c=source[i+1],l=distance(a,b),r=distance(b,c),cos=l*r?((b.x-a.x)*(c.x-b.x)+(b.y-a.y)*(c.y-b.y))/(l*r):1;if(gestureCorner(source,i)||((source.length<=4||zig)&&l>.0001&&r>.0001&&cos<.5))corners.add(i);}
@@ -164,6 +164,7 @@ export function structuralGeometry(source:Point[],stabilization:number,smoothnes
  if(phase==='final'&&stable.length&&stabilization>0)stable[stable.length-1]={...source.at(-1)!};
  const liveCleaned=liveSmoothness?liveSmoothCapturedPath(stable,smoothness,corners):stable;
  const points=phase==='final'&&finalRefinement?refineCapturedPath(liveCleaned,smoothness,source,(_,i)=>corners.has(i)):liveCleaned;
+ if(phase==='live'&&followLiveTip&&points.length)points[points.length-1]={...source.at(-1)!};
  // Restore structural vertices after refinement, which retains all source indices.
  for(const i of corners)points[i]={...source[i]};
  const cubics=interpolateCapturedPoints(points,(_,i)=>corners.has(i));

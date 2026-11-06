@@ -1,0 +1,27 @@
+{
+  "src/ui/App.tsx": {
+    "before": "02284a578eaf154c2e3cdc99b42a13871b013d27e80b4db94ae5ea2066d55600",
+    "after": "7228c4c6d2b73178389a1677e627612f47ccc55ade70ed1cb5f2543d39f1dd24",
+    "reason": "Add project scene actions, image placement, and pointer-following ink preview."
+  },
+  "src/engine/ReferenceController.ts": {
+    "before": "24073612dab91b755c1454ab208fa400a08d429cca32a2a17d44f6f6c1a5ab1c",
+    "after": "769e10c79b8e77426b6a42e64ae41eaad1aa66e8c1e72d0d0ff0bf414af344d1",
+    "reason": "Add project scene actions, image placement, and pointer-following ink preview."
+  },
+  "src/engine/strokeGeometry.ts": {
+    "before": "6bddf7bc60fda73eb62d599f0cc38f5608ccf58f98d5548a0d2984589db7eca5",
+    "after": "12d7a1cffae2f06843be64bb9fb6dd493c73659a83371ccd125dd2f18ce87839",
+    "reason": "Add project scene actions, image placement, and pointer-following ink preview."
+  },
+  "src/engine/strokeProcessing.ts": {
+    "before": "c917ca87ca56ed185f5aaf9c3972c04e044d810085de9024f97523a2fe09a1d2",
+    "after": "98eea24c0da4e8592b8c255a4195855ee1eb80269ce3991ecc372588b90efb72",
+    "reason": "Add project scene actions, image placement, and pointer-following ink preview."
+  },
+  "src/core/buildInfo.ts": {
+    "before": "eeabe8afab7411d71015f103acc80eedd54882c65c1fe63641a0cfd4be765739",
+    "after": "51cf5645283c18dac6d267b425f15178473dcf95345bf58a7daaba2bdefcfeaf",
+    "reason": "Add project scene actions, image placement, and pointer-following ink preview."
+  }
+}
