@@ -18,7 +18,7 @@ export type WatercolorControls={watercolorAppearanceVersion?:1;watercolorShape?:
 export type PressureSettings={minSize?:number;maxSize?:number;minOpacity?:number;maxOpacity?:number;velocityTaper?:boolean};
 export type Matrix = [number,number,number,number,number,number];
 export type PerspectiveMatrix = [number,number,number,number,number,number,number,number,number];
-export type Stroke = {id:string;kind:'stroke';tool:'brush'|'eraser';points:Point[];size:number;opacity:number;color:string;pressure:boolean;response:number;watercolorEngine?:1;mixVersion?:2;nativeMixVersion?:1|2|3;nativeMixAmount?:number;nativeMixRadius?:number;nativeMixPaintLoad?:number;rasterTransformVersion?:1;rasterSourceId?:string;engineVersion?:2|3|4|5|6|7|8|9|10;/** Continuous flat-nib sweep for new strokes only. */flatNibVersion?:1;/** Diameter-scaled soft-paint sampling for new strokes. */paintNibVersion?:1;paintTipVersion?:1|2;/** Reference-guided watercolor coverage and edge pooling, new strokes only. */watercolorVersion?:1|2|3;/** Reference-guided materials on the continuous version-3 front. */watercolorMaterialVersion?:1|2;watercolorSeed?:number;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number;mixStops?:{x:number;y:number;color:string}[];flow?:number;hardness?:number;pressureFlow?:boolean;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;liveRefinementVersion?:1|2|3;/** Canvas zoom captured on pen-down. New strokes only: makes spatial stroke cleanup consistent in screen pixels. */captureZoom?:number;stabilization?:number;smoothness?:number;pressureWidth?:boolean;pressureOpacity?:boolean;pressureCurve?:{x:number;y:number}[];taperStart?:number;taperEnd?:number;brushKind?:string;textureStrength?:number;/** Non-destructive affine transform of one line. */transform?:Matrix;/** Projective transform for independent corner sizing. */perspective?:PerspectiveMatrix}&PressureSettings&WatercolorControls&ColoringControls&DryBristleControls&TipMixControls;
+export type Stroke = {id:string;kind:'stroke';worldStroke?:true;tool:'brush'|'eraser';points:Point[];size:number;opacity:number;color:string;pressure:boolean;response:number;watercolorEngine?:1;mixVersion?:2;nativeMixVersion?:1|2|3;nativeMixAmount?:number;nativeMixRadius?:number;nativeMixPaintLoad?:number;rasterTransformVersion?:1;rasterSourceId?:string;engineVersion?:2|3|4|5|6|7|8|9|10;/** Continuous flat-nib sweep for new strokes only. */flatNibVersion?:1;/** Diameter-scaled soft-paint sampling for new strokes. */paintNibVersion?:1;paintTipVersion?:1|2;/** Reference-guided watercolor coverage and edge pooling, new strokes only. */watercolorVersion?:1|2|3;/** Reference-guided materials on the continuous version-3 front. */watercolorMaterialVersion?:1|2;watercolorSeed?:number;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number;mixStops?:{x:number;y:number;color:string}[];flow?:number;hardness?:number;pressureFlow?:boolean;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;liveRefinementVersion?:1|2|3;/** Canvas zoom captured on pen-down. New strokes only: makes spatial stroke cleanup consistent in screen pixels. */captureZoom?:number;stabilization?:number;smoothness?:number;pressureWidth?:boolean;pressureOpacity?:boolean;pressureCurve?:{x:number;y:number}[];taperStart?:number;taperEnd?:number;brushKind?:string;textureStrength?:number;/** Non-destructive affine transform of one line. */transform?:Matrix;/** Projective transform for independent corner sizing. */perspective?:PerspectiveMatrix}&PressureSettings&WatercolorControls&ColoringControls&DryBristleControls&TipMixControls;
 export type Fill = {id:string;kind:'fill';png:string;under?:boolean};
 export type ImageOperation={id:string;kind:'image';png:string;x:number;y:number;width:number;height:number};
 export type ClearOperation={id:string;kind:'clear';polygon:Point[]};
@@ -27,8 +27,9 @@ export type ArtworkOrigin={inShot?:true;inPreviousStage?:true};
 export type Operation = (Stroke | Fill | Transform | VectorLine | ImageOperation | ClearOperation)&ArtworkOrigin;
 export type BlendMode='normal'|'multiply'|'screen'|'overlay'|'add';
 export type Layer = {id:string;name:string;visible:boolean;locked:boolean;opacity:number;operations:Operation[];kind?:'raster'|'vector';blend?:BlendMode;reference?:boolean;exportReference?:boolean};
-export type Project = {format:'solo-anime-studio';version:1|2|3|4|5;id:string;name:string;width:number;height:number;shotFrame?:ShotFrame;previousStage?:ShotFrame;activeLayerId:string;layers:Layer[];settings:{guides:boolean};createdAt:string;animation?:DrawingTimeline;substitutionShelf?:SubstitutionShelfData;cycleShelf?:CycleShelf;audio?:SceneAudio;motionPlanning?:MotionPlanning;camera?:SceneCamera};
+export type Project = {format:'solo-anime-studio';version:1|2|3|4|5|6;id:string;name:string;width:number;height:number;shotFrame?:ShotFrame;previousStage?:ShotFrame;activeLayerId:string;layers:Layer[];settings:{guides:boolean};createdAt:string;animation?:DrawingTimeline;substitutionShelf?:SubstitutionShelfData;cycleShelf?:CycleShelf;audio?:SceneAudio;motionPlanning?:MotionPlanning;camera?:SceneCamera};
 export const MAX_STAGE_SIDE=8192,MAX_STAGE_PIXELS=16_777_216;
+export const WORLD_STROKE_LIMIT=8_000_000;
 export const uid = () => crypto.randomUUID();
 export function newLayer(name:string,kind:'raster'|'vector'='raster'):Layer {return {id:uid(),name,visible:true,locked:false,opacity:1,operations:[],kind};}
 export function newProject(name='Untitled scene',width=1920,height=1080):Project {
@@ -59,18 +60,20 @@ export function reorderLayer(p:Project,id:string,delta:number):Project {
 }
 const finite=(n:unknown):n is number=>typeof n==='number'&&Number.isFinite(n);
 const bounded=(n:unknown,min:number,max:number)=>finite(n)&&n>=min&&n<=max;
-const point=(p:any)=>p&&finite(p.x)&&finite(p.y)&&Math.abs(p.x)<=1e6&&Math.abs(p.y)<=1e6&&bounded(p.p,0,1)&&(p.v===undefined||bounded(p.v,0,1));
+const pointWithin=(p:any,limit:number)=>p&&finite(p.x)&&finite(p.y)&&Math.abs(p.x)<=limit&&Math.abs(p.y)<=limit&&bounded(p.p,0,1)&&(p.v===undefined||bounded(p.v,0,1));
+const point=(p:any)=>pointWithin(p,1e6);
 export function validateProject(value:unknown):Project {
  const p=value as any;
- if(!p||p.format!=='solo-anime-studio'||![1,2,3,4,5].includes(p.version))throw Error('Unsupported project format or version.');
+ if(!p||p.format!=='solo-anime-studio'||![1,2,3,4,5,6].includes(p.version))throw Error('Unsupported project format or version.');
  const frame=p.shotFrame,expanded=p.version>=4,previous=p.previousStage;
  if(typeof p.id!=='string'||typeof p.name!=='string'||p.name.length>200||typeof p.createdAt!=='string'||!Number.isInteger(p.width)||!Number.isInteger(p.height)||!bounded(p.width,64,expanded?MAX_STAGE_SIDE:4096)||!bounded(p.height,64,expanded?MAX_STAGE_SIDE:4096)||p.width*p.height>(expanded?MAX_STAGE_PIXELS:8388608))throw Error('Invalid project dimensions or metadata.');
  if(expanded){
-  if(!frame||![frame.x,frame.y,frame.width,frame.height].every(Number.isInteger)||frame.x<1||frame.y<1||
+  const margin=p.version===6?0:1;
+  if(!frame||![frame.x,frame.y,frame.width,frame.height].every(Number.isInteger)||frame.x<margin||frame.y<margin||
     !bounded(frame.width,64,4096)||!bounded(frame.height,64,4096)||frame.width*frame.height>8388608||
-    frame.x+frame.width>=p.width||frame.y+frame.height>=p.height)throw Error('Invalid shot frame.');
+    frame.x+frame.width+margin>p.width||frame.y+frame.height+margin>p.height)throw Error('Invalid shot frame.');
  }else if(frame!==undefined)throw Error('Shot frame requires an expanded project.');
- if(previous!==undefined&&(p.version!==5||!previous||![previous.x,previous.y,previous.width,previous.height].every(Number.isInteger)||
+ if(previous!==undefined&&(p.version<5||!previous||![previous.x,previous.y,previous.width,previous.height].every(Number.isInteger)||
     previous.x<0||previous.y<0||previous.x>=frame.x||previous.y>=frame.y||previous.x+previous.width>p.width||previous.y+previous.height>p.height||
     previous.x+previous.width<=frame.x+frame.width||previous.y+previous.height<=frame.y+frame.height))throw Error('Invalid previous drawing area.');
  if(!Array.isArray(p.layers)||p.layers.length<1||p.layers.length>100)throw Error('Projects require 1–100 layers.');
@@ -88,7 +91,8 @@ export function validateProject(value:unknown):Project {
    if(o.inShot!==undefined&&(!expanded||o.inShot!==true))throw Error('Invalid drawing operation frame.');
    if(o.inPreviousStage!==undefined&&(!previous||o.inPreviousStage!==true))throw Error('Invalid drawing operation area.');
    if(o.kind==='stroke'){
-    if(!['brush','eraser'].includes(o.tool)||!bounded(o.size,.1,500)||!bounded(o.opacity,0,1)||!/^#[\da-f]{6}$/i.test(o.color)||typeof o.pressure!=='boolean'||!bounded(o.response,.2,3)||!Array.isArray(o.points)||!o.points.length||o.points.length>200000||!o.points.every(point))throw Error('Invalid stroke data.');
+    if(o.worldStroke!==undefined&&(o.worldStroke!==true||p.version!==6))throw Error('Invalid workspace stroke.');
+    if(!['brush','eraser'].includes(o.tool)||!bounded(o.size,.1,500)||!bounded(o.opacity,0,1)||!/^#[\da-f]{6}$/i.test(o.color)||typeof o.pressure!=='boolean'||!bounded(o.response,.2,3)||!Array.isArray(o.points)||!o.points.length||o.points.length>200000||!o.points.every((v:unknown)=>pointWithin(v,o.worldStroke?WORLD_STROKE_LIMIT:1e6)))throw Error('Invalid stroke data.');
     if(o.engineVersion!==undefined&&o.engineVersion!==2&&o.engineVersion!==3&&o.engineVersion!==4&&o.engineVersion!==5&&o.engineVersion!==6&&o.engineVersion!==7&&o.engineVersion!==8&&o.engineVersion!==9&&o.engineVersion!==10)throw Error('Unsupported stroke renderer.');
     if(o.mixVersion!==undefined&&o.mixVersion!==2)throw Error('Invalid color mixing version.');
     if(o.nativeMixVersion!==undefined&&(![1,2,3].includes(o.nativeMixVersion)||o.tool!=='brush'||o.brushTip==='color-blender'||!bounded(o.nativeMixAmount,0,1)||(o.nativeMixRadius!==undefined&&!bounded(o.nativeMixRadius,.02,1))))throw Error('Invalid native brush mixing version or settings.');

@@ -4,7 +4,7 @@ import {useEffect,useMemo,useRef,useState,useSyncExternalStore,Fragment,type Rea
 import {Plus,ChevronDown,ChevronRight,Folder,Layers,Copy,Trash2,Eye,EyeOff,Lock,Unlock,ArrowUp,ArrowDown,Undo2,Redo2,Maximize,RotateCcw,Settings,Download,Check,Keyboard,X,PanelLeftClose,PanelRightClose,GripVertical,Film,Play,Pause,Square,SkipBack,SkipForward,ChevronsLeft,ChevronsRight,SlidersHorizontal,Palette,Image as ImageIcon,Save,FilePlus,FolderOpen,Clock,MousePointer2,Maximize2,Minimize2,PanelLeftOpen,PanelRightOpen,Link2,MapPinned,Target} from 'lucide-react';
 import {AutosaveWriter} from '../core/AutosaveWriter';
 import {ViewPreferences,documentDirty} from '../core/viewPreferences';
-import {expandPasteboard,shotFrame} from '../core/shotFrame';
+import {openInfiniteWorkspace,shotFrame} from '../core/shotFrame';
 import {CameraViewState} from '../core/CameraViewState';
 import {DocumentStore} from '../core/history';
 import {addDrawingFrame,duplicateDrawingFrame,deleteDrawingFrame,selectDrawingFrame,adjacentFrame,frameList,currentFrameIndex,MAX_DRAWING_FRAMES,frameHold,frameExposureStart,totalExposureFrames,currentExposureRange,setDrawingFrameHold,setDrawingFrameHoldById,holdFromDrag,MAX_FRAME_HOLD,hasIndependentLayers,isLayerHeld,layerKeyStart,layerKeyEnd,setLayerHoldEnd,insertLayerKey,enableIndependentLayers} from '../animation/timeline';
@@ -71,7 +71,11 @@ function IconButton({label,onClick,disabled=false,children,active}:{label:string
 function Range({label,onChange,...rest}:{label:string;value:number;min?:number;max?:number;step?:number;unit?:string;onChange:(n:number)=>void}){return <ExactRange name={label} set={onChange} {...rest}/>;}
 function Section({title,icon,children,open=true}:{title:string;icon?:ReactNode;children:ReactNode;open?:boolean}){return <details className="inspector-section" open={open}><summary>{icon}<span>{title}</span><ChevronDown size={13}/></summary><div className="section-content">{children}</div></details>;}
 type CameraControlProps={camera:CameraViewState;engine:StudioEngine|null};
-function CameraZoom({camera,engine}:CameraControlProps){const view=useSyncExternalStore(camera.subscribe,camera.getSnapshot);return <select aria-label="Canvas zoom" value={String(Math.round(view.zoom*100))} onChange={e=>engine?.zoomTo(+e.target.value/100)}>{![25,50,75,100,150,200,400,800].includes(Math.round(view.zoom*100))&&<option value={Math.round(view.zoom*100)}>{Math.round(view.zoom*100)}%</option>}{[25,50,75,100,150,200,400,800].map(n=><option value={n} key={n}>{n}%</option>)}</select>;}
+function CameraZoom({camera,engine,outside=false}:CameraControlProps&{outside?:boolean}){
+ const view=useSyncExternalStore(camera.subscribe,camera.getSnapshot),percent=Math.round(view.zoom*100);
+ const sizes=[...(outside?[3,5,10]:[]),25,50,75,100,150,200,400,800];
+ return <select aria-label="Canvas zoom" value={String(percent)} onChange={e=>engine?.zoomTo(+e.target.value/100)}>{!sizes.includes(percent)&&<option value={percent}>{percent}%</option>}{sizes.map(n=><option value={n} key={n}>{n}%</option>)}</select>;
+}
 function CameraAngle({camera,engine}:CameraControlProps){const view=useSyncExternalStore(camera.subscribe,camera.getSnapshot);return <label className="rotation-control"><input aria-label="Canvas rotation" type="number" min="-180" max="180" value={Math.round(view.rotation*180/Math.PI)} onChange={e=>engine?.rotate(Math.max(-180,Math.min(180,+e.target.value)))}/>°</label>;}
 function CameraPercent({camera}:{camera:CameraViewState}){const view=useSyncExternalStore(camera.subscribe,camera.getSnapshot);return <>{Math.round(view.zoom*100)}%</>;}
 export function App(){
@@ -523,39 +527,27 @@ export function App(){
   const k=p.camera.keys.find(k=>k.frame===cameraExposure);
   commitCamera({...p,camera:setCameraKey(p.camera,{frame:cameraExposure,...st,x,y,ease:k?.ease??'ease-in-out'})},'Move camera');
  }
- function fullDrawingArea(project:Project){
-  const viewport=canvas.current?.getBoundingClientRect();
-  return validateProject(expandPasteboard(project,viewport?.width??0,viewport?.height??0));
- }
- async function loadStudioProject(project:Project,expectedRevision?:number){
-  const studio=engine.current!;
-  let opened=project;
-  if(project.version===4&&!frameOnly){
-   try{opened=fullDrawingArea(project);}
-   catch{
-    const loaded=await studio.load(project,expectedRevision);
-    if(loaded)notify('Opened in Frame Only. Studio could not expand this drawing area.');
-    return loaded;
-   }
-  }
-  return studio.load(opened,expectedRevision);
+ function loadStudioProject(project:Project,expectedRevision?:number){
+  const opened=project.shotFrame&&!frameOnly?openInfiniteWorkspace(project):project;
+  return engine.current!.load(opened,expectedRevision);
  }
  useEffect(()=>{engine.current?.setOutsideFrame(!frameOnly);},[frameOnly]);
  function toggleOutsideFrame(){
   const current=store.getSnapshot(),studio=engine.current;
   if(!studio||busy||sequenceBusy||operationLock.current||studio.drawing)return;
-  if(current.version===5){setFrameOnly(value=>!value);return;}
+  if(current.version===6){setFrameOnly(value=>!value);return;}
   stopPlayback();clearFlipPreview();
   try{
-   const expanded=fullDrawingArea(current);
+   const expanded=validateProject(openInfiniteWorkspace(current));
    studio.clearSelection();
    studio.setOutsideFrame(true);
-   store.commit(expanded,'Expand outside drawing area');
+   store.commit(expanded,'Open infinite workspace');
    setFrameOnly(false);
+   studio.fit();
   }catch(error){notify(error instanceof Error?error.message:'Could not extend the drawing area.');}
  }
  const frameSize=shotFrame(doc);
- const showingOutside=doc.version===5&&!frameOnly;
+ const showingOutside=doc.version===6&&!frameOnly;
  const maskOutside=!!doc.shotFrame&&!showingOutside;
  const outsideFrameLabel=showingOutside?'Frame Only':'Show Outside Frame';
  function goToCameraExposure(n:number){const item=cameraPlan.find(i=>i.number===n)??cameraPlan.at(-1);if(!item)return;setCameraExposure(item.number);if(doc.animation&&item.frameId!==doc.animation.activeFrameId)goToDrawingFrame(item.frameId);}
@@ -979,7 +971,7 @@ export function App(){
      <div className="local-notice"><span className="local-icon"><Save size={15}/></span><div>Made here. Saved here.<small>Local autosave · every 2.5 seconds after edits</small></div></div>
     </>}
    </aside><div className="panel-resizer left-resizer" role="separator" aria-label="Resize project panel" onPointerDown={e=>resizePanel(e,'left')}/>
-   <main className="center-panel"><div className="canvas-tabbar"><div className="document-tab"><span className="tab-dot"/>{doc.name}<span className="tab-label">{workspaceMode==='DRAW'?'ILLUSTRATION':'ANIMATION'}</span></div><div className="canvas-controls"><MirrorControls engine={engineReady}/><IconButton label="Undo" onClick={undo} disabled={!store.canUndo||busy}><Undo2 size={15}/></IconButton><IconButton label="Redo" onClick={redo} disabled={!store.canRedo||busy}><Redo2 size={15}/></IconButton><span className="vertical-divider"/><CameraZoom camera={camera} engine={engineReady}/><button title="Reset rotation" aria-label="Reset rotation" onClick={()=>engine.current?.rotate(0)}>0°</button><IconButton label="Fit canvas" onClick={()=>engine.current?.fit()}><Maximize size={15}/></IconButton><IconButton label="Reset view" onClick={()=>engine.current?.reset()}><RotateCcw size={15}/></IconButton><button type="button" className={"canvas-focus-tab-action "+(focusMode?"selected":"")} title={focusMode?"Exit Canvas Focus Mode · F9":"Focus Canvas · F9"} aria-label={focusMode?"Exit Canvas Focus Mode (F9)":"Focus Canvas (F9)"} aria-pressed={focusMode} onClick={()=>{setFocusMode(v=>!v);setOnionSettingsOpen(false);}}>{focusMode?<Minimize2 size={14}/>:<Maximize2 size={14}/>}<span>{focusMode?"Exit Focus":"Focus"}</span></button><button type="button" className={"outside-frame-button "+(showingOutside?"selected":"")} title={outsideFrameLabel} onClick={toggleOutsideFrame} disabled={busy||sequenceBusy}>{outsideFrameLabel}</button><CameraAngle camera={camera} engine={engineReady}/></div></div>
+   <main className="center-panel"><div className="canvas-tabbar"><div className="document-tab"><span className="tab-dot"/>{doc.name}<span className="tab-label">{workspaceMode==='DRAW'?'ILLUSTRATION':'ANIMATION'}</span></div><div className="canvas-controls"><MirrorControls engine={engineReady}/><IconButton label="Undo" onClick={undo} disabled={!store.canUndo||busy}><Undo2 size={15}/></IconButton><IconButton label="Redo" onClick={redo} disabled={!store.canRedo||busy}><Redo2 size={15}/></IconButton><span className="vertical-divider"/><CameraZoom camera={camera} engine={engineReady} outside={showingOutside}/><button title="Reset rotation" aria-label="Reset rotation" onClick={()=>engine.current?.rotate(0)}>0°</button><IconButton label="Fit canvas" onClick={()=>engine.current?.fit()}><Maximize size={15}/></IconButton><IconButton label="Reset view" onClick={()=>engine.current?.reset()}><RotateCcw size={15}/></IconButton><button type="button" className={"canvas-focus-tab-action "+(focusMode?"selected":"")} title={focusMode?"Exit Canvas Focus Mode · F9":"Focus Canvas · F9"} aria-label={focusMode?"Exit Canvas Focus Mode (F9)":"Focus Canvas (F9)"} aria-pressed={focusMode} onClick={()=>{setFocusMode(v=>!v);setOnionSettingsOpen(false);}}>{focusMode?<Minimize2 size={14}/>:<Maximize2 size={14}/>}<span>{focusMode?"Exit Focus":"Focus"}</span></button><button type="button" className={"outside-frame-button "+(showingOutside?"selected":"")} title={outsideFrameLabel} onClick={toggleOutsideFrame} disabled={busy||sequenceBusy}>{outsideFrameLabel}</button><CameraAngle camera={camera} engine={engineReady}/></div></div>
     <div className={'canvas-xsheet-row'+(timelineView==='xsheet'?' has-side-xsheet':'')+(xsheetSide==='left'?' xsheet-left':' xsheet-right')}>
     <div className="drawing-workspace" ref={workspace}
      onPointerDownCapture={e=>{

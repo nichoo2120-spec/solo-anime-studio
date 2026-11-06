@@ -12,7 +12,7 @@ export const IDENTITY:Matrix=[1,0,0,1,0,0];
 export function mul(a:Matrix,b:Matrix):Matrix{return [a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];}
 export function mapPoint(p:{x:number;y:number},m:Matrix){return {x:m[0]*p.x+m[2]*p.y+m[4],y:m[1]*p.x+m[3]*p.y+m[5]};}
 export function scaleOf(m:Matrix){return Math.sqrt(Math.max(0.0001,Math.abs(m[0]*m[3]-m[1]*m[2])));}
-export function selectable(layer:Layer):Selectable[]{return layer.operations.filter((o):o is Selectable=>o.kind==='vector'||o.kind==='stroke'&&o.tool==='brush');}
+export function selectable(layer:Layer):Selectable[]{return layer.operations.filter((o):o is Selectable=>o.kind==='vector'||o.kind==='stroke'&&o.tool==='brush'&&!o.worldStroke);}
 const pathCache=new WeakMap<Selectable,{x:number;y:number}[]>();
 export function polyline(op:Selectable):{x:number;y:number}[]{
  const cached=pathCache.get(op);if(cached)return cached;

@@ -5,7 +5,7 @@ import {NavigationSnapshot} from './NavigationSnapshot';
 import {RasterSceneDisplay} from './RasterSceneDisplay';
 import {EditingSceneSnapshot} from './EditingSceneSnapshot';
 import {mirrorMatrix,mirrorPivot,reflectedStroke} from './symmetry';
-import {compositePaintStroke} from './paintCompositing';
+import {compositePaintStroke,strokeRasterBounds,strokeRasterExtent} from './paintCompositing';
 import {commitBandRegion,strokeBand,type BandFrame} from './commitBand';
 import {watercolorShapePath} from './watercolorShapes';
 import {watercolorVelocity} from './watercolorPigment';
@@ -16,12 +16,13 @@ import {colorNibOutline} from './colorNibs';
 import {defaultColorNib,type ColoringControls} from '../core/coloring';
 import {paintingOutline} from './paintingTips';
 let originalFlatOutline:Path2D|undefined;
-import {activeLayer,appendOperation,uid,type Point,type Stroke,type Tool,type Project,type Matrix,type PressureSettings,type WatercolorControls} from '../core/model';
+import {activeLayer,appendOperation,uid,WORLD_STROKE_LIMIT,type Point,type Stroke,type Tool,type Project,type Matrix,type PressureSettings,type WatercolorControls} from '../core/model';
 import {DocumentStore} from '../core/history';
 import {syncActiveFrame} from '../animation/timeline';
 import {followBoundSelectionTransform} from '../animation/motionPlanning';
-import {coverView,fitView,toProject,toScreen,type View} from '../core/geometry';
+import {fitView,toProject,toScreen,type View} from '../core/geometry';
 import {shotFrame} from '../core/shotFrame';
+import {supportsSparseStroke} from './SparseStrokeTiles';
 import {LayerRenderer,makeCanvas,context,drawStroke,polygonPath,applyTransform,blendOperation,paintVectorLayer} from './renderer';
 import {VectorController} from './VectorController';
 import {SmoothingController} from './SmoothingController';
@@ -68,6 +69,13 @@ export class StudioEngine {
  centerMirrorPivot(){this.mirrorDrawing.pivot={x:.5,y:.5};this.mirrorDrawing.center=.5;this.pickMirrorPivot=false;this.request();this.onMirrorChange();}
  tool:Tool='brush';brush={...defaultBrush};view:View={x:0,y:0,zoom:1,rotation:0};space=false;busy=false;
  private outsideFrame=false;
+ private worldOnlyStroke=false;
+ private get infinite(){return this.outsideFrame&&this.store.getSnapshot().version===6;}
+ private get minimumZoom(){return this.infinite ? .025 : .25;}
+ private resizeStrokeScratch(p:Pick<Project,'width'|'height'>){
+  if(this.scratch.width!==p.width)this.scratch.width=p.width;
+  if(this.scratch.height!==p.height)this.scratch.height=p.height;
+ }
  selection:Point[]=[];strokeIds:string[]=[];strokePickMode:PickMode='touch';strokeShape:'rectangle'|'lasso'='lasso';strokeScope:'current'|'visible'='current';strokeMode:'select'|'lasso'|'move'|'scale'|'rotate'|'perspective-move'|'perspective'|'freeform'='select';freeformCornerMode:'scale'|'perspective'='scale';areaTransformMode:'freeform'|'move'|'scale'|'rotate'='freeform';private warpQuad?:XY[];vanishingPoint?:{x:number;y:number};pickVanishingPoint=false;private strokeClipboard?:Selectable[];private strokeExact=new Map<string,{source:Project['layers'][number]['operations'];key:string;operations:Project['layers'][number]['operations']}>();private strokePending?:{x:number;y:number;shift:boolean};transform:TransformSettings={dx:0,dy:0,scale:1,angle:0};
  renderer=new LayerRenderer();private scratch=makeCanvas(1920,1080);private stroke?:Stroke;private pickup?:Pickup;private lasso?:Point[];
  private pan?:{x:number;y:number;vx:number;vy:number};private drag?:{x:number;y:number;settings:TransformSettings;kind:'move'|'scale'|'rotate'|'perspective-move'|'perspective';center:{x:number;y:number};anchor?:{x:number;y:number};corner?:number;edge?:number;startQuad?:XY[]};private cursor?:Point;private navigation?:{x:number;y:number;view:View;alt:boolean;moved:boolean};private rectangleStart?:Point;
@@ -143,7 +151,13 @@ export class StudioEngine {
  diagnosticSnapshot(){const summary=this.diagnostics.summary();return {...summary,tool:this.tool,preset:{...this.preset},device:this.pointerId===undefined?summary.trace?.device??this.device:this.device,pointerId:this.pointerId,rawSamples:this.stroke?.points.length??this.lasso?.length??summary.trace?.sourceSamples??0,geometrySamples:this.stroke?this.liveGeometry?.points.length??0:summary.trace?.geometrySamples??0,segments:this.stroke?this.liveGeometry?.cubics.length??0:summary.trace?.segments??0,pressure:this.stroke?.points.at(-1)?.p??this.cursor?.p,brush:{size:this.brush.size,opacity:this.brush.opacity,smoothness:this.brush.smoothness??0,stabilization:this.brush.stabilization},capture:this.capture?.stats??summary.trace?.audit};}
  private finalizeStroke(stroke?:Stroke){
   this.finalLayerResult=undefined;this.finalBlendResult=undefined;if(!stroke)return undefined;
-  const start=performance.now(),snapshot=strokeSnapshot(stroke);
+  const start=performance.now();
+  if(stroke.worldStroke&&!this.worldOnlyStroke){
+   const {left,top,right,bottom}=strokeRasterExtent(stroke),p=this.store.getSnapshot();
+   if(left>=0&&top>=0&&right<=p.width&&bottom<=p.height)stroke={...stroke,worldStroke:undefined};
+  }
+  const snapshot=strokeSnapshot(stroke);
+  if(snapshot.worldStroke&&this.worldOnlyStroke)return snapshot;
   if(!this.strokeMirror&&this.blendSource&&this.blendWorker.matches(snapshot,this.blendSource)){const pending=this.blendWorker.finish(snapshot);if(pending){this.finalBlendResult={stroke:snapshot,base:this.blendSource,...pending};const ms=performance.now()-start;this.performance.record('finalProcessingMs',ms);this.diagnostics.timing('finalProcessingMs',ms);return snapshot;}}
   const geometry=finalGeometry(snapshot),pencil=!!snapshot.brushKind?.startsWith('graphite-');
   if(!this.mirrorDrawing.enabled&&pencil){const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===this.strokeTarget?.layer);if(layer)this.renderer.deferPencil(snapshot,this.scratch,layer,doc,()=>this.request());}
@@ -217,9 +231,9 @@ export class StudioEngine {
  setOutsideFrame(enabled:boolean){
   if(this.outsideFrame===enabled)return;
   this.outsideFrame=enabled;
-  if(enabled&&this.store.getSnapshot().version===5)this.setView(this.view);
+  if(!enabled&&this.store.getSnapshot().version===6)this.fit();else this.request();
  }
- private fitBounds(){const p=this.store.getSnapshot();return p.version===5&&!this.outsideFrame?shotFrame(p):{x:0,y:0,width:p.width,height:p.height};}
+ private fitBounds(){const p=this.store.getSnapshot();return p.version>=5?shotFrame(p):{x:0,y:0,width:p.width,height:p.height};}
  fit(){
   const bounds=this.fitBounds(),view=fitView(this.width,this.height,bounds.width,bounds.height,this.view.rotation);
   this.setView({...view,...toScreen({x:-bounds.x,y:-bounds.y},view)});
@@ -230,14 +244,13 @@ export class StudioEngine {
  private publishView(){this.viewPending=false;this.onView(this.view);this.paintCursor();}
  setView(view:View,deferNotification=false,interactive=false){
   const project=this.store.getSnapshot();
-  if(this.outsideFrame&&project.version===5)view=coverView(view,this.width,this.height,project.width,project.height);
   const changed=view.x!==this.view.x||view.y!==this.view.y||view.zoom!==this.view.zoom||view.rotation!==this.view.rotation;
-  if(changed&&interactive&&!this.viewMoving&&this.hasRendered&&this.navigationSurface.style.display==='none'&&this.navigationSnapshot.canvas.style.display==='none')this.navigationSnapshot.capture(this.canvas,this.store.getSnapshot(),this.view,this.width,this.height);
+  if(changed&&interactive&&project.version!==6&&!this.viewMoving&&this.hasRendered&&this.navigationSurface.style.display==='none'&&this.navigationSnapshot.canvas.style.display==='none')this.navigationSnapshot.capture(this.canvas,this.store.getSnapshot(),this.view,this.width,this.height);
   if(changed&&interactive)this.beginViewMotion();if(changed&&!deferNotification&&!interactive)this.stopViewMotion();if(changed&&(this.stroke||this.lasso))this.finishGesture('view-change');this.view=view;
   this.onion.setView(view,this.width,this.height,window.devicePixelRatio||1);this.flipbook.setView(view,this.width,this.height,window.devicePixelRatio||1);
   if(deferNotification)this.viewPending=true;else this.publishView();this.request();
  }
- zoomTo(zoom:number){zoom=Math.max(.25,Math.min(8,zoom));const pivot={x:this.width/2,y:this.height/2},p=toProject(pivot,this.view),v={...this.view,zoom};const s=toScreen(p,v);this.setView({...v,x:v.x+pivot.x-s.x,y:v.y+pivot.y-s.y},false,true);}
+ zoomTo(zoom:number){zoom=Math.max(this.minimumZoom,Math.min(8,zoom));const pivot={x:this.width/2,y:this.height/2},p=toProject(pivot,this.view),v={...this.view,zoom};const s=toScreen(p,v);this.setView({...v,x:v.x+pivot.x-s.x,y:v.y+pivot.y-s.y},false,true);}
  rotate(deg:number){const pivot={x:this.width/2,y:this.height/2},p=toProject(pivot,this.view),v={...this.view,rotation:deg*Math.PI/180};const s=toScreen(p,v);this.setView({...v,x:v.x+pivot.x-s.x,y:v.y+pivot.y-s.y});}
  setInput(t:Tool,brush:BrushSettings,preset?:{id:string;name:string}){const next=preset?{...preset}:{id:brush.brushKind??'custom',name:brush.brushKind??'Custom brush'},changed=t!==this.tool,presetChanged=next.id!==this.preset.id||brush.brushKind!==this.brush.brushKind;if((changed||presetChanged&&!this.drawing)&&this.pointerId!==undefined)this.finishGesture(changed?'tool-change':'preset-change');if(this.recorder.recording)this.recorder.event(changed?'tool-change':presetChanged?'preset-change':'brush-settings',{tool:t,preset:next,settings:structuredClone(brush)});if(changed&&(t==='stroke-select'||this.tool==='stroke-select'))this.clearSelection();this.preset=next;this.tool=t;this.canvas.style.cursor='';this.brush=structuredClone(brush);if(t==='brush'&&(this.brush.nativeMixEnabled||workerBlendEligible({...this.brush,...brushStrokeMetadata(this.brush),tool:'brush'})))this.blendWorker.warm();this.paintCursor();this.request();}
  setTool(t:Tool){this.setInput(t,this.brush);}
@@ -354,7 +367,11 @@ export class StudioEngine {
   return this.renderer.get({...layer,id:layer.id+':stroke-transform-preview',operations:cached.operations},p);
  }
  private local(e:PointerEvent|WheelEvent){const r=this.canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
- private point(e:PointerEvent,rect=this.canvas.getBoundingClientRect()):Point {return {...toProject({x:e.clientX-rect.left,y:e.clientY-rect.top},this.view),p:e.pointerType==='pen'?inputPressure(e.pressure,this.stroke?.points.at(-1)?.p):1};}
+ private point(e:PointerEvent,rect=this.canvas.getBoundingClientRect()):Point {
+  const p=toProject({x:e.clientX-rect.left,y:e.clientY-rect.top},this.view);
+  if(this.stroke?.worldStroke){p.x=Math.max(-WORLD_STROKE_LIMIT,Math.min(WORLD_STROKE_LIMIT,p.x));p.y=Math.max(-WORLD_STROKE_LIMIT,Math.min(WORLD_STROKE_LIMIT,p.y));}
+  return {...p,p:e.pointerType==='pen'?inputPressure(e.pressure,this.stroke?.points.at(-1)?.p):1};
+ }
  private down=(e:PointerEvent)=>{
   this.navigationScene.pauseWarmup();
   if(this.flipbook.previewActive){this.recorder.event('ignored-contact',{reason:'flipbook-preview',pointerType:e.pointerType});return;}
@@ -362,6 +379,10 @@ export class StudioEngine {
   if(this.mirrorDrawing.enabled&&!this.mirrorDrawing.lockCenter&&!this.space&&e.button===0&&(this.pickMirrorPivot||Math.hypot(p.x-mirrorPivot(this.mirrorDrawing,doc).x,p.y-mirrorPivot(this.mirrorDrawing,doc).y)<8/this.view.zoom)){this.setMirrorPivot(p);this.mirrorPivotDrag=true;this.pickMirrorPivot=false;this.onMirrorChange();return;}
   if(this.space||this.tool==='hand'||e.button===1){this.pan={...local,vx:this.view.x,vy:this.view.y};return;}
   if(this.tool==='zoom'||this.tool==='rotate'){this.navigation={...local,view:{...this.view},alt:e.altKey,moved:false};return;}
+  const beyond=p.x<0||p.y<0||p.x>doc.width||p.y>doc.height;
+  if(doc.version===6&&beyond&&this.tool!=='brush'&&this.tool!=='eraser'){
+   this.notify('Use a drawing brush or Hard Eraser here.');return;
+  }
   if(this.tool==='eyedropper'){if(p.x>=0&&p.y>=0&&p.x<doc.width&&p.y<doc.height){const pixel=context(this.renderer.composite(doc,{includeReferences:false})).getImageData(Math.floor(p.x),Math.floor(p.y),1,1).data;this.onColor('#'+Array.from(pixel.slice(0,3)).map(n=>n.toString(16).padStart(2,'0')).join(''));}return;}
   const layer=activeLayer(doc);if(this.tool!=='stroke-select'&&(layer.locked||!layer.visible)){this.diagnostics.note('Active layer is locked or hidden.');this.notify('The active layer is locked or hidden.');return;}
   if(layer.reference&&!['lasso','rectangle','transform','stroke-select'].includes(this.tool)){this.notify('Choose an artwork layer to draw. Reference images have their own placement controls.');return;}
@@ -419,12 +440,16 @@ export class StudioEngine {
   }
   if(layer.kind==='vector'){this.notify('Choose a raster layer for Pencil, Eraser or Fill. This layer contains editable vector lines.');return;}
   if(this.tool==='fill'){void this.fill(p);return;}
-  if(p.x<0||p.y<0||p.x>doc.width||p.y>doc.height){this.diagnostics.note('Press began outside project boundaries.');return;}
+  const workspaceStroke=doc.version===6&&!this.mirrorDrawing.enabled&&!this.brush.nativeMixEnabled&&!this.brush.mixColors&&
+   supportsSparseStroke({...this.brush,...brushStrokeMetadata(this.brush),tool:this.tool==='eraser'?'eraser':'brush'});
+  if(beyond&&!workspaceStroke){this.diagnostics.note('Press began outside project boundaries.');if(this.infinite)this.notify('Use Pencil, Solid Paint, Soft Paint or Hard Eraser to draw here.');return;}
+  if(workspaceStroke&&(Math.abs(p.x)>WORLD_STROKE_LIMIT||Math.abs(p.y)>WORLD_STROKE_LIMIT)){this.notify('This point is outside the supported drawing coordinates.');return;}
+  this.worldOnlyStroke=beyond&&workspaceStroke;
   if(this.tool==='brush'&&this.brush.nativeMixEnabled&&layer.operations.length===0){this.notify('Mix needs existing paint on the selected layer. Paint two colours with Paint mode, then switch to Mix on that same layer.');return;}
   if(this.tool==='brush'&&this.brush.brushTip==='color-blender'&&layer.operations.length===0){this.notify('Blender works on paint in the active layer. Select your painted layer first.');return;}
-  this.cancelDrawingWarmup();if(this.tool==='brush'&&this.brush.nativeMixEnabled)this.blendWorker.retryForNewGesture();this.renderer.prepareForInput(doc);this.clearSelection();if(this.scratch.width!==doc.width)this.scratch.width=doc.width;if(this.scratch.height!==doc.height)this.scratch.height=doc.height;
+  this.cancelDrawingWarmup();if(this.tool==='brush'&&this.brush.nativeMixEnabled)this.blendWorker.retryForNewGesture();this.renderer.prepareForInput(doc);this.clearSelection();if(!this.worldOnlyStroke)this.resizeStrokeScratch(doc);
   this.strokeMirror=this.mirrorDrawing.enabled?{matrix:mirrorMatrix(this.mirrorDrawing,doc),id:uid()}:undefined;this.strokeTarget={project:doc.id,layer:layer.id};this.pressureRequested=this.brush.pressure;this.initialPressurePending=this.brush.pressure&&e.pointerType==='pen'&&!(Number.isFinite(e.pressure)&&e.pressure>0);this.sampleTime=e.timeStamp;if(this.initialPressurePending)this.diagnostics.note('Initial pressure is unknown; defer the provisional dot until contact or release.');if(this.brush.velocityTaper&&e.pointerType!=='pen')p.v=1;
-  this.pickup=undefined;this.stroke={id:this.capture.gestureId,kind:'stroke',tool:this.tool,points:[p],size:this.brush.size,opacity:this.brush.opacity,color:this.brush.color,pressure:this.brush.pressure&&e.pointerType==='pen',response:this.brush.response,...brushStrokeMetadata(this.brush),captureZoom:this.view.zoom,stabilization:this.brush.stabilization,smoothness:this.brush.smoothness??0,pressureWidth:this.brush.pressureWidth??true,pressureOpacity:this.brush.pressureOpacity??false,pressureCurve:this.brush.pressureCurve?.map(p=>({...p})),taperStart:this.brush.taperStart??0,taperEnd:this.brush.taperEnd??0,brushKind:this.brush.brushKind,textureStrength:this.brush.textureStrength,nativeMixVersion:this.tool==='brush'&&this.brush.nativeMixEnabled?3:undefined,nativeMixAmount:this.tool==='brush'&&this.brush.nativeMixEnabled?(this.brush.mixAmount??.58):undefined,nativeMixPaintLoad:this.tool==='brush'&&this.brush.nativeMixEnabled?Math.max(0,Math.min(1,this.brush.mixPaintLoad??0)):undefined,nativeMixRadius:this.tool==='brush'&&this.brush.nativeMixEnabled?Math.max(.02,Math.min(1,(this.brush.mixPickupLen??1)/2)):undefined,minSize:this.brush.minSize,maxSize:this.brush.maxSize,minOpacity:this.brush.minOpacity,maxOpacity:this.brush.maxOpacity,velocityTaper:this.brush.velocityTaper&&e.pointerType!=='pen'};if((this.stroke.dryBristleVersion===1||this.stroke.dryBristleVersion===2||this.stroke.dryBristleVersion===3)){this.stroke.dryBristleSeed=watercolorSeedFor(this.stroke.id);p.v=.65;}if(this.stroke.coloringEngine===1){this.stroke.colorSeed=watercolorSeedFor(this.stroke.id);p.v=.65;}if(this.stroke.watercolorMaterialVersion===2||this.stroke.watercolorEngine===1){this.stroke.watercolorSeed=watercolorSeedFor(this.stroke.id);p.v=.65;}if(this.tool==='brush'&&!this.stroke.nativeMixVersion&&this.stroke.brushTip!=='color-blender'&&(this.stroke.watercolorMode==='wet'||!this.stroke.watercolorMode&&this.brush.mixColors)&&layer.operations.length>0){this.stroke.mixStops=[];this.pickup=new Pickup(this.renderer.get(layer,doc),this.brush.mixAmount??.55);this.pickup.update(this.stroke);}this.geometryDirty=true;this.liveGeometry=undefined;this.liveTip=p;if(this.diagnostics.enabled&&this.diagnostics.perEventGeometry)this.refreshLiveGeometry();this.strokeDirty=true;this.request();
+  this.pickup=undefined;this.stroke={id:this.capture.gestureId,kind:'stroke',worldStroke:workspaceStroke?true:undefined,tool:this.tool,points:[p],size:this.brush.size,opacity:this.brush.opacity,color:this.brush.color,pressure:this.brush.pressure&&e.pointerType==='pen',response:this.brush.response,...brushStrokeMetadata(this.brush),captureZoom:this.view.zoom,stabilization:this.brush.stabilization,smoothness:this.brush.smoothness??0,pressureWidth:this.brush.pressureWidth??true,pressureOpacity:this.brush.pressureOpacity??false,pressureCurve:this.brush.pressureCurve?.map(p=>({...p})),taperStart:this.brush.taperStart??0,taperEnd:this.brush.taperEnd??0,brushKind:this.brush.brushKind,textureStrength:this.brush.textureStrength,nativeMixVersion:this.tool==='brush'&&this.brush.nativeMixEnabled?3:undefined,nativeMixAmount:this.tool==='brush'&&this.brush.nativeMixEnabled?(this.brush.mixAmount??.58):undefined,nativeMixPaintLoad:this.tool==='brush'&&this.brush.nativeMixEnabled?Math.max(0,Math.min(1,this.brush.mixPaintLoad??0)):undefined,nativeMixRadius:this.tool==='brush'&&this.brush.nativeMixEnabled?Math.max(.02,Math.min(1,(this.brush.mixPickupLen??1)/2)):undefined,minSize:this.brush.minSize,maxSize:this.brush.maxSize,minOpacity:this.brush.minOpacity,maxOpacity:this.brush.maxOpacity,velocityTaper:this.brush.velocityTaper&&e.pointerType!=='pen'};if((this.stroke.dryBristleVersion===1||this.stroke.dryBristleVersion===2||this.stroke.dryBristleVersion===3)){this.stroke.dryBristleSeed=watercolorSeedFor(this.stroke.id);p.v=.65;}if(this.stroke.coloringEngine===1){this.stroke.colorSeed=watercolorSeedFor(this.stroke.id);p.v=.65;}if(this.stroke.watercolorMaterialVersion===2||this.stroke.watercolorEngine===1){this.stroke.watercolorSeed=watercolorSeedFor(this.stroke.id);p.v=.65;}if(this.tool==='brush'&&!this.stroke.nativeMixVersion&&this.stroke.brushTip!=='color-blender'&&(this.stroke.watercolorMode==='wet'||!this.stroke.watercolorMode&&this.brush.mixColors)&&layer.operations.length>0){this.stroke.mixStops=[];this.pickup=new Pickup(this.renderer.get(layer,doc),this.brush.mixAmount??.55);this.pickup.update(this.stroke);}this.geometryDirty=true;this.liveGeometry=undefined;this.liveTip=p;if(this.diagnostics.enabled&&this.diagnostics.perEventGeometry)this.refreshLiveGeometry();this.strokeDirty=true;this.request();
  };
  private updateDrag(p:Point,e:Pick<PointerEvent,'shiftKey'|'altKey'>){const g=this.drag;if(!g)return;const t=g.settings;if(g.kind==='perspective'){const next=(g.startQuad??this.selection).map(q=>({x:q.x,y:q.y}));if(g.corner!==undefined){const m=this.matrix(),det=m[0]*m[3]-m[1]*m[2],dx=p.x-g.x,dy=p.y-g.y;next[g.corner]={x:next[g.corner].x+(Math.abs(det)>1e-9?(m[3]*dx-m[2]*dy)/det:dx),y:next[g.corner].y+(Math.abs(det)>1e-9?(-m[1]*dx+m[0]*dy)/det:dy)};if(quadValid(next)){this.warpQuad=next;this.request();}}}else if(g.kind==='perspective-move'){const vp=this.vanishingPoint??{x:this.store.getSnapshot().width/2,y:this.store.getSnapshot().height*.35},vx=vp.x-g.center.x,vy=vp.y-g.center.y,d=Math.max(10,Math.hypot(vx,vy)),projection=((p.x-g.x)*vx+(p.y-g.y)*vy)/d,ratio=Math.max(.1,Math.min(8,(d-projection)/d));this.setTransform({dx:t.dx+projection*vx/d,dy:t.dy+projection*vy/d,scale:t.scale*ratio});}else if(g.kind==='move')this.setTransform({dx:t.dx+p.x-g.x,dy:t.dy+p.y-g.y});else if(g.kind==='rotate'){let angle=t.angle+angleDelta(Math.atan2(p.y-g.center.y,p.x-g.center.x),Math.atan2(g.y-g.center.y,g.x-g.center.x))*180/Math.PI;if(e.shiftKey)angle=Math.round(angle/15)*15;this.setTransform({angle});}else{const a=t.angle*Math.PI/180,anchor=e.altKey?g.center:(g.anchor??g.center),local=(q:{x:number;y:number})=>({x:(q.x-anchor.x)*Math.cos(a)+(q.y-anchor.y)*Math.sin(a),y:-(q.x-anchor.x)*Math.sin(a)+(q.y-anchor.y)*Math.cos(a)}),start=local(g),end=local(p),ratio=Math.hypot(end.x,end.y)/(Math.hypot(start.x,start.y)||1),edgeRatio=g.edge===undefined?ratio:Math.abs(g.edge%2===0?end.y/(start.y||1):end.x/(start.x||1)),rx=e.shiftKey?edgeRatio:Math.abs(end.x/(start.x||1)),ry=e.shiftKey?edgeRatio:Math.abs(end.y/(start.y||1));const sx=Math.max(.02,Math.min(50,(t.scaleX??1)*(g.edge===undefined||g.edge%2===1||e.shiftKey?rx:1))),sy=Math.max(.02,Math.min(50,(t.scaleY??1)*(g.edge===undefined||g.edge%2===0||e.shiftKey?ry:1))),offset=local(g.center),cx=offset.x*sx/(t.scaleX??1),cy=offset.y*sy/(t.scaleY??1),center={x:anchor.x+cx*Math.cos(a)-cy*Math.sin(a),y:anchor.y+cx*Math.sin(a)+cy*Math.cos(a)};this.setTransform({scaleX:sx,scaleY:sy,dx:t.dx+center.x-g.center.x,dy:t.dy+center.y-g.center.y});}}
  private move=(e:PointerEvent)=>{
@@ -443,7 +468,7 @@ export class StudioEngine {
 
   if(this.mirrorPivotDrag){this.setMirrorPivot(this.point(e));return;}
   if(this.pan){this.setView({...this.view,x:this.pan.vx+local.x-this.pan.x,y:this.pan.vy+local.y-this.pan.y},true,true);return;}
-  if(this.navigation){const n=this.navigation,dx=local.x-n.x,dy=local.y-n.y;if(Math.hypot(dx,dy)>2)n.moved=true;if(n.moved){if(this.tool==='zoom'){const zoom=Math.max(.25,Math.min(8,n.view.zoom*Math.exp(dx*.008))),anchor=toProject(n,n.view),next={...n.view,zoom},screen=toScreen(anchor,next);this.setView({...next,x:next.x+n.x-screen.x,y:next.y+n.y-screen.y},true,true);}else{const nearCenter=Math.hypot(n.x-this.width/2,n.y-this.height/2)<24,cx=nearCenter?n.x-80:this.width/2,cy=nearCenter?n.y:this.height/2,start=Math.atan2(n.y-cy,n.x-cx),angle=Math.atan2(local.y-cy,local.x-cx);let degrees=(n.view.rotation+angleDelta(angle,start))*180/Math.PI;if(e.shiftKey)degrees=Math.round(degrees/15)*15;this.rotate(degrees);}}return;}
+  if(this.navigation){const n=this.navigation,dx=local.x-n.x,dy=local.y-n.y;if(Math.hypot(dx,dy)>2)n.moved=true;if(n.moved){if(this.tool==='zoom'){const zoom=Math.max(this.minimumZoom,Math.min(8,n.view.zoom*Math.exp(dx*.008))),anchor=toProject(n,n.view),next={...n.view,zoom},screen=toScreen(anchor,next);this.setView({...next,x:next.x+n.x-screen.x,y:next.y+n.y-screen.y},true,true);}else{const nearCenter=Math.hypot(n.x-this.width/2,n.y-this.height/2)<24,cx=nearCenter?n.x-80:this.width/2,cy=nearCenter?n.y:this.height/2,start=Math.atan2(n.y-cy,n.x-cx),angle=Math.atan2(local.y-cy,local.x-cx);let degrees=(n.view.rotation+angleDelta(angle,start))*180/Math.PI;if(e.shiftKey)degrees=Math.round(degrees/15)*15;this.rotate(degrees);}}return;}
   if(this.drag){this.updateDrag(this.point(e),e);this.canvas.style.cursor='none';this.paintCursor();return;}
   if(this.strokePending){const now=this.point(e),start=this.strokePending;if(Math.hypot(now.x-start.x,now.y-start.y)*this.view.zoom>3){if(this.strokeMode==='lasso'||this.strokeShape==='lasso'){if(!this.lasso)this.lasso=[{x:start.x,y:start.y,p:1}];appendPath(this.lasso,now);}else this.lasso=rectangle({x:start.x,y:start.y,p:1},now);this.request();}return;}
   if(this.vectors.drawing){this.acceptVectorMovement(e);return;}
@@ -463,7 +488,7 @@ export class StudioEngine {
   this.pan=undefined;this.drag=undefined;this.canvas.style.cursor='';this.paintCursor();this.releaseCapture();const committed=this.commitStroke(stroke,target);if(stroke)this.diagnostics.committed(stroke.id,committed);this.request();
  };
  private cancel=(e:PointerEvent)=>{if(e.pointerId===this.pointerId&&e.timeStamp>=(this.capture?.started??0)){this.consume(e,true);this.finishGesture('pointercancel');}};private lostCapture=(e:PointerEvent)=>{this.diagnostics.record(e,[],false);if(e.pointerId===this.pointerId&&e.timeStamp>=(this.capture?.started??0)&&!this.canvas.hasPointerCapture(e.pointerId)&&this.drawing)this.finishGesture('lostpointercapture');};private leave=()=>{if(!this.drawing){this.cursor=undefined;this.paintCursor();}};
- private wheel=(e:WheelEvent)=>{e.preventDefault();if(this.drawing||this.busy)return;const next=wheelZoom(this.view,this.local(e),e.deltaY,e.deltaMode,this.height);if(next===this.view)return;this.setView(next,true,true);};
+ private wheel=(e:WheelEvent)=>{e.preventDefault();if(this.drawing||this.busy)return;const next=wheelZoom(this.view,this.local(e),e.deltaY,e.deltaMode,this.height,this.minimumZoom);if(next===this.view)return;this.setView(next,true,true);};
  private async fill(p:Point){
   const doc=this.store.getSnapshot();if(p.x<0||p.y<0||p.x>=doc.width||p.y>=doc.height)return;this.busy=true;this.onBusy(true);const revision=this.store.revision;
   try{
@@ -502,52 +527,59 @@ export class StudioEngine {
   // Native Mix has a dedicated coalescing worker: never duplicate the expensive
   // pencil/dry/watercolor stroke rendering on the pointer/UI thread.
   if(this.stroke?.nativeMixVersion!==undefined&&!this.blendWorker.available())this.strokeDirty=true;
-  if(this.stroke&&this.strokeDirty){this.refreshLiveGeometry();if(this.stroke.nativeMixVersion!==undefined&&this.blendWorker.available()&&!this.strokeMirror){
+  const p=this.store.getSnapshot(),world=p.version===6;
+  if(this.stroke&&this.strokeDirty){this.refreshLiveGeometry();if(this.worldOnlyStroke){const bounds=strokeRasterBounds(this.stroke,p.width,p.height,this.liveGeometry);if(bounds.width&&bounds.height){this.worldOnlyStroke=false;this.resizeStrokeScratch(p);}}
+   if(this.worldOnlyStroke){this.strokeDirty=false;}
+   else if(this.stroke.nativeMixVersion!==undefined&&this.blendWorker.available()&&!this.strokeMirror){
     this.strokeDirty=false;livePainted=false;
   }else if(this.displayInk(this.stroke)&&!(this.initialPressurePending&&this.stroke.points.length===1)){this.liveRaster.reset();if(this.diagnostics.enabled)this.diagnostics.observeLive(this.liveTip);}else{const sc=this.scratch.getContext('2d')!;if(!(this.initialPressurePending&&this.stroke.points.length===1)){const start=this.diagnostics.enabled?performance.now():0;this.performance.measure('liveRasterMs',()=>{const pixels=this.liveRaster.paint(sc,this.stroke!,this.liveGeometry!);this.performance.record('liveDirtyPixels',pixels);});if(this.diagnostics.enabled){this.diagnostics.timing('liveRenderMs',performance.now()-start);this.diagnostics.observeLive(this.liveTip);}}else{sc.clearRect(0,0,this.scratch.width,this.scratch.height);this.liveRaster.reset();}}this.strokeDirty=false;livePainted=true;}
-  const compositeStarted=this.performance.enabled?performance.now():0;const ctx=this.canvas.getContext('2d')!,nativeDpr=window.devicePixelRatio||1,p=this.store.getSnapshot();
+  const compositeStarted=this.performance.enabled?performance.now():0;const ctx=this.canvas.getContext('2d')!,nativeDpr=window.devicePixelRatio||1;
+  const denseStroke=this.worldOnlyStroke?undefined:this.stroke;
+  const corners=[toScreen({x:0,y:0},this.view),toScreen({x:p.width,y:0},this.view),toScreen({x:0,y:p.height},this.view),toScreen({x:p.width,y:p.height},this.view)];
+  const pageVisible=!world||corners.some(q=>q.x>0)&&corners.some(q=>q.x<this.width)&&corners.some(q=>q.y>0)&&corners.some(q=>q.y<this.height);
   // Only the background/rulers use a smaller buffer during navigation. Artwork
   // is on its own compositor surface; drawing and sharp finishing use native DPR.
   const selectionStable=!this.warpQuad&&(!this.selection.length||this.matrix().every((v,i)=>Math.abs(v-[1,0,0,1,0,0][i])<1e-9));
-  const plainView=!this.stroke&&!this.smoothing.previewLayer&&!this.vectors.drawing&&selectionStable;
+  const plainView=!denseStroke&&!this.smoothing.previewLayer&&!this.vectors.drawing&&selectionStable;
   const navigationPixels=this.viewMoving&&plainView,dpr=navigationPixels?Math.min(1,nativeDpr):nativeDpr;
   const W=Math.round(this.width*dpr),H=Math.round(this.height*dpr);if(this.canvas.width!==W)this.canvas.width=W;if(this.canvas.height!==H)this.canvas.height=H;ctx.setTransform(dpr,0,0,dpr,0,0);
-  const navigationGroup=(this.viewMoving||this.viewRefining)&&plainView?this.navigationScene.present(this.navigationSurface,p,this.renderer,this.view):undefined;
-  const snapshotPreview=!navigationGroup&&(this.viewMoving||this.viewRefining&&plainView)&&!this.stroke&&!this.vectors.drawing&&this.navigationSnapshot.present(p,this.view,this.width,this.height);
+  const navigationGroup=!world&&(this.viewMoving||this.viewRefining)&&plainView?this.navigationScene.present(this.navigationSurface,p,this.renderer,this.view):undefined;
+  const snapshotPreview=!world&&!navigationGroup&&(this.viewMoving||this.viewRefining&&plainView)&&!denseStroke&&!this.vectors.drawing&&this.navigationSnapshot.present(p,this.view,this.width,this.height);
   const navigationActive=!!navigationGroup||snapshotPreview;
-  this.navigationHost.style.display='block';this.navigationSurface.style.display=navigationGroup?'block':'none';if(!snapshotPreview)this.navigationSnapshot.hide();
+  this.navigationHost.style.display='block';this.navigationHost.style.background=world?'#fff':'#20272c';this.navigationSurface.style.display=navigationGroup?'block':'none';if(!snapshotPreview)this.navigationSnapshot.hide();
   const paperCos=Math.cos(this.view.rotation)*this.view.zoom,paperSin=Math.sin(this.view.rotation)*this.view.zoom;
-  Object.assign(this.navigationPaper.style,{display:'block',width:p.width+'px',height:p.height+'px',transform:`matrix(${paperCos},${paperSin},${-paperSin},${paperCos},${this.view.x},${this.view.y})`,boxShadow:this.viewMoving?'none':`0 0 ${25/this.view.zoom}px #0008`});
+  Object.assign(this.navigationPaper.style,{display:world?'none':'block',width:p.width+'px',height:p.height+'px',transform:`matrix(${paperCos},${paperSin},${-paperSin},${paperCos},${this.view.x},${this.view.y})`,boxShadow:this.viewMoving?'none':`0 0 ${25/this.view.zoom}px #0008`});
   // Rotated page-edge coverage changes during bitmap copies in Canvas 2D.
   // Retain the original rendering path there rather than changing its pixels.
-  const cachedDrawing=!!this.stroke&&!!this.liveGeometry&&!this.initialPressurePending&&!this.mirrorDrawing.enabled&&!this.strokeMirror&&!this.viewMoving&&!this.viewRefining&&Math.abs(this.view.rotation)<1e-9&&!this.selection.length&&!this.strokeIds.length&&!this.smoothing.previewLayer&&!this.vectors.drawing&&!this.drag&&!this.pan&&!this.navigation;
-  const workingBlend=!!this.stroke&&!this.strokeMirror&&workerBlendEligible(this.stroke)&&this.blendWorker.available()&&!!this.blendSource&&this.blendWorker.matches(this.stroke,this.blendSource);
+  const cachedDrawing=!!denseStroke&&!!this.liveGeometry&&!this.initialPressurePending&&!this.mirrorDrawing.enabled&&!this.strokeMirror&&!this.viewMoving&&!this.viewRefining&&Math.abs(this.view.rotation)<1e-9&&!this.selection.length&&!this.strokeIds.length&&!this.smoothing.previewLayer&&!this.vectors.drawing&&!this.drag&&!this.pan&&!this.navigation;
+  const workingBlend=!!denseStroke&&!this.strokeMirror&&workerBlendEligible(denseStroke)&&this.blendWorker.available()&&!!this.blendSource&&this.blendWorker.matches(denseStroke,this.blendSource);
   // No bitmap arrived yet: the unchanged preview should not trigger a
   // full-project redraw. First-frame startup still renders normally.
-  const blendDirty=workingBlend?this.blendWorker.takeRegion(this.stroke!)??{x:0,y:0,width:0,height:0}:undefined;
-  const changedFrame=cachedDrawing?this.drawingFrames.begin({project:p,renderer:this.renderer,revision:this.renderer.displayRevision,target:this.strokeTarget!.layer,width:W,height:H,dpr,view:this.view},this.stroke!,this.liveGeometry!,blendDirty??(livePainted?this.liveRaster.lastRegion:undefined)):undefined;
+  const blendDirty=workingBlend?this.blendWorker.takeRegion(denseStroke!)??{x:0,y:0,width:0,height:0}:undefined;
+  const changedFrame=cachedDrawing?this.drawingFrames.begin({project:p,renderer:this.renderer,revision:this.renderer.displayRevision,target:this.strokeTarget!.layer,width:W,height:H,dpr,view:this.view},denseStroke!,this.liveGeometry!,blendDirty??(livePainted?this.liveRaster.lastRegion:undefined)):undefined;
   // Canvas scan conversion can change by a few RGBA levels when the left
   // clip origin moves, including integer zoom on 4K surfaces. Keep its origin
   // fixed and limit the vertical band instead; preserve exact native pixels.
   // v0.5.175: commit/undo/redo band. When the only change since the last exact
   // frame is stroke operations added/removed on layers, redraw only the band
   // those strokes cover (same fixed-left-origin rule as live drawing).
-  const overlayFree=!this.stroke&&!this.lasso&&!this.selection.length&&!this.strokeIds.length&&!this.smoothing.previewLayer&&!this.vectors.drawing&&!this.warpQuad&&!this.mirrorDrawing.enabled&&!this.busy&&!this.drag&&!this.pan&&!this.navigation&&!['vector','transform','stroke-select','lasso','select'].includes(this.tool);
+  const overlayFree=!denseStroke&&!this.lasso&&!this.selection.length&&!this.strokeIds.length&&!this.smoothing.previewLayer&&!this.vectors.drawing&&!this.warpQuad&&!this.mirrorDrawing.enabled&&!this.busy&&!this.drag&&!this.pan&&!this.navigation&&!['vector','transform','stroke-select','lasso','select'].includes(this.tool);
   const frameState={p,W,H,dpr,x:this.view.x,y:this.view.y,zoom:this.view.zoom,rotation:this.view.rotation,revision:this.renderer.displayRevision,exact:false};
-  const commitBand=!changedFrame&&overlayFree&&!navigationActive&&!this.viewMoving&&!this.viewRefining?commitBandRegion(this.lastExactFrame,frameState):undefined;
+  const commitBand=!world&&!changedFrame&&overlayFree&&!navigationActive&&!this.viewMoving&&!this.viewRefining?commitBandRegion(this.lastExactFrame,frameState):undefined;
   this.performance.record('commitBandPixels',commitBand?commitBand.width*commitBand.height:-1);this.lastCommitBand=commitBand;
   const dirtyFrame=changedFrame?{...changedFrame,x:0,width:changedFrame.x+changedFrame.width}:commitBand;
-  const warmDrawing=!this.stroke&&(this.tool==='brush'||this.tool==='eraser')&&!this.drawing&&!this.viewMoving&&!this.viewRefining&&Math.abs(this.view.rotation)<1e-9&&!this.selection.length&&!this.strokeIds.length&&!this.mirrorDrawing.enabled;
+  const warmDrawing=pageVisible&&!denseStroke&&(this.tool==='brush'||this.tool==='eraser')&&!this.drawing&&!this.viewMoving&&!this.viewRefining&&Math.abs(this.view.rotation)<1e-9&&!this.selection.length&&!this.strokeIds.length&&!this.mirrorDrawing.enabled;
   if(warmDrawing)this.drawingFrames.warm({project:p,renderer:this.renderer,revision:this.renderer.displayRevision,target:p.activeLayerId,width:W,height:H,dpr,view:this.view});else if(!cachedDrawing)this.drawingFrames.invalidate();
   this.performance.record('displayDirtyPixels',dirtyFrame?dirtyFrame.width*dirtyFrame.height:W*H);this.performance.record('displayViewportPixels',W*H);
   ctx.save();if(dirtyFrame){ctx.resetTransform();ctx.beginPath();ctx.rect(dirtyFrame.x,dirtyFrame.y,dirtyFrame.width,dirtyFrame.height);ctx.clip();ctx.setTransform(dpr,0,0,dpr,0,0);}
   // Page decoration belongs to the browser compositor. The drawing canvas still
   // receives an opaque white page, so screen/multiply/add keep their exact math.
   ctx.save();ctx.resetTransform();if(dirtyFrame)ctx.clearRect(dirtyFrame.x,dirtyFrame.y,dirtyFrame.width,dirtyFrame.height);else ctx.clearRect(0,0,W,H);ctx.restore();
-  if(!navigationActive){ctx.save();ctx.translate(this.view.x,this.view.y);ctx.rotate(this.view.rotation);ctx.scale(this.view.zoom,this.view.zoom);ctx.fillStyle='#fff';ctx.fillRect(0,0,p.width,p.height);ctx.restore();}
+  if(world){ctx.fillStyle='#fff';ctx.fillRect(0,0,this.width,this.height);}
+  else if(!navigationActive){ctx.save();ctx.translate(this.view.x,this.view.y);ctx.rotate(this.view.rotation);ctx.scale(this.view.zoom,this.view.zoom);ctx.fillStyle='#fff';ctx.fillRect(0,0,p.width,p.height);ctx.restore();}
   const cachedBelow=cachedDrawing?this.drawingFrames.restore(ctx,dirtyFrame):undefined;
   // v0.5.162: exact main-thread snapshot of the bottom raster group (see EditingSceneSnapshot).
-  const snapshotKey=!cachedBelow&&!navigationActive&&!this.viewMoving&&!this.viewRefining&&!this.selection.length&&!this.strokeIds.length&&!this.smoothing.previewLayer&&!this.vectors.drawing?this.editingSnapshot.group(p,this.renderer,W,H,dpr,this.view,this.stroke?this.strokeTarget?.layer:p.activeLayerId):undefined;
+  const snapshotKey=pageVisible&&!cachedBelow&&!navigationActive&&!this.viewMoving&&!this.viewRefining&&!this.selection.length&&!this.strokeIds.length&&!this.smoothing.previewLayer&&!this.vectors.drawing?this.editingSnapshot.group(p,this.renderer,W,H,dpr,this.view,denseStroke?this.strokeTarget?.layer:p.activeLayerId):undefined;
   const snapshotGroup=snapshotKey?this.editingSnapshot.restore(ctx,snapshotKey,dirtyFrame):undefined;
   let snapshotPending=!!snapshotKey&&!snapshotGroup&&!dirtyFrame;
   ctx.imageSmoothingEnabled=this.view.zoom*dpr<=1;ctx.imageSmoothingQuality=this.viewMoving?'low':'high';
@@ -555,55 +587,61 @@ export class StudioEngine {
   // Build the selected-stroke lookup once per render instead of re-scanning every
   // selected ID against all operations on every layer (quadratic on dense projects).
   const selectedStrokeIds=new Set(this.strokeIds);
+  if(this.viewRefining&&world)this.viewRefining=false;
   if(this.viewRefining&&plainView){let ready=true;for(const layer of p.layers)if(layer.visible&&layer.operations.length&&!this.inkDisplay.primeView(ctx,layer,p,this.renderer))ready=false;if(ready){this.viewRefining=false;this.request();}}
   // The cached preview already has mip levels. Expensive high-quality software
   // resampling on every wheel tick stalls presentation even when JS is fast.
   // Restore full-quality sampling on the settled frame.
   ctx.imageSmoothingQuality=this.viewMoving||this.viewRefining?'low':'high';
-  const rasterGroup=cachedBelow??navigationGroup??snapshotGroup??(snapshotPreview?new Set(p.layers.map(l=>l.id)):(!this.selection.length&&!this.strokeIds.length&&!this.smoothing.previewLayer&&!this.vectors.drawing?this.rasterScene.paint(ctx,p,this.renderer,this.stroke?this.strokeTarget?.layer:undefined):undefined));
+  const rasterGroup=cachedBelow??navigationGroup??snapshotGroup??(snapshotPreview?new Set(p.layers.map(l=>l.id)):(pageVisible&&!this.selection.length&&!this.strokeIds.length&&!this.smoothing.previewLayer&&!this.vectors.drawing?this.rasterScene.paint(ctx,p,this.renderer,denseStroke?this.strokeTarget?.layer:undefined):undefined));
   const snapshotTop=snapshotPending?snapshotKey!.layers[snapshotKey!.layers.length-1].id:undefined;let snapshotPassed=false;
-  for(const l of [...p.layers].reverse()){if(snapshotPending&&snapshotPassed){this.editingSnapshot.capture(ctx,snapshotKey!);snapshotPending=false;}if(l.id===snapshotTop)snapshotPassed=true;if(!l.visible||rasterGroup?.has(l.id))continue;if(cachedDrawing&&l.id===this.strokeTarget!.layer)this.drawingFrames.capture(ctx);ctx.globalCompositeOperation=blendOperation(l.blend);let displayed=this.smoothing.previewLayer?.id===l.id?this.smoothing.previewLayer:this.vectors.layerPreview(l);if(l.kind==='vector'&&l.id===p.activeLayerId&&this.selection.length&&!this.strokeIds.length)displayed=this.vectors.transformedLayer(l,this.selection,this.matrix());// Empty layers contribute no pixels. Avoid repeatedly scaling full-size blank
+  for(const l of [...p.layers].reverse()){if(snapshotPending&&snapshotPassed){this.editingSnapshot.capture(ctx,snapshotKey!);snapshotPending=false;}if(l.id===snapshotTop)snapshotPassed=true;if(!pageVisible||!l.visible||rasterGroup?.has(l.id))continue;if(cachedDrawing&&l.id===this.strokeTarget!.layer)this.drawingFrames.capture(ctx);ctx.globalCompositeOperation=blendOperation(l.blend);let displayed=this.smoothing.previewLayer?.id===l.id?this.smoothing.previewLayer:this.vectors.layerPreview(l);if(l.kind==='vector'&&l.id===p.activeLayerId&&this.selection.length&&!this.strokeIds.length)displayed=this.vectors.transformedLayer(l,this.selection,this.matrix());// Empty layers contribute no pixels. Avoid repeatedly scaling full-size blank
    // bitmaps while a brush is active, especially below 100% zoom.
-   if(!displayed.operations.length&&!(this.stroke&&l.id===this.strokeTarget?.layer)&&!(l.id===p.activeLayerId&&this.selection.length))continue;
+   if(!displayed.operations.length&&!(denseStroke&&l.id===this.strokeTarget?.layer)&&!(l.id===p.activeLayerId&&this.selection.length))continue;
    if(l.kind==='vector'){ctx.globalAlpha=l.opacity;if(!selectionStable&&displayed.operations.some(o=>selectedStrokeIds.has(o.id))){const ids=selectedStrokeIds,h=this.projectiveMatrix(),m=this.matrix();paintVectorLayer(ctx,{...displayed,opacity:1,operations:displayed.operations.map(o=>!ids.has(o.id)||o.kind!=='vector'?o:h?projectiveVector(o,h):transformVector(o,m))});}else if(displayed.operations.every(o=>o.kind==='vector'&&!o.inShot&&!o.inPreviousStage)){
     // Draw actual vector paths at device resolution. For opacity/blend layers,
     // paintVectorLayer isolates the group at display resolution as well.
     ctx.globalAlpha=1;paintVectorLayer(ctx,displayed);
    }else{ctx.drawImage(this.renderer.getDisplay(displayed,p),0,0);}continue;}
    if((cachedDrawing||warmDrawing)&&this.drawingFrames.paintInk(ctx,l))continue;
-   if(!(this.stroke&&l.id===this.strokeTarget?.layer&&this.initialPressurePending&&this.stroke.points.length===1)&&!this.mirrorDrawing.enabled&&(selectionStable||!displayed.operations.some(o=>selectedStrokeIds.has(o.id)))&&!(l.id===p.activeLayerId&&this.selection.length&&!selectionStable)&&this.inkDisplay.paint(ctx,displayed,p,this.stroke&&l.id===this.strokeTarget?.layer?this.stroke:undefined,this.stroke&&l.id===this.strokeTarget?.layer?this.liveGeometry:undefined,this.renderer)){if(cachedDrawing||warmDrawing)this.drawingFrames.rememberInk(l.id,this.inkDisplay.cachedSurface(l.id));continue;}
+   if(!(denseStroke&&l.id===this.strokeTarget?.layer&&this.initialPressurePending&&denseStroke.points.length===1)&&!this.mirrorDrawing.enabled&&(selectionStable||!displayed.operations.some(o=>selectedStrokeIds.has(o.id)))&&!(l.id===p.activeLayerId&&this.selection.length&&!selectionStable)&&this.inkDisplay.paint(ctx,displayed,p,denseStroke&&l.id===this.strokeTarget?.layer?denseStroke:undefined,denseStroke&&l.id===this.strokeTarget?.layer?this.liveGeometry:undefined,this.renderer)){if(cachedDrawing||warmDrawing)this.drawingFrames.rememberInk(l.id,this.inkDisplay.cachedSurface(l.id));continue;}
    let c=this.renderer.getDisplay(displayed,p);
    if(!selectionStable&&displayed.operations.some(o=>selectedStrokeIds.has(o.id))){ctx.globalAlpha=l.opacity;ctx.drawImage(this.exactStrokePreview(displayed,p),0,0);continue;}
-   const workerPreview=this.stroke&&l.id===this.strokeTarget?.layer&&!this.strokeMirror&&workerBlendEligible(this.stroke)?this.blendWorker.preview(this.stroke,c,this.liveGeometry):undefined;
-   if(workerPreview){this.blendSource=c;c=workerPreview;}else if(this.stroke?l.id===this.strokeTarget?.layer:l.id===p.activeLayerId&&this.selection.length&&!selectionStable){const preview=this.previewSurface;if(preview.width!==p.width){preview.width=p.width;this.previewStrokeId='';}if(preview.height!==p.height){preview.height=p.height;this.previewStrokeId='';}const pc=preview.getContext('2d')!,samePreview=this.stroke&&this.previewStrokeId===this.stroke.id&&this.previewBase===c&&this.previewBaseOperations===displayed.operations;
+   const workerPreview=denseStroke&&l.id===this.strokeTarget?.layer&&!this.strokeMirror&&workerBlendEligible(denseStroke)?this.blendWorker.preview(denseStroke,c,this.liveGeometry):undefined;
+   if(workerPreview){this.blendSource=c;c=workerPreview;}else if(denseStroke?l.id===this.strokeTarget?.layer:l.id===p.activeLayerId&&this.selection.length&&!selectionStable){const preview=this.previewSurface;if(preview.width!==p.width){preview.width=p.width;this.previewStrokeId='';}if(preview.height!==p.height){preview.height=p.height;this.previewStrokeId='';}const pc=preview.getContext('2d')!,samePreview=denseStroke&&this.previewStrokeId===denseStroke.id&&this.previewBase===c&&this.previewBaseOperations===displayed.operations;
     const dirty=samePreview&&livePainted&&!this.strokeMirror?this.liveRaster.lastRegion:undefined;
     if(!samePreview||livePainted){
      pc.globalCompositeOperation='source-over';pc.globalAlpha=1;
      if(dirty){const {x,y,width,height}=dirty;
-      if(width>0&&height>0){pc.clearRect(x,y,width,height);pc.drawImage(c,x,y,width,height,x,y,width,height);compositePaintStroke(pc,this.scratch,this.stroke!,0,0,dirty,c);}
+      if(width>0&&height>0){pc.clearRect(x,y,width,height);pc.drawImage(c,x,y,width,height,x,y,width,height);compositePaintStroke(pc,this.scratch,denseStroke!,0,0,dirty,c);}
      }else{
       pc.clearRect(0,0,p.width,p.height);pc.drawImage(c,0,0);
-      if(this.stroke){compositePaintStroke(pc,this.scratch,this.stroke,0,0,undefined,c);if(this.strokeMirror){const reflected=this.mirrorSurface??=makeCanvas(p.width,p.height);if(reflected.width!==p.width)reflected.width=p.width;if(reflected.height!==p.height)reflected.height=p.height;const rc=reflected.getContext('2d')!;rc.clearRect(0,0,p.width,p.height);rc.save();rc.transform(...this.strokeMirror.matrix);rc.drawImage(this.scratch,0,0);rc.restore();compositePaintStroke(pc,reflected,reflectedStroke(this.stroke,this.strokeMirror.matrix,this.strokeMirror.id));}}
+      if(denseStroke){compositePaintStroke(pc,this.scratch,denseStroke,0,0,undefined,c);if(this.strokeMirror){const reflected=this.mirrorSurface??=makeCanvas(p.width,p.height);if(reflected.width!==p.width)reflected.width=p.width;if(reflected.height!==p.height)reflected.height=p.height;const rc=reflected.getContext('2d')!;rc.clearRect(0,0,p.width,p.height);rc.save();rc.transform(...this.strokeMirror.matrix);rc.drawImage(this.scratch,0,0);rc.restore();compositePaintStroke(pc,reflected,reflectedStroke(denseStroke,this.strokeMirror.matrix,this.strokeMirror.id));}}
       else if(this.selection.length)applyTransform(preview,this.selection,this.matrix());
      }
     }
-    if(this.stroke){this.previewStrokeId=this.stroke.id;this.previewBase=c;this.previewBaseOperations=displayed.operations;}
+    if(denseStroke){this.previewStrokeId=denseStroke.id;this.previewBase=c;this.previewBaseOperations=displayed.operations;}
     else{this.previewStrokeId='';this.previewBase=undefined;this.previewBaseOperations=undefined;}
     c=preview;}
    ctx.globalAlpha=l.opacity;ctx.drawImage(c,0,0);
   }if(snapshotPending&&snapshotPassed){this.editingSnapshot.capture(ctx,snapshotKey!);snapshotPending=false;}
   // Animation can change cels again before a navigation preview is useful.
   // Build it when the animator actually pans or zooms instead.
-  if(plainView&&!p.animation&&!this.viewMoving&&!this.viewRefining&&!this.busy)this.navigationScene.warm(p,this.renderer);
+  if(!world&&plainView&&!p.animation&&!this.viewMoving&&!this.viewRefining&&!this.busy)this.navigationScene.warm(p,this.renderer);
   ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';this.vectors.renderNewLayer(ctx);if(this.tool==='vector')this.vectors.renderHandles(ctx,this.view.zoom);
-  frameState.exact=overlayFree&&!navigationActive&&!this.viewMoving&&!this.viewRefining&&!this.initialPressurePending;this.lastExactFrame=this.stroke?strokeBand(this.lastExactFrame,frameState,dirtyFrame,this.stroke.points.length):frameState.exact?{...frameState,band:!!commitBand}:undefined;
+  frameState.exact=overlayFree&&!navigationActive&&!this.viewMoving&&!this.viewRefining&&!this.initialPressurePending;this.lastExactFrame=denseStroke?strokeBand(this.lastExactFrame,frameState,dirtyFrame,denseStroke.points.length):frameState.exact?{...frameState,band:!!commitBand}:undefined;
   if(!snapshotPreview&&this.mirrorDrawing.enabled&&this.mirrorDrawing.showLine){
    ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.strokeStyle='#3fe0f0';ctx.lineWidth=1/this.view.zoom;ctx.setLineDash([6/this.view.zoom,5/this.view.zoom]);
    const pivot=mirrorPivot(this.mirrorDrawing,p),split=this.mirrorDrawing.axis==='vertical'?pivot.x:pivot.y;
    ctx.beginPath();if(this.mirrorDrawing.axis==='vertical'){ctx.moveTo(split,0);ctx.lineTo(split,p.height);}else{ctx.moveTo(0,split);ctx.lineTo(p.width,split);}ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.arc(pivot.x,pivot.y,6/this.view.zoom,0,Math.PI*2);ctx.moveTo(pivot.x-10/this.view.zoom,pivot.y);ctx.lineTo(pivot.x+10/this.view.zoom,pivot.y);ctx.moveTo(pivot.x,pivot.y-10/this.view.zoom);ctx.lineTo(pivot.x,pivot.y+10/this.view.zoom);ctx.stroke();ctx.restore();
   }
-  if(!snapshotPreview&&p.settings.guides){const guide=p.version===5?shotFrame(p):{x:0,y:0,width:p.width,height:p.height};ctx.strokeStyle='#8cabb845';ctx.lineWidth=1/this.view.zoom;const inset=Math.min(guide.width,guide.height)*.035;ctx.strokeRect(guide.x+inset,guide.y+inset,guide.width-inset*2,guide.height-inset*2);ctx.setLineDash([8/this.view.zoom,8/this.view.zoom]);ctx.beginPath();ctx.moveTo(guide.x+guide.width/2,guide.y);ctx.lineTo(guide.x+guide.width/2,guide.y+18/this.view.zoom);ctx.moveTo(guide.x,guide.y+guide.height/2);ctx.lineTo(guide.x+18/this.view.zoom,guide.y+guide.height/2);ctx.stroke();ctx.setLineDash([]);}
+  if(!snapshotPreview&&p.settings.guides){const guide=p.version>=5?shotFrame(p):{x:0,y:0,width:p.width,height:p.height};ctx.strokeStyle='#8cabb845';ctx.lineWidth=1/this.view.zoom;const inset=Math.min(guide.width,guide.height)*.035;ctx.strokeRect(guide.x+inset,guide.y+inset,guide.width-inset*2,guide.height-inset*2);ctx.setLineDash([8/this.view.zoom,8/this.view.zoom]);ctx.beginPath();ctx.moveTo(guide.x+guide.width/2,guide.y);ctx.lineTo(guide.x+guide.width/2,guide.y+18/this.view.zoom);ctx.moveTo(guide.x,guide.y+guide.height/2);ctx.lineTo(guide.x+18/this.view.zoom,guide.y+guide.height/2);ctx.stroke();ctx.setLineDash([]);}
   ctx.restore();ctx.save();ctx.translate(this.view.x,this.view.y);ctx.rotate(this.view.rotation);ctx.scale(this.view.zoom,this.view.zoom);
+  if(world){
+   const live=this.stroke?.worldStroke&&!(this.initialPressurePending&&this.stroke.points.length===1)?strokeSnapshot(this.stroke):undefined;
+   for(const layer of [...p.layers].reverse())if(layer.visible){ctx.globalAlpha=layer.opacity;ctx.globalCompositeOperation=blendOperation(layer.blend);this.renderer.paintOutside(ctx,layer,p,layer.id===this.strokeTarget?.layer?live:undefined);}
+   ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+  }
   if(this.lasso||this.selection.length&&!this.strokeIds.length){ctx.save();if(!this.lasso)ctx.transform(...this.matrix());polygonPath(ctx,this.lasso??this.selection);ctx.lineWidth=1/this.view.zoom;ctx.strokeStyle='#55d9c4';ctx.setLineDash([5/this.view.zoom,4/this.view.zoom]);ctx.stroke();ctx.restore();}
   // Highlight the REAL selected line paths. Picking shows no rectangular box.
   if(!snapshotPreview&&this.tool==='stroke-select'&&this.strokeIds.length){
