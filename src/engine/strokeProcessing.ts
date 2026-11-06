@@ -164,6 +164,7 @@ export function structuralGeometry(source:Point[],stabilization:number,smoothnes
  if(phase==='final'&&stable.length&&stabilization>0)stable[stable.length-1]={...source.at(-1)!};
  const liveCleaned=liveSmoothness?liveSmoothCapturedPath(stable,smoothness,corners):stable;
  const points=phase==='final'&&finalRefinement?refineCapturedPath(liveCleaned,smoothness,source,(_,i)=>corners.has(i)):liveCleaned;
+ if(phase==='live'&&lowLatencyBase&&points.length)points[points.length-1]={...source.at(-1)!};
  // Restore structural vertices after refinement, which retains all source indices.
  for(const i of corners)points[i]={...source[i]};
  const cubics=interpolateCapturedPoints(points,(_,i)=>corners.has(i));

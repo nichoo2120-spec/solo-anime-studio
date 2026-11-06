@@ -67,11 +67,10 @@ function screenSpaceGeometry(stroke:Stroke,phase:'live'|'final',calculate:(sourc
  const geometry=calculate(input),inv=1/ratio;
  const project=(p:Point):Point=>({...p,x:p.x*inv,y:p.y*inv});
  const points=geometry.points.map(project);
- // Maintain bit-exact captured endpoints (not even subpixel FP roundoff).
- // When stabilization is enabled, the live tip may intentionally trail; only
- // finished strokes are snapped back to the physical pen-up location.
+ // Keep the newest live preview and the finished stroke at the captured
+ // endpoint, including when converting back from reference screen units.
  if(points.length){points[0]={...stroke.points[0]};
-  if(phase==='final'||(stroke.stabilization??0)===0)points[points.length-1]={...stroke.points.at(-1)!};
+  if(phase==='final'||(stroke.liveRefinementVersion??0)>=2||(stroke.stabilization??0)===0)points[points.length-1]={...stroke.points.at(-1)!};
  }
  const cubics=geometry.cubics.map(c=>({a:project(c.a),c1:project(c.c1),c2:project(c.c2),b:project(c.b)}));
  if(cubics.length){cubics[0].a={...points[0]};cubics[cubics.length-1].b={...points.at(-1)!};}
