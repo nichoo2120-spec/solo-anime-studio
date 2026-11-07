@@ -40,6 +40,14 @@ jobs:
       - run: node tests/drawing-latency-v187.mjs
       - run: node tests/project-tabs-v199.mjs
       - run: node tests/new-ink-v200.mjs
+      - run: node tests/automatic-ink-v201.mjs
+      - uses: actions/checkout@v4
+        with:
+          ref: v0.5.200
+          path: baseline-ink-200
+      - name: Reuse dependencies for saved ink compatibility
+        run: node -e "require('fs').symlinkSync(require('path').resolve('node_modules'),require('path').resolve('baseline-ink-200/node_modules'),'junction')"
+      - run: node tests/ink-legacy-v201.mjs
       - uses: actions/checkout@v4
         with:
           ref: v0.5.178

@@ -1,3 +1,4 @@
+import type {InkFlowControls} from '../core/inkFlow';
 import {LiveBlendWorker,workerBlendEligible} from './LiveBlendWorker';
 import {DrawingFrameCache} from './DrawingFrameCache';
 import type {DryBristleControls} from '../core/dryBrush';
@@ -51,7 +52,7 @@ import {rejectCanvasContact,endsCanvasCaptureOnControl} from './penContact';
 import {hitStroke,idsInMarquee,boundsOf,selectable,transformedStroke,projectiveStroke,mapPoint,nearSelection,polyline,IDENTITY, type Selectable,type PickMode} from './strokeSelection';
 import {transformVector,projectiveVector} from './vector';
 import {affineH,multiplyH,projectPoint,homography,quadValid,type XY,type H} from './perspectiveWarp';
-export type BrushSettings={size:number;opacity:number;color:string;stabilization:number;pressure:boolean;response:number;tolerance:number;smoothness?:number;pressureWidth?:boolean;pressureOpacity?:boolean;pressureCurve?:{x:number;y:number}[];taperStart?:number;taperEnd?:number;brushKind?:string;textureStrength?:number;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;pressureFlow?:boolean;mixColors?:boolean;mixAmount?:number;mixTipA?:PaintTip;mixTipB?:PaintTip;mixBlend?:number;mixPickupLen?:number;mixHoldLen?:number;mixStreak?:number;mixPaintLoad?:number;nativeMixEnabled?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number}&PressureSettings&WatercolorControls&ColoringControls&DryBristleControls;
+export type BrushSettings={size:number;opacity:number;color:string;stabilization:number;pressure:boolean;response:number;tolerance:number;smoothness?:number;pressureWidth?:boolean;pressureOpacity?:boolean;pressureCurve?:{x:number;y:number}[];taperStart?:number;taperEnd?:number;brushKind?:string;textureStrength?:number;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;pressureFlow?:boolean;mixColors?:boolean;mixAmount?:number;mixTipA?:PaintTip;mixTipB?:PaintTip;mixBlend?:number;mixPickupLen?:number;mixHoldLen?:number;mixStreak?:number;mixPaintLoad?:number;nativeMixEnabled?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number}&InkFlowControls&PressureSettings&WatercolorControls&ColoringControls&DryBristleControls;
 export const defaultBrush:BrushSettings={size:6,opacity:1,color:'#263039',stabilization:.25,pressure:true,response:1,tolerance:24};
 export type {TransformSettings} from './selectionControls';
 export class StudioEngine {
