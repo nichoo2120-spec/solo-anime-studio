@@ -41,6 +41,7 @@ jobs:
       - run: node tests/project-tabs-v199.mjs
       - run: node tests/new-ink-v200.mjs
       - run: node tests/automatic-ink-v201.mjs
+      - run: node tests/brush-settings-v202.mjs
       - uses: actions/checkout@v4
         with:
           ref: v0.5.200
