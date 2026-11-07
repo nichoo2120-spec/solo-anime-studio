@@ -1,3 +1,4 @@
+import {validImportedGrain} from './importedGrain';
 import type {InkFlowControls} from './inkFlow';
 import {smudgeLimits} from './smudge';
 import {dryControlLimits,type DryBristleControls} from './dryBrush';
@@ -137,6 +138,7 @@ export function validateProject(value:unknown):Project {
     if(o.brushTip!==undefined&&!isPaintTip(o.brushTip))throw Error('Unknown brush tip.');
     if(o.tipAngle!==undefined&&(!Number.isFinite(o.tipAngle)||o.tipAngle< -180||o.tipAngle>180))throw Error('Invalid tip angle.');
     if(o.tipSpacing!==undefined&&(!Number.isFinite(o.tipSpacing)||o.tipSpacing<.02||o.tipSpacing>.5))throw Error('Invalid tip spacing.');
+    if(o.inkImage!==undefined&&(!validImportedGrain(o.inkImage)||o.inkTipVersion!==1)||o.inkImageAmount!==undefined&&!bounded(o.inkImageAmount,0,1)||o.inkImageScale!==undefined&&!bounded(o.inkImageScale,.25,8)||o.inkImageInvert!==undefined&&typeof o.inkImageInvert!=='boolean')throw Error('Invalid imported brush texture.');
     if(o.inkTipVersion!==undefined&&(o.inkTipVersion!==1||!['studio-ink','contour-flow','technical','g-pen','mapping','brush-pen'].includes(o.brushKind??'')))throw Error('Invalid ink tip.');
     if(o.inkTipShape!==undefined&&!['round','oval'].includes(o.inkTipShape)||o.inkTipRoundness!==undefined&&!bounded(o.inkTipRoundness,.1,1)||o.inkTipAngle!==undefined&&!bounded(o.inkTipAngle,-180,180)||o.inkGrainScale!==undefined&&!bounded(o.inkGrainScale,.25,8)||o.inkTipFollow!==undefined&&typeof o.inkTipFollow!=='boolean')throw Error('Invalid ink tip controls.');
     if(o.inkFlowVersion!==undefined&&(o.inkFlowVersion!==1||!['studio-ink','contour-flow'].includes(o.brushKind??'')||o.engineVersion!==10))throw Error('Invalid automatic ink flow version.');

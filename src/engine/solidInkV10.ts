@@ -16,7 +16,7 @@ export type SolidPathInfo={ends:number[];states:PathState[];points?:Point[];tota
 export function drawSolidInkV10(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnType<typeof strokeGeometry>,region?:RasterRegion,displayScale=0,paths?:Path2D[],info?:SolidPathInfo):boolean{
  const kind=s.brushKind??'technical';
  const roundInk=kind==='studio-ink'||kind==='contour-flow';
- if(!displayScale&&s.size<64&&!roundInk&&s.inkTipVersion!==1||(displayScale?s.pressure&&s.pressureOpacity:s.pressureOpacity)||s.textureStrength||!['studio-ink','contour-flow','technical','eraser-hard','g-pen','mapping','brush-pen','flat'].includes(kind))return false;
+ if(!displayScale&&s.size<64&&!roundInk&&s.inkTipVersion!==1||(displayScale?s.pressure&&s.pressureOpacity:s.pressureOpacity)||s.textureStrength||s.inkTipVersion===1&&s.inkImage&&(s.inkImageAmount??1)>0||!['studio-ink','contour-flow','technical','eraser-hard','g-pen','mapping','brush-pen','flat'].includes(kind))return false;
  const points:Point[]=g.cubics.length?g.cubics.flatMap((c,i)=>flattenCubic(c,s.inkFlowVersion===1?.12:.18/Math.max(1,displayScale)).slice(i?1:0)):g.points;
  if(!points.length)return true;
  let total=0;for(let i=1;i<points.length;i++)total+=Math.hypot(points[i].x-points[i-1].x,points[i].y-points[i-1].y);

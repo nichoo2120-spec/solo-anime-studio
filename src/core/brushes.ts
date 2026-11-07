@@ -1,3 +1,4 @@
+import {validImportedGrain} from './importedGrain';
 import {smudgeMetadata,smudgeLimits} from './smudge';
 import {dryControlLimits} from './dryBrush';
 import {isColoringTip,isColorNib,coloringNibs,defaultColorNib,type ColorNib} from './coloring';
@@ -55,7 +56,9 @@ const retiredWatercolorPreset=(p:Partial<BrushPreset>|undefined)=>!!p&&(typeof p
 export function newBrushLibrary():BrushLibrary{return {brushId:'hb',eraserId:'eraser-hard',mode:'paint',presets:stockPresets.map(p=>({...p,defaults:{...p.defaults},settings:{...p.settings}}))};}
 export function sanitizeBrush(value:unknown,fallback:BrushSettings):BrushSettings{
  if(!value||typeof value!=='object')return {...fallback};const p=value as Partial<BrushSettings>,result={...fallback};
- for(const [key,min,max] of [['inkTipRoundness',.1,1],['inkTipAngle',-180,180],['inkGrainScale',.25,8],['inkFlowAmount',0,1],['inkFlowLength',24,1000],['size',.1,500],['opacity',0,1],['stabilization',0,1],['smoothness',0,100],['response',.2,3],['taperStart',0,1],['taperEnd',0,1],['minSize',0,1],['maxSize',0,1],['minOpacity',0,1],['maxOpacity',0,1],['textureStrength',0,1],['tolerance',0,255],['tipAngle',-180,180],['tipSpacing',.02,.5],['flow',0,1],['hardness',0,1],['mixAmount',0,1],['mixPickupLen',.2,4],['mixHoldLen',.5,12],['mixStreak',0,1],['mixPaintLoad',0,1],['pigmentPooling',0,1],['pigmentAmount',0,1],['waterAmount',0,1],['edgeSoftness',0,1],['dryness',0,1],['pigmentBuildup',0,1],['pigmentDepletion',0,1],['wetDiffusion',0,1],['edgeBleeding',0,1]] as const){const n=p[key];if(typeof n==='number'&&Number.isFinite(n))(result[key] as number)=Math.max(min,Math.min(max,n));}
+ for(const [key,min,max] of [['inkImageAmount',0,1],['inkImageScale',.25,8],['inkTipRoundness',.1,1],['inkTipAngle',-180,180],['inkGrainScale',.25,8],['inkFlowAmount',0,1],['inkFlowLength',24,1000],['size',.1,500],['opacity',0,1],['stabilization',0,1],['smoothness',0,100],['response',.2,3],['taperStart',0,1],['taperEnd',0,1],['minSize',0,1],['maxSize',0,1],['minOpacity',0,1],['maxOpacity',0,1],['textureStrength',0,1],['tolerance',0,255],['tipAngle',-180,180],['tipSpacing',.02,.5],['flow',0,1],['hardness',0,1],['mixAmount',0,1],['mixPickupLen',.2,4],['mixHoldLen',.5,12],['mixStreak',0,1],['mixPaintLoad',0,1],['pigmentPooling',0,1],['pigmentAmount',0,1],['waterAmount',0,1],['edgeSoftness',0,1],['dryness',0,1],['pigmentBuildup',0,1],['pigmentDepletion',0,1],['wetDiffusion',0,1],['edgeBleeding',0,1]] as const){const n=p[key];if(typeof n==='number'&&Number.isFinite(n))(result[key] as number)=Math.max(min,Math.min(max,n));}
+ if(p.inkImage===undefined)delete result.inkImage;else if(validImportedGrain(p.inkImage))result.inkImage={...p.inkImage};
+ if(typeof p.inkImageInvert==='boolean')result.inkImageInvert=p.inkImageInvert;
  if(p.inkTipVersion===1)result.inkTipVersion=1;
  if(p.inkTipShape==='round'||p.inkTipShape==='oval')result.inkTipShape=p.inkTipShape;
  if(typeof p.inkTipFollow==='boolean')result.inkTipFollow=p.inkTipFollow;
