@@ -1,4 +1,5 @@
-export type InkFlowControls={inkFlowAmount?:number;inkFlowLength?:number};
+import type {InkTipControls} from './inkTip';
+export type InkFlowControls={inkFlowAmount?:number;inkFlowLength?:number}&InkTipControls;
 export type InkFlowStroke=InkFlowControls&{inkFlowVersion?:1;size:number};
 export const isFlowInk=(kind:string|undefined)=>kind==='studio-ink'||kind==='contour-flow';
 /** Distance from pen-down is the phase anchor. Never use elapsed time or the
