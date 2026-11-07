@@ -1,3 +1,4 @@
+import {widthPointExtent} from '../core/widthPoints';
 /** Stroke-aware selection helpers. All geometry is in document coordinates.
  * Unlike a pixel marquee this returns operation IDs, so unrelated marks are never cut. */
 import type {ArtworkOrigin,Matrix,Point,Stroke,Layer} from '../core/model';
@@ -31,7 +32,7 @@ export function polyline(op:Selectable):{x:number;y:number}[]{
  const result=out.length?out:op.nodes;pathCache.set(op,result);return result;
 }
 export function boundsOf(ops:Selectable[]){let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
- for(const op of ops){const radius=(op.kind==='stroke'?op.size:op.width)/2;
+ for(const op of ops){const radius=(op.kind==='stroke'?op.size*widthPointExtent(op):op.width)/2;
   const [a,b,c,d]=op.kind==='stroke'&&!op.perspective?op.transform??IDENTITY:IDENTITY;
   const xPad=radius*Math.hypot(a,c),yPad=radius*Math.hypot(b,d);
   for(const p of polyline(op)){minX=Math.min(minX,p.x-xPad);minY=Math.min(minY,p.y-yPad);maxX=Math.max(maxX,p.x+xPad);maxY=Math.max(maxY,p.y+yPad);}
@@ -47,7 +48,7 @@ export function hitStroke(layer:Layer,p:{x:number;y:number},zoom:number):Selecta
  const ops=selectable(layer),tolerance=7/Math.max(.25,zoom);let winner:Selectable|undefined,best=Infinity;
  for(let i=ops.length-1;i>=0;i--){const op=ops[i];let b=hitBounds.get(op);if(b===undefined){b=boundsOf([op]);hitBounds.set(op,b);}if(!b)continue;
   if(p.x<b.x-tolerance||p.x>b.x+b.w+tolerance||p.y<b.y-tolerance||p.y>b.y+b.h+tolerance)continue;
-  const radius=(op.kind==='stroke'?op.size:op.width)/2;
+  const radius=(op.kind==='stroke'?op.size*widthPointExtent(op):op.width)/2;
   const points=polyline(op);let distance=Infinity;
   const affine=op.kind==='stroke'&&!op.perspective?op.transform:undefined;
   if(affine){
@@ -93,3 +94,4 @@ export function projectiveStroke(op:Stroke,h:H):Stroke{
  const {inShot:_inShot,inPreviousStage:_inPreviousStage,...editable}=op as Stroke&ArtworkOrigin;
  return {...editable,transform:undefined,perspective:multiplyH(h,op.perspective??affineH(op.transform??IDENTITY))};
 }
+
