@@ -137,6 +137,8 @@ export function validateProject(value:unknown):Project {
     if(o.brushTip!==undefined&&!isPaintTip(o.brushTip))throw Error('Unknown brush tip.');
     if(o.tipAngle!==undefined&&(!Number.isFinite(o.tipAngle)||o.tipAngle< -180||o.tipAngle>180))throw Error('Invalid tip angle.');
     if(o.tipSpacing!==undefined&&(!Number.isFinite(o.tipSpacing)||o.tipSpacing<.02||o.tipSpacing>.5))throw Error('Invalid tip spacing.');
+    if(o.inkTipVersion!==undefined&&(o.inkTipVersion!==1||!['studio-ink','contour-flow','technical','g-pen','mapping','brush-pen'].includes(o.brushKind??'')))throw Error('Invalid ink tip.');
+    if(o.inkTipShape!==undefined&&!['round','oval'].includes(o.inkTipShape)||o.inkTipRoundness!==undefined&&!bounded(o.inkTipRoundness,.1,1)||o.inkTipAngle!==undefined&&!bounded(o.inkTipAngle,-180,180)||o.inkGrainScale!==undefined&&!bounded(o.inkGrainScale,.25,8)||o.inkTipFollow!==undefined&&typeof o.inkTipFollow!=='boolean')throw Error('Invalid ink tip controls.');
     if(o.inkFlowVersion!==undefined&&(o.inkFlowVersion!==1||!['studio-ink','contour-flow'].includes(o.brushKind??'')||o.engineVersion!==10))throw Error('Invalid automatic ink flow version.');
     if(o.inkFlowAmount!==undefined&&!bounded(o.inkFlowAmount,0,1)||o.inkFlowLength!==undefined&&!bounded(o.inkFlowLength,24,1000))throw Error('Invalid automatic ink flow controls.');
     if(o.liveRefinementVersion!==undefined&&o.liveRefinementVersion!==1&&o.liveRefinementVersion!==2&&o.liveRefinementVersion!==3)throw Error('Unsupported live stroke refinement.');

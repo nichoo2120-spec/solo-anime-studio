@@ -686,3 +686,5 @@
 @media(max-width:720px){.brush-settings-panel{top:82px;bottom:14px;right:8px;max-width:calc(100vw - 16px)}.brush-settings-body{grid-template-columns:108px minmax(0,1fr)}.brush-settings-body nav button{font-size:10px;padding:10px 7px}.brush-settings-content{padding-left:12px;padding-right:12px}.brush-settings-panel .range-row.exact-range{grid-template-columns:1fr 68px;gap:6px}.brush-settings-panel .exact-range>label:first-child{grid-column:1 / -1}.brush-settings-panel select{max-width:160px}}
 .brush-settings-section[hidden]{display:none}.brush-settings-preset{display:flex;gap:10px;padding:12px 18px 0;flex-shrink:0}.brush-settings-preset select{flex:1;min-width:0;max-width:none;font-size:11px}.brush-settings-preset button{padding:7px 12px;border:1px solid #3b5960;font-size:11px;white-space:nowrap}.brush-settings-panel .brush-studio-preview{object-position:left center}.brush-settings-section .brush-pressure>summary{display:none}.brush-settings-section{border-bottom:0}
 
+
+.ink-tip-controls{border:0;padding:0;margin:0;min-width:0}.ink-tip-controls:disabled{opacity:.55}

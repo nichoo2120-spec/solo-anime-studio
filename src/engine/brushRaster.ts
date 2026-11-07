@@ -1,3 +1,4 @@
+import {inkTipGeometry} from '../core/inkTip';
 import {inkFlowFactor} from '../core/inkFlow';
 import {drawDryBristleV3} from './dryBristleV3';
 import {drawDryBristleV2} from './dryBristleV2';
@@ -41,7 +42,7 @@ function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|
  if(stroke.flatNibVersion===1&&drawFlatInk(ctx,stroke,resolved,region))return;
  const {points,cubics}=resolved;if(!points.length)return;
  const tapered=!!(stroke.taperStart||stroke.taperEnd),varyingWidth=stroke.pressure&&stroke.pressureWidth!==false||!!stroke.velocityTaper;
- if(!stroke.pressureOpacity&&!tapered&&!varyingWidth&&(!stroke.brushKind||stroke.brushKind==='technical'||stroke.brushKind==='eraser-hard')){
+ if(!stroke.inkTipVersion&&!stroke.pressureOpacity&&!tapered&&!varyingWidth&&(!stroke.brushKind||stroke.brushKind==='technical'||stroke.brushKind==='eraser-hard')){
   ctx.save();ctx.strokeStyle=stroke.color;ctx.fillStyle=stroke.color;ctx.lineWidth=stroke.size;ctx.lineCap='round';ctx.lineJoin='round';
   if(!cubics.length){ctx.beginPath();ctx.arc(points[0].x,points[0].y,stroke.size/2,0,Math.PI*2);ctx.fill();}else{ctx.beginPath();ctx.moveTo(points[0].x,points[0].y);for(const c of cubics)ctx.bezierCurveTo(c.c1.x,c.c1.y,c.c2.x,c.c2.y,c.b.x,c.b.y);ctx.stroke();}ctx.restore();return;
  }
@@ -75,6 +76,7 @@ function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|
    const intensity=Math.round(255*(stroke.pressure&&stroke.pressureOpacity?opacityResponse(response,stroke):1)),kind=stroke.brushKind;
    let aspect=1,rotation=0,softness=0;
    if(kind==='2b')softness=.22;else if(kind==='hb'||kind==='blue')softness=.1;else if(kind==='marker'){aspect=.8;softness=.3;}else if(kind==='g-pen'){aspect=.74;rotation=-.55;}else if(kind==='mapping'){aspect=.48;rotation=-.55;}else if(kind==='brush-pen'){aspect=.52;rotation=angle+.6;}else if(kind==='paint'){aspect=.72;rotation=angle+.25;softness=.16;}else if(kind==='dry'||kind==='dry-grain'){aspect=.65;rotation=-.6;}else if(kind==='watercolor'){aspect=.9;softness=stroke.engineVersion===7?.43:.67;}else if(kind==='airbrush')softness=1;else if(kind==='eraser-soft')softness=.8;
+   if(stroke.inkTipVersion===1){const tip=inkTipGeometry(stroke,angle);aspect=tip.aspect;rotation=tip.rotation;}
    // Canvas sampling can entirely miss a subpixel nib. Preserve its
    // integrated coverage with a bounded pixel filter instead of enlarging it.
    if((stroke.engineVersion===4||stroke.engineVersion===5||stroke.engineVersion===6||stroke.engineVersion===7||stroke.engineVersion===10)&&radius<.75&&kind!=='flat'){micro.push({x:px-x,y:py-y,energy:Math.PI*radius*radius*aspect*intensity*(kind==='airbrush'?73/300:1-softness+softness*softness/3)});continue;}
@@ -96,7 +98,7 @@ function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|
  // Read mask luminance once per pixel. Transparent pixels need no color/texture
  // work; packing RGBA avoids four byte stores across the mostly empty rectangle.
  if(littleEndian){const words=new Uint32Array(pixels.data.buffer,pixels.data.byteOffset,pixels.data.byteLength/4),color=rgb[0]|rgb[1]<<8|rgb[2]<<16;
-  for(let i=0;i<words.length;i++){let alpha=words[i]&255;if(!alpha){words[i]=0;continue;}if(strength){const px=x+i%w,py=y+Math.floor(i/w);let hash=Math.imul(Math.floor(px*1.4)^Math.imul(Math.floor(py*1.4),374761393),668265263);hash=(hash^(hash>>>13))>>>0;const paper=(hash%1024)/1023;
+  for(let i=0;i<words.length;i++){let alpha=words[i]&255;if(!alpha){words[i]=0;continue;}if(strength){const px=x+i%w,py=y+Math.floor(i/w);let hash=Math.imul(Math.floor(px*1.4/(stroke.inkTipVersion===1?stroke.inkGrainScale??1:1))^Math.imul(Math.floor(py*1.4/(stroke.inkTipVersion===1?stroke.inkGrainScale??1:1)),374761393),668265263);hash=(hash^(hash>>>13))>>>0;const paper=(hash%1024)/1023;
    if(kind==='dry-grain'){
     // Directional broken bristles + coarse patches. Anchored in document space
     // so incremental tile painting cannot make the texture swim behind the pen.
