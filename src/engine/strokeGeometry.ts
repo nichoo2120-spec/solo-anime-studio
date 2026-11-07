@@ -58,7 +58,7 @@ export function flattenCubic(c:Cubic,tolerance=.18):Point[]{
  * artwork and keep their precise previous geometry and rendering behavior.
  */
 export const STROKE_FEEL_REFERENCE_ZOOM=1.21;
-const followLiveInkTip=(stroke:Stroke)=>stroke.liveRefinementVersion===3&&(stroke.brushKind==='g-pen'||stroke.brushKind==='mapping');
+const followLiveInkTip=(stroke:Stroke)=>stroke.liveRefinementVersion===3&&['g-pen','mapping','brush-pen'].includes(stroke.brushKind??'');
 function screenSpaceGeometry(stroke:Stroke,phase:'live'|'final',calculate:(source:Point[])=>{points:Point[];cubics:Cubic[]}){
  const zoom=stroke.captureZoom;
  if(zoom===undefined||!Number.isFinite(zoom)||zoom<=0)return calculate(stroke.points);
@@ -98,3 +98,4 @@ export function pressureResponse(value:number,curve:PressureNode[]=linearPressur
 export function taperFactor(distanceAlong:number,total:number,start=0,end=0,fixedSpan?:number){if(total<.5)return 1;const span=fixedSpan??total;return Math.max(0,Math.min(1,start?distanceAlong/(span*Math.min(1,start)):1,end?(total-distanceAlong)/(span*Math.min(1,end)):1));}
 export function pointInPolygon(point:{x:number;y:number},polygon:Point[]){let inside=false;for(let i=0,j=polygon.length-1;i<polygon.length;j=i++){const a=polygon[i],b=polygon[j];if((a.y>point.y)!==(b.y>point.y)&&point.x<(b.x-a.x)*(point.y-a.y)/(b.y-a.y)+a.x)inside=!inside;}return inside;}
 export function intersectsPolygon(points:Point[],polygon:Point[]){if(points.some(p=>pointInPolygon(p,polygon)))return true;const cross=(a:Point,b:Point,c:Point)=>(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);for(let i=1;i<points.length;i++)for(let j=0;j<polygon.length;j++){const a=points[i-1],b=points[i],c=polygon[j],d=polygon[(j+1)%polygon.length];if(Math.max(a.x,b.x)<Math.min(c.x,d.x)||Math.min(a.x,b.x)>Math.max(c.x,d.x)||Math.max(a.y,b.y)<Math.min(c.y,d.y)||Math.min(a.y,b.y)>Math.max(c.y,d.y))continue;if(cross(a,b,c)*cross(a,b,d)<=0&&cross(c,d,a)*cross(c,d,b)<=0)return true;}return false;}
+

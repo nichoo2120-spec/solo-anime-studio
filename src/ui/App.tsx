@@ -137,6 +137,11 @@ export function App(){
   mute:(value:boolean)=>audioActionDelegates.current.mute(value),
   seek:(seconds:number)=>audioActionDelegates.current.seek(seconds)
  });
+ const wheelDelegates=useRef({action:(_action:'previous-cel'|'next-cel'|'onion-skin')=>{},mix:()=>{}});
+ const wheelCallbacks=useRef({
+  action:(action:'previous-cel'|'next-cel'|'onion-skin')=>wheelDelegates.current.action(action),
+  mix:()=>wheelDelegates.current.mix()
+ });
  // Stable props let large drawing inspector and Tool Wheel skip unrelated
  // document commits. The delegates are refreshed before each render so button
  // actions always use the latest application state.
@@ -888,6 +893,10 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
   };const blur=()=>{cancelHoldDrag();playback.current?.pause();engine.current?.flipbook.preview(null);setFlipPreview(null);if(engine.current){engine.current.space=false;engine.current.finishGesture();}};
   window.addEventListener('keydown',keydown);window.addEventListener('keyup',keyup);window.addEventListener('blur',blur);return()=>{window.removeEventListener('keydown',keydown);window.removeEventListener('keyup',keyup);window.removeEventListener('blur',blur);};
  },[doc,shortcuts,linkTargetFrameId,modal,hasSelection,tool,vectorId,fillQuestion,renameId,busy,flipPreview,strokeCount,multiCelAvailable,batchCanvasMode]);
+ wheelDelegates.current={
+  action:action=>{if(action==='onion-skin')setOnionSettings(settings=>({...settings,enabled:!settings.enabled}));else stepDrawingFrame(action==='previous-cel'?-1:1);},
+  mix:()=>toggleMixMode()
+ };
  const layer=activeLayer(doc),activeTool=allTools.find(t=>t.id===tool)!;
  const selectedVector=layer.operations.find(o=>o.kind==='vector'&&o.id===vectorId) as VectorLine|undefined;
  const displayStatus=documentDirty(doc,saved.current)&&!['Saving…','Save failed'].includes(status)?'Unsaved changes':status;
@@ -1291,7 +1300,7 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
       </div>
      </div>}
    </section>
-   <div className="wheel-overlay"><RadialToolbar shortcuts={shortcuts} onAction={action=>{if(action==='onion-skin')setOnionSettings(s=>({...s,enabled:!s.enabled}));else stepDrawingFrame(action==='previous-cel'?-1:1);}} active={tool} onTool={stablePanelHandlers.current.choose} workspace={workbench} homeOpen={!layout.leftClosed&&!focusMode} onNotice={stablePanelHandlers.current.notice} mixMode={brushLibrary.mode==='mix'} onToggleMix={()=>toggleMixMode()}/></div>
+   <div className="wheel-overlay"><RadialToolbar shortcuts={shortcuts} onAction={wheelCallbacks.current.action} active={tool} onTool={stablePanelHandlers.current.choose} workspace={workbench} homeOpen={!layout.leftClosed&&!focusMode} onNotice={stablePanelHandlers.current.notice} mixMode={brushLibrary.mode==='mix'} onToggleMix={wheelCallbacks.current.mix}/></div>
   </div>
   <footer className="app-footer"><span><i/> LOCAL WORKSPACE<span className="footer-divider"/>All artwork stays on this device</span><span>{busy?'Processing fill':hasSelection?'Selection active':'Ready to draw'}<span className="footer-divider"/>{frameSize.width} × {frameSize.height} px<span className="footer-divider"/><CameraPercent camera={camera}/></span></footer>
   <input ref={fileInput} type="file" accept=".json,.solo.json" hidden onChange={async e=>{const file=e.target.files?.[0];if(file)try{await openProject(await importProject(file));}catch(err){notify('Import failed: '+String(err));}e.target.value='';}}/>
@@ -1313,5 +1322,6 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
   </div></div>}
  </div>;
 }
+
 
 
