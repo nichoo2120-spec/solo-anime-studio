@@ -69,7 +69,7 @@ export class DrawingFrameCache{
    // Native joins can change at the last common segment. Keep two complete
    // common segments and both moving end tapers, rather than the whole stroke.
    prefix=Math.max(0,prefix-2);
-   const length=(g:Geometry)=>g.cubics.reduce((n,c)=>n+Math.hypot(c.b.x-c.a.x,c.b.y-c.a.y),0),local=stroke.engineVersion===10&&stroke.size>=64&&!stroke.pressureOpacity;
+   const length=(g:Geometry)=>g.cubics.reduce((n,c)=>n+Math.hypot(c.b.x-c.a.x,c.b.y-c.a.y),0),local=stroke.engineVersion===10&&stroke.size>=64&&!stroke.pressureOpacity&&!['studio-ink','contour-flow'].includes(stroke.brushKind??'');
    const span=(g:Geometry)=>local?Math.min(length(g)*.45,Math.max(32,stroke.size*2)):Math.max(64,stroke.size*12);
    if(previous&&stroke.taperStart&&local&&span(previous)!==span(geometry))prefix=0;
    for(const g of previous?[previous,geometry]:[geometry]){let i=g.cubics.length,travel=0;while(i>0&&travel<span(g)*(stroke.taperEnd??0)){i--;travel+=Math.hypot(g.cubics[i].b.x-g.cubics[i].a.x,g.cubics[i].b.y-g.cubics[i].a.y);}prefix=Math.min(prefix,Math.max(0,i-2));}
@@ -123,3 +123,4 @@ export class DrawingFrameCache{
  finish(stroke:Stroke,geometry:Geometry){this.lastStroke=stroke.id;this.geometry=geometry;}
  status(){return{bytes:(this.prefix?.width??0)*(this.prefix?.height??0)*4+[...this.ink.values()].reduce((n,c)=>n+c.surface.width*c.surface.height*4,0),ready:this.prefixReady,captured:this.captured};}
 }
+
