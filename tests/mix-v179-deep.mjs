@@ -12,9 +12,14 @@ try{
  async function legacy(port,saved){await page.goto('http://127.0.0.1:'+port+'/__mixqa');return page.evaluate(async(saved)=>{
   const {stockPresets,isRetiredBlendPresetId}=await import('/src/core/brushes.ts'),{brushStrokeMetadata,watercolorSeedFor}=await import('/src/core/paintTips.ts'),{drawStroke}=await import('/src/engine/renderer.ts'),{compositePaintStroke,strokeRasterBounds}=await import('/src/engine/paintCompositing.ts');
   const make=()=>{const c=document.createElement('canvas');c.width=560;c.height=180;return c;},rows=[],strokes=[];
-  for(const p of stockPresets.filter(p=>p.category!=='Eraser'&&!isRetiredBlendPresetId(p.id)))for(const version of [0,1,2])for(const alpha of [1,.43]){
-   const id='legacy-'+p.id,s=saved?saved[rows.length]:{...p.settings,...brushStrokeMetadata(p.settings),id,kind:'stroke',tool:'brush',size:55,opacity:.63,color:'#379567',nativeMixVersion:version||undefined,nativeMixAmount:.72,nativeMixRadius:.5,dryBristleSeed:watercolorSeedFor(id),watercolorSeed:watercolorSeedFor(id),colorSeed:watercolorSeedFor(id),points:Array.from({length:42},(_,i)=>({x:30+i*11.3,y:90+24*Math.sin(i/41*Math.PI*2),p:.15+.85*Math.sin(i/41*Math.PI)**2,v:.65}))};
-   strokes.push(s);const c=make(),ctx=c.getContext('2d'),mask=make();ctx.fillStyle=`rgba(231,31,49,${alpha})`;ctx.fillRect(0,20,220,140);ctx.fillStyle=`rgba(22,66,202,${alpha})`;ctx.fillRect(220,20,240,140);drawStroke(mask.getContext('2d'),s);compositePaintStroke(ctx,mask,s,0,0,strokeRasterBounds(s,560,180));const bytes=ctx.getImageData(0,0,560,180).data,hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');rows.push({preset:p.id,version,alpha,hash});c.width=c.height=mask.width=mask.height=0;
+  // Catalog additions are new brushes, not historical saved strokes.
+  const cases=saved??stockPresets.filter(p=>p.category!=='Eraser'&&!isRetiredBlendPresetId(p.id)).flatMap(p=>[0,1,2].flatMap(version=>[1,.43].map(alpha=>{
+   const id='legacy-'+p.id,stroke={...p.settings,...brushStrokeMetadata(p.settings),id,kind:'stroke',tool:'brush',size:55,opacity:.63,color:'#379567',nativeMixVersion:version||undefined,nativeMixAmount:.72,nativeMixRadius:.5,dryBristleSeed:watercolorSeedFor(id),watercolorSeed:watercolorSeedFor(id),colorSeed:watercolorSeedFor(id),points:Array.from({length:42},(_,i)=>({x:30+i*11.3,y:90+24*Math.sin(i/41*Math.PI*2),p:.15+.85*Math.sin(i/41*Math.PI)**2,v:.65}))};
+   return {preset:p.id,version,alpha,stroke};
+  })));
+  for(const entry of cases){
+   const {preset,version,alpha,stroke:s}=entry;strokes.push(entry);
+   const c=make(),ctx=c.getContext('2d'),mask=make();ctx.fillStyle=`rgba(231,31,49,${alpha})`;ctx.fillRect(0,20,220,140);ctx.fillStyle=`rgba(22,66,202,${alpha})`;ctx.fillRect(220,20,240,140);drawStroke(mask.getContext('2d'),s);compositePaintStroke(ctx,mask,s,0,0,strokeRasterBounds(s,560,180));const bytes=ctx.getImageData(0,0,560,180).data,hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');rows.push({preset,version,alpha,hash});c.width=c.height=mask.width=mask.height=0;
   }return {rows,strokes};
  },saved);}
  // Generate historical stroke records once with the baseline metadata factory.

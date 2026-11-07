@@ -14,7 +14,7 @@ type Key={operations:Layer['operations'];matrix:number[];firstClean:number;width
 type Pending={token:number;layer:string;key:Key;operations:Layer['operations'];base:HTMLCanvasElement;timer:ReturnType<typeof setTimeout>};
 type ViewPending={token:number;layer:string;key:Key;base?:Key;timer:ReturnType<typeof setTimeout>};
 export const displayCleanInk=(s:Stroke&ArtworkOrigin)=>!s.inShot&&!s.inPreviousStage&&!s.nativeMixVersion&&!s.mixStops&&!s.paintTipVersion&&!s.perspective&&!s.textureStrength&&!(s.pressure&&s.pressureOpacity)&&(
- !!s.engineVersion&&['technical','eraser-hard','g-pen','mapping','brush-pen'].includes(s.brushKind??'technical')||s.flatNibVersion===1
+ !!s.engineVersion&&['studio-ink','contour-flow','technical','eraser-hard','g-pen','mapping','brush-pen'].includes(s.brushKind??'technical')||s.flatNibVersion===1
 );
 const native=(s:Stroke)=>!s.pressureOpacity&&!s.taperStart&&!s.taperEnd&&!(s.pressure&&s.pressureWidth!==false)&&!s.velocityTaper&&['technical','eraser-hard'].includes(s.brushKind??'technical');
 const clean=displayCleanInk;
@@ -251,3 +251,4 @@ export class InkDisplay{
   if(present){ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.globalCompositeOperation=blendOperation(layer.blend);ctx.drawImage(picture,0,0);ctx.restore();}
  }
 }
+

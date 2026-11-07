@@ -68,7 +68,7 @@ export class LiveStrokeRaster{
   }
   if(stroke.paintTipVersion===1&&old&&old.cubics.reduce((n,c)=>n+Math.hypot(c.b.x-c.a.x,c.b.y-c.a.y),0)<.5)prefix=0;
   let region:RasterRegion|undefined;
-  const native=stroke.paintTipVersion!==1&&((stroke.flatNibVersion===1&&!stroke.textureStrength&&!(stroke.pressure&&stroke.pressureOpacity))||(stroke.engineVersion===10&&stroke.size>=64&&!stroke.pressureOpacity&&!stroke.textureStrength&&['technical','eraser-hard','g-pen','mapping','brush-pen','flat'].includes(stroke.brushKind??'technical'))||!stroke.pressureOpacity&&!stroke.taperStart&&!stroke.taperEnd&&!(stroke.pressure&&stroke.pressureWidth!==false)&&!stroke.velocityTaper&&(!stroke.brushKind||stroke.brushKind==='technical'||stroke.brushKind==='eraser-hard'));
+  const native=stroke.paintTipVersion!==1&&((stroke.flatNibVersion===1&&!stroke.textureStrength&&!(stroke.pressure&&stroke.pressureOpacity))||(stroke.engineVersion===10&&(stroke.size>=64||['studio-ink','contour-flow'].includes(stroke.brushKind??''))&&!stroke.pressureOpacity&&!stroke.textureStrength&&['studio-ink','contour-flow','technical','eraser-hard','g-pen','mapping','brush-pen','flat'].includes(stroke.brushKind??'technical'))||!stroke.pressureOpacity&&!stroke.taperStart&&!stroke.taperEnd&&!(stroke.pressure&&stroke.pressureWidth!==false)&&!stroke.velocityTaper&&(!stroke.brushKind||stroke.brushKind==='technical'||stroke.brushKind==='eraser-hard'));
   // Both pressure nibs and ordinary ink can repaint only the changed tail.
   // Native Canvas stroke tessellation changes at clip boundaries. Redraw those
   // paths on the full scratch surface so preview and full rendering agree.
@@ -96,3 +96,4 @@ export class LiveStrokeRaster{
   this.id=stroke.id;this.previous=geometry;this.hadSingle=!curves.length;this.lastRegion=region;return region?region.width*region.height:ctx.canvas.width*ctx.canvas.height;
  }
 }
+
