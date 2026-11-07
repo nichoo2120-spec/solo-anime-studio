@@ -688,3 +688,5 @@
 
 
 .ink-tip-controls{border:0;padding:0;margin:0;min-width:0}.ink-tip-controls:disabled{opacity:.55}
+
+.texture-import-button{display:flex;flex-direction:column;gap:10px;font-size:12px;padding:12px;border:1px solid #3b5960;border-radius:5px}.texture-import-button input{max-width:100%;font-size:11px}.brush-settings-section .hint{overflow-wrap:anywhere}

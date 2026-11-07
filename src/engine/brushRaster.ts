@@ -1,3 +1,4 @@
+import {importedGrainSampler} from '../core/importedGrain';
 import {inkTipGeometry} from '../core/inkTip';
 import {inkFlowFactor} from '../core/inkFlow';
 import {drawDryBristleV3} from './dryBristleV3';
@@ -94,7 +95,7 @@ function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|
  }
  const pixels=mc.getImageData(ox,oy,w,h),rgb=stroke.color.slice(1).match(/../g)!.map(n=>parseInt(n,16));
  for(const dab of micro){const ix=Math.floor(dab.x-.5),iy=Math.floor(dab.y-.5),fx=dab.x-.5-ix,fy=dab.y-.5-iy;for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){const px=ix+dx,py=iy+dy;if(px<0||py<0||px>=w||py>=h)continue;const index=(py*w+px)*4,alpha=Math.round(dab.energy*(dx?fx:1-fx)*(dy?fy:1-fy));pixels.data[index]=Math.max(pixels.data[index],Math.min(255,alpha));}}
- const strength=stroke.textureStrength??0,kind=stroke.brushKind;
+ const strength=stroke.textureStrength??0,kind=stroke.brushKind,imageGrain=importedGrainSampler(stroke);
  // Read mask luminance once per pixel. Transparent pixels need no color/texture
  // work; packing RGBA avoids four byte stores across the mostly empty rectangle.
  if(littleEndian){const words=new Uint32Array(pixels.data.buffer,pixels.data.byteOffset,pixels.data.byteLength/4),color=rgb[0]|rgb[1]<<8|rgb[2]<<16;
@@ -114,7 +115,7 @@ function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|
     if(stroke.engineVersion===7){const wetRim=Math.max(0,1-Math.abs(alpha-102)/100),sediment=.89+.14*Math.sin(px*.047+py*.107)+.09*Math.sin(px*.16-py*.06);alpha*=Math.max(.4,sediment+wetRim*.23);if(paper<.055)alpha*=.56;}
    }else if(kind==='paint')alpha*=1-strength*(.3+.3*Math.sin(px*.3+py*1.3))*(.5+paper*.5);
    else alpha*=1-strength*(.25+paper*.75);
-  }words[i]=color|Math.round(alpha)<<24;}
+  }if(imageGrain)alpha*=imageGrain(x+i%w,y+Math.floor(i/w));words[i]=color|Math.round(alpha)<<24;}
  }else for(let i=0;i<pixels.data.length;i+=4){let alpha=pixels.data[i];if(alpha&&strength){const px=x+(i/4)%w,py=y+Math.floor(i/4/w);let hash=Math.imul(Math.floor(px*1.4)^Math.imul(Math.floor(py*1.4),374761393),668265263);hash=(hash^(hash>>>13))>>>0;const paper=(hash%1024)/1023;
    if(kind==='dry-grain'){
     // Directional broken bristles + coarse patches. Anchored in document space
@@ -131,7 +132,7 @@ function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|
     if(stroke.engineVersion===7){const wetRim=Math.max(0,1-Math.abs(alpha-102)/100),sediment=.89+.14*Math.sin(px*.047+py*.107)+.09*Math.sin(px*.16-py*.06);alpha*=Math.max(.4,sediment+wetRim*.23);if(paper<.055)alpha*=.56;}
    }else if(kind==='paint')alpha*=1-strength*(.3+.3*Math.sin(px*.3+py*1.3))*(.5+paper*.5);
    else alpha*=1-strength*(.25+paper*.75);
-  }pixels.data[i]=rgb[0];pixels.data[i+1]=rgb[1];pixels.data[i+2]=rgb[2];pixels.data[i+3]=Math.round(alpha);}
+  }if(imageGrain)alpha*=imageGrain(x+(i/4)%w,y+Math.floor(i/4/w));pixels.data[i]=rgb[0];pixels.data[i+1]=rgb[1];pixels.data[i+2]=rgb[2];pixels.data[i+3]=Math.round(alpha);}
  mc.putImageData(pixels,ox,oy);ctx.drawImage(tile,ox,oy,w,h,x,y,w,h);
 }
 
