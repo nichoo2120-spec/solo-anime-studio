@@ -654,4 +654,21 @@
 .timeline .cel-hold,.timeline .cel-art{font-size:8px}
 .timeline .timeline-track>.layer-track-heading{height:31px;min-height:31px;font-size:8px}
 .timeline .layer-track-name,.timeline .layer-cel-row{height:23px;min-height:23px}
+/* Project documents share one canvas; inactive tabs retain only immutable history. */
+.project-tabs-row{height:31px;min-height:31px;display:flex;align-items:stretch;background:#111b20;border-bottom:1px solid #2d4048;padding:0 4px;gap:2px}
+.project-tabs-list{display:flex;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#3e5860 transparent;gap:2px}
+.project-tabs-list::-webkit-scrollbar{height:3px}
+.project-tab{display:flex;flex:0 0 auto;max-width:210px;min-width:100px;align-items:center;border-top:2px solid transparent;border-right:1px solid #293a42;background:#152127;color:#8fa5b0}
+.project-tab.active{border-top-color:#55d9c4;background:#213139;color:#d8e9e9}
+.project-tab>[role=tab]{display:flex;gap:7px;min-width:0;height:27px;padding:0 7px 0 10px;border:0;border-radius:0;font-size:10px;text-align:left;justify-content:flex-start}
+.project-tab-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.project-tab-dot{width:5px;height:5px;min-width:5px;border:1px solid #688d8d;border-radius:50%}
+.project-tab-dot.dirty{background:#55d9c4;border-color:#55d9c4}
+.project-tab .project-tab-close{height:24px;width:24px;min-width:24px;padding:0;margin-right:2px;border-radius:4px;color:#8eabb4}
+.project-tab .project-tab-close:hover:not(:disabled){background:#48636b66;color:#fff}
+.project-tabs-action{flex:0 0 29px;width:29px;height:28px;padding:0;border-radius:3px;color:#81a5ad}
+.canvas-workspace-label{padding:0 9px;color:#76929f;font-size:8px;letter-spacing:1px;white-space:nowrap}
+.project-close-backdrop{z-index:120}
+.project-tabs-row .document-tab{height:29px;padding:0;gap:0;max-width:210px;overflow:visible;border-radius:0}
+.project-close-error{color:#f1b2a4;font-size:12px;line-height:1.5}
 

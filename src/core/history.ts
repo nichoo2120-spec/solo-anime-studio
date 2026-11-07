@@ -1,6 +1,8 @@
 import type {Project} from './model';
 import {syncActiveFrame} from '../animation/timeline';
 export type HistoryEntry={id:number;label:string;project:Project};
+/** In-memory tab state; never serialized into a project backup. */
+export type DocumentHistory={project:Project;entries:readonly HistoryEntry[];index:number;serial:number};
 function describeChange(a:Project,b:Project){
  if(a.layers.length<b.layers.length)return 'Add / duplicate layer';if(a.layers.length>b.layers.length)return 'Delete layer';
  if(a.layers.some((l,i)=>b.layers[i].id!==l.id))return 'Reorder layers';if(a.name!==b.name)return 'Rename project';
@@ -24,6 +26,12 @@ export class DocumentStore {
  undo(){this.goTo(this.index-1);}redo(){this.goTo(this.index+1);}
  goTo(index:number){if(index<0||index>=this.entries.length||index===this.index)return;this.index=index;this.project=this.entries[index].project;this.emit();}
  replace(p:Project){this.project=p;this.entries=[{id:this.serial++,label:'Opened document',project:p}];this.index=0;this.emit();}
+ captureHistory():DocumentHistory{return {project:this.project,entries:this.entries.slice(),index:this.index,serial:this.serial};}
+ restoreHistory(state:DocumentHistory){
+  if(!state.entries.length||state.index<0||state.index>=state.entries.length||state.entries[state.index].project!==state.project)throw Error('Invalid document tab history.');
+  this.project=state.project;this.entries=state.entries.slice();this.index=state.index;this.serial=state.serial;this.emit();
+ }
  getHistory(){return this.entries.map((entry,index)=>({id:entry.id,label:entry.label,index,current:index===this.index,future:index>this.index}));}
  get currentIndex(){return this.index;}get canUndo(){return this.index>0;}get canRedo(){return this.index<this.entries.length-1;}
 }
+

@@ -9,12 +9,13 @@ type Record={id:string;project:Project;savedAt:string};
 
 const sceneDragType='application/x-solo-scene';
 const photoFile=(files:FileList)=>Array.from(files).find(file=>['image/png','image/jpeg','image/webp'].includes(file.type));
-export function ProjectHome({records,open,create,importBackup,activeId,deleteScenes,combine,placePhoto}:{
+export function ProjectHome({records,open,create,importBackup,activeId,protectedIds=[],deleteScenes,combine,placePhoto}:{
  records:Record[];
  open:(project:Project)=>void;
  create:(name:string,width:number,height:number,photo?:File)=>Promise<string|undefined>;
  importBackup:()=>void;
  activeId:string;
+ protectedIds?:string[];
  deleteScenes:(ids:string[])=>Promise<boolean|undefined>;
  combine:(destination:Project,source:Project)=>Promise<string|undefined>;
  placePhoto:(project:Project,file:File)=>Promise<void>;
@@ -48,13 +49,14 @@ export function ProjectHome({records,open,create,importBackup,activeId,deleteSce
  const scenePaths=new Map(projects.flatMap(item=>item.episodes.flatMap(entry=>entry.scenes.map(id=>[id,item.name+' / '+entry.name] as const))));
  const ready=!!name.trim()&&(!!project||!!episodeName.trim()&&!!sceneName.trim());
  const save=(next:Production[])=>{writePreference('production-library',next);setProjects(next);};
- const available=records.filter(record=>record.id!==activeId&&(!episode||episode.scenes.includes(record.id)));
+ const protectedScenes=new Set([activeId,...protectedIds]);
+ const available=records.filter(record=>!protectedScenes.has(record.id)&&(!episode||episode.scenes.includes(record.id)));
  function toggle(id:string){
   setSelected(items=>items.includes(id)?items.filter(item=>item!==id):[...items,id]);
  }
  function sceneIds(item:Production){return item.episodes.flatMap(entry=>entry.scenes).filter(id=>records.some(record=>record.id===id));}
  function toggleProject(item:Production){
-  const ids=sceneIds(item).filter(id=>id!==activeId);
+  const ids=sceneIds(item).filter(id=>!protectedScenes.has(id));
   setSelected(current=>ids.every(id=>current.includes(id))?current.filter(id=>!ids.includes(id)):[...new Set([...current,...ids])]);
  }
  function allowDrop(event:DragEvent){
@@ -120,7 +122,7 @@ export function ProjectHome({records,open,create,importBackup,activeId,deleteSce
   }
   setName('');
  }
- const scenes=(list:Record[])=>list.length?list.map(({id,project,savedAt})=><button className="startup-row" key={id} type="button" disabled={busy||selecting&&id===activeId} aria-pressed={selecting?selected.includes(id):undefined} draggable={!busy&&!selecting} onDragStart={event=>{event.dataTransfer.setData(sceneDragType,id);event.dataTransfer.effectAllowed='copy';}} onDragOver={allowDrop} onDrop={event=>void dropOnScene(event,project)} onClick={()=>selecting?toggle(id):open(project)}><strong>{selecting?(selected.includes(id)?'☑ ':'☐ '):''}{project.name}</strong><span>{scenePaths.get(id)??'Standalone scene'}</span><span>{new Date(savedAt).toLocaleDateString()}</span></button>):<p className="startup-empty">Saved scenes will appear here.</p>;
+ const scenes=(list:Record[])=>list.length?list.map(({id,project,savedAt})=><button className="startup-row" key={id} type="button" disabled={busy||selecting&&protectedScenes.has(id)} aria-pressed={selecting?selected.includes(id):undefined} draggable={!busy&&!selecting} onDragStart={event=>{event.dataTransfer.setData(sceneDragType,id);event.dataTransfer.effectAllowed='copy';}} onDragOver={allowDrop} onDrop={event=>void dropOnScene(event,project)} onClick={()=>selecting?toggle(id):open(project)}><strong>{selecting?(selected.includes(id)?'☑ ':'☐ '):''}{project.name}</strong><span>{scenePaths.get(id)??'Standalone scene'}</span><span>{new Date(savedAt).toLocaleDateString()}</span></button>):<p className="startup-empty">Saved scenes will appear here.</p>;
  return <div className="project-home">
   <header className="startup-bar"><strong><span aria-hidden="true">◩</span> Solo Anime Studio</strong><small>WORKSPACE</small></header>
   {desktop?.checkForUpdates&&<div className="startup-update">
@@ -152,7 +154,7 @@ export function ProjectHome({records,open,create,importBackup,activeId,deleteSce
      </section>
      {!project&&projects.length>0&&<section className="startup-panel startup-library"><h2>Projects</h2>{projects.map(item=>{
       const ids=sceneIds(item),only=ids.length===1?records.find(record=>record.id===ids[0]):undefined;
-      const removable=ids.filter(id=>id!==activeId);
+      const removable=ids.filter(id=>!protectedScenes.has(id));
       const checked=!!removable.length&&removable.every(id=>selected.includes(id));
       return <button className="startup-folder" key={item.id} disabled={busy||selecting&&!removable.length} aria-pressed={selecting?checked:undefined} draggable={!!only&&!busy&&!selecting} onDragStart={event=>{if(only){event.dataTransfer.setData(sceneDragType,only.id);event.dataTransfer.effectAllowed='copy';}}} onDragOver={only?allowDrop:undefined} onDrop={only?event=>void dropOnScene(event,only.project):undefined} onClick={()=>{if(selecting){toggleProject(item);return;}selectProject(item.id);setName('');}}>{selecting?(checked?'☑ ':'☐ '):''}{item.name}{selecting?'':' ›'}</button>;
      })}</section>}
@@ -176,3 +178,4 @@ export function ProjectHome({records,open,create,importBackup,activeId,deleteSce
   </div>
  </div>;
 }
+

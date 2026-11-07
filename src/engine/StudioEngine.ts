@@ -18,7 +18,7 @@ import {defaultColorNib,type ColoringControls} from '../core/coloring';
 import {paintingOutline} from './paintingTips';
 let originalFlatOutline:Path2D|undefined;
 import {activeLayer,appendOperation,uid,WORLD_STROKE_LIMIT,type Point,type Stroke,type Tool,type Project,type Matrix,type PressureSettings,type WatercolorControls} from '../core/model';
-import {DocumentStore} from '../core/history';
+import {DocumentStore,type DocumentHistory} from '../core/history';
 import {syncActiveFrame} from '../animation/timeline';
 import {followBoundSelectionTransform} from '../animation/motionPlanning';
 import {fitView,toProject,toScreen,type View} from '../core/geometry';
@@ -537,11 +537,11 @@ export class StudioEngine {
    if(revision===this.store.revision)this.store.commit(appendOperation(doc,{id:uid(),kind:'fill',png,under}),'Fill region');else this.notify('The document changed. Fill was safely canceled.');
   }catch(e){this.notify('Fill failed: '+String(e));}finally{this.worker?.terminate();this.worker=undefined;this.busy=false;this.onBusy(false);}
  }
- async load(p:Project,expectedRevision?:number){if(expectedRevision!==undefined&&this.explicitLoad)return false;if(expectedRevision===undefined)this.explicitLoad=true;const generation=++this.loadGeneration,revision=expectedRevision??this.store.revision,renderer=new LayerRenderer();await renderer.prepare(p);
+ async load(p:Project,expectedRevision?:number,history?:DocumentHistory){if(history&&history.project!==p)throw Error('Tab history does not match its document.');if(expectedRevision!==undefined&&this.explicitLoad)return false;if(expectedRevision===undefined)this.explicitLoad=true;const generation=++this.loadGeneration,revision=expectedRevision??this.store.revision,renderer=new LayerRenderer();await renderer.prepare(p);
   // v0.5.176: build each layer's pixels in its own short task before showing the project,
   // so opening a big project no longer freezes the window in one long block. Same
   // renderer.get() the first frame would call, so the pixels are identical.
-  for(const l of p.layers){if(!l.visible||!l.operations.length)continue;await new Promise<void>(r=>setTimeout(r,0));if(this.disposed||generation!==this.loadGeneration||this.store.revision!==revision||this.drawing)return false;renderer.get(l,p);}if(this.disposed||generation!==this.loadGeneration||this.store.revision!==revision||this.drawing)return false;this.cancelGesture();this.clearSelection();this.stopViewMotion();this.navigationHost.style.display='none';this.navigationScene.clear();this.navigationSnapshot.clear();this.hasRendered=false;this.blendWorker.cancel();this.drawingFrames.clear();this.inkDisplay.clear();this.rasterScene.clear();this.renderer.clear();this.renderer=renderer;const view=this.restoreView(p);this.onLoad(p);this.store.replace(p);if(view)this.setView(view);else this.fit();return true;}
+  for(const l of p.layers){if(!l.visible||!l.operations.length)continue;await new Promise<void>(r=>setTimeout(r,0));if(this.disposed||generation!==this.loadGeneration||this.store.revision!==revision||this.drawing){renderer.clear();return false;}renderer.get(l,p);}if(this.disposed||generation!==this.loadGeneration||this.store.revision!==revision||this.drawing){renderer.clear();return false;}this.cancelGesture();this.clearSelection();this.stopViewMotion();this.navigationHost.style.display='none';this.navigationScene.clear();this.navigationSnapshot.clear();this.hasRendered=false;this.blendWorker.cancel();this.drawingFrames.clear();this.inkDisplay.clear();this.rasterScene.clear();this.renderer.clear();this.renderer=renderer;const view=this.restoreView(p);this.onLoad(p);if(history)this.store.restoreHistory(history);else this.store.replace(p);if(view)this.setView(view);else this.fit();return true;}
  private cancelDrawingWarmup(){const task=this.drawingWarmup;if(!task)return;if(task.kind==='idle')window.cancelIdleCallback(task.id);else window.clearTimeout(task.id);this.drawingWarmup=undefined;}
  private warmDrawingInk(p:Project,W:number,H:number,dpr:number){
   if(this.drawingWarmup)return;
@@ -749,3 +749,4 @@ export class StudioEngine {
  }
 
 }
+
