@@ -1,3 +1,4 @@
+import {canEditStrokeWidth,validWidthPoints,type WidthPoint} from '../core/widthPoints';
 import type {InkFlowControls} from '../core/inkFlow';
 import {LiveBlendWorker,workerBlendEligible} from './LiveBlendWorker';
 import {DrawingFrameCache} from './DrawingFrameCache';
@@ -313,6 +314,15 @@ export class StudioEngine {
  selectAllStrokes(){this.setStrokeIds(this.selectableLayers().flatMap(l=>selectable(l).map(o=>o.id)));}
  setStrokeShape(shape:'rectangle'|'lasso'){this.strokeShape=shape;}
  startVanishingPoint(){this.pickVanishingPoint=true;this.notify('Click the drawing to set the perspective vanishing point.');}
+ selectedWidthStroke(){const ops=this.selectedOperations();return ops.length===1&&ops[0].kind==='stroke'&&canEditStrokeWidth(ops[0])?ops[0]:undefined;}
+ applyStrokeWidthPoints(expected:Stroke,points:WidthPoint[]|undefined){
+  if(this.drawing||this.selectedWidthStroke()!==expected||points!==undefined&&!validWidthPoints(points)){this.notify('Select the same unlocked ink stroke before applying width points.');return false;}
+  if(this.warpQuad||!this.matrix().every((v,i)=>Math.abs(v-IDENTITY[i])<1e-8)){this.notify('Apply or cancel the current transform before editing thickness.');return false;}
+  const p=this.store.getSnapshot(),ids=[...this.strokeIds],next:Stroke={...expected};
+  if(points){next.widthPointVersion=1;next.widthPoints=points.map(p=>({...p}));}else{delete next.widthPointVersion;delete next.widthPoints;}
+  const layers=p.layers.map(l=>l.locked||!l.visible||l.reference||!l.operations.includes(expected)?l:{...l,operations:l.operations.map(o=>o===expected?next:o)});
+  this.store.commit(syncActiveFrame({...p,layers}),points?'Edit stroke thickness':'Remove stroke width points');this.setStrokeIds(ids);this.request();return true;
+ }
  private selectedOperations(){const ids=new Set(this.strokeIds);return this.selectableLayers().flatMap(l=>selectable(l).filter(o=>ids.has(o.id)));}
  private setStrokeIds(ids:string[]){
   const set=new Set(ids),ops=this.selectableLayers().flatMap(l=>selectable(l).filter(o=>set.has(o.id)));
