@@ -27,6 +27,7 @@ export function drawModernStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phas
  const c=mixedBase??=document.createElement('canvas');if(c.width!==ctx.canvas.width)c.width=ctx.canvas.width;if(c.height!==ctx.canvas.height)c.height=ctx.canvas.height;const cc=c.getContext('2d')!;cc.clearRect(0,0,c.width,c.height);drawBaseStroke(cc,{...stroke,mixStops:undefined},phase,geometry,undefined,pass);ctx.drawImage(c,0,0);tintMix(ctx,stroke);
 }
 function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|'final'='final',geometry?:ReturnType<typeof strokeGeometry>,region?:RasterRegion,pass?:PaintPass,origin?:{x:number;y:number}){
+ const roundInk=stroke.brushKind==='studio-ink'||stroke.brushKind==='contour-flow';
  const resolved=geometry??(phase==='final'?finalGeometry(stroke):strokeGeometry(stroke,phase));
  if(stroke.dryBristleVersion===3){drawDryBristleV3(ctx,stroke,resolved,region,pass);return;}
  if(stroke.dryBristleVersion===2){drawDryBristleV2(ctx,stroke,resolved,region,pass);return;}
@@ -69,7 +70,7 @@ function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|
   // Keep fine sampling wherever pressure or taper makes a broad brush narrow.
   const spacing=fastPaint?Math.max(.25,Math.min(8,stroke.size*.05*Math.min(nibFactor(a,along),nibFactor(p,along+length)))):optimizedWash?Math.min(2.5,Math.max(1.3,stroke.size*.065)):stroke.brushKind==='flat'?.25:Math.max(.25,Math.min(1,stroke.size*.08)),steps=Math.min(8192,Math.max(1,Math.ceil(length/spacing)));
   const tangent=i===0&&stroke.engineVersion===10?samples[1]??p:p;const angle=Math.atan2(tangent.y-a.y,tangent.x-a.x);
-  for(let j=i?1:0;j<=steps;j++){const t=j/steps,px=a.x+(p.x-a.x)*t,py=a.y+(p.y-a.y)*t;if(region&&(px<x-stroke.size||py<y-stroke.size||px>x+w+stroke.size||py>y+h+stroke.size))continue;const reported=a.p+(p.p-a.p)*t,response=stroke.pressure?pressureResponse(Math.pow(reported,stroke.response),stroke.pressureCurve):1,velocity=stroke.velocityTaper?(a.v??1)+((p.v??1)-(a.v??1))*t:1,radius=stroke.size/2*(varyingWidth?widthResponse(response*velocity,stroke):1)*taperFactor(along+length*t,total,stroke.taperStart,stroke.taperEnd,stroke.engineVersion===6||stroke.engineVersion===7||stroke.engineVersion===10?Math.max(64,stroke.size*12):undefined);if(radius<.01)continue;
+  for(let j=i?1:0;j<=steps;j++){const t=j/steps,px=a.x+(p.x-a.x)*t,py=a.y+(p.y-a.y)*t;if(region&&(px<x-stroke.size||py<y-stroke.size||px>x+w+stroke.size||py>y+h+stroke.size))continue;const reported=a.p+(p.p-a.p)*t,response=stroke.pressure?pressureResponse(Math.pow(reported,stroke.response),stroke.pressureCurve):1,velocity=stroke.velocityTaper?(a.v??1)+((p.v??1)-(a.v??1))*t:1,radius=stroke.size/2*(varyingWidth?widthResponse(response*velocity,stroke):1)*(roundInk?Math.sin(taperFactor(along+length*t,total,stroke.taperStart,stroke.taperEnd,Math.max(4,stroke.size*4))*Math.PI/2):taperFactor(along+length*t,total,stroke.taperStart,stroke.taperEnd,stroke.engineVersion===6||stroke.engineVersion===7||stroke.engineVersion===10?Math.max(64,stroke.size*12):undefined));if(radius<.01)continue;
    const intensity=Math.round(255*(stroke.pressure&&stroke.pressureOpacity?opacityResponse(response,stroke):1)),kind=stroke.brushKind;
    let aspect=1,rotation=0,softness=0;
    if(kind==='2b')softness=.22;else if(kind==='hb'||kind==='blue')softness=.1;else if(kind==='marker'){aspect=.8;softness=.3;}else if(kind==='g-pen'){aspect=.74;rotation=-.55;}else if(kind==='mapping'){aspect=.48;rotation=-.55;}else if(kind==='brush-pen'){aspect=.52;rotation=angle+.6;}else if(kind==='paint'){aspect=.72;rotation=angle+.25;softness=.16;}else if(kind==='dry'||kind==='dry-grain'){aspect=.65;rotation=-.6;}else if(kind==='watercolor'){aspect=.9;softness=stroke.engineVersion===7?.43:.67;}else if(kind==='airbrush')softness=1;else if(kind==='eraser-soft')softness=.8;
@@ -130,3 +131,4 @@ function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|
   }pixels.data[i]=rgb[0];pixels.data[i+1]=rgb[1];pixels.data[i+2]=rgb[2];pixels.data[i+3]=Math.round(alpha);}
  mc.putImageData(pixels,ox,oy);ctx.drawImage(tile,ox,oy,w,h,x,y,w,h);
 }
+

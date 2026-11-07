@@ -24,6 +24,8 @@ export const stockPresets:BrushPreset[]=[
  preset('mapping','Mapping Pen','Ink',{size:4,opacity:1,response:1.6,taperStart:.04,taperEnd:.13,textureStrength:0}),
  preset('technical','Technical Pen','Ink',{size:4,opacity:1,pressureWidth:false,textureStrength:0,smoothness:40}),
  preset('brush-pen','Brush Pen','Ink',{size:14,opacity:1,response:.65,taperStart:.06,taperEnd:.15,textureStrength:0}),
+ preset('studio-ink','Studio Ink','Ink',{size:6,opacity:1,stabilization:.08,smoothness:28,response:.9,minSize:.08,maxSize:1,pressureCurve:[{x:0,y:0},{x:.25,y:.18},{x:.5,y:.45},{x:.75,y:.73},{x:1,y:1}],taperStart:.08,taperEnd:.2,textureStrength:0}),
+ preset('contour-flow','Contour Flow','Ink',{size:9,opacity:1,stabilization:.05,smoothness:18,response:1.1,minSize:.035,maxSize:1,pressureCurve:[{x:0,y:0},{x:.25,y:.06},{x:.5,y:.32},{x:.75,y:.72},{x:1,y:1}],taperStart:.025,taperEnd:.09,textureStrength:0,velocityTaper:true}),
  preset('color-solid','Solid Paint','Paint',{brushKind:'coloring-solid',brushTip:'color-solid',coloringEngine:1,colorNib:'chisel',colorNibFollow:false,tipAngle:-25,size:45,opacity:1,flow:1,hardness:1,pressureFlow:false,pressureWidth:true,minSize:.08,textureStrength:0,stabilization:.08,smoothness:18},'coloring'),
  preset('color-soft','Soft Paint','Paint',{brushKind:'coloring-soft',brushTip:'color-soft',coloringEngine:1,colorNib:'filbert',colorNibFollow:false,tipAngle:-20,size:65,opacity:1,flow:.8,hardness:.4,pressureFlow:true,pressureWidth:true,minSize:.15,textureStrength:0,stabilization:.08,smoothness:18},'coloring'),
  preset('color-air','Airbrush','Paint',{brushKind:'coloring-air',brushTip:'color-air',coloringEngine:1,colorNib:'oval',colorNibFollow:false,tipAngle:-15,size:90,opacity:1,flow:.55,hardness:0,pressureFlow:true,pressureWidth:true,minSize:.25,textureStrength:0,stabilization:.06,smoothness:18},'coloring'),
@@ -158,3 +160,4 @@ export function activeInputPreset(library:BrushLibrary,eraser=false){
  if(eraser||library.mode!=='mix'||!brushSupportsMix(preset))return preset;
  return {...preset,name:preset.name+' · Mix',settings:mixifiedBrushSettings(preset.settings)};
 }
+
