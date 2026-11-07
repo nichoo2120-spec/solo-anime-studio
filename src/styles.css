@@ -279,6 +279,7 @@
 /* Wheel floats above the WORKBENCH, not inside the clipping drawing canvas. */
 .workbench{position:relative}.wheel-overlay{position:absolute;inset:0;pointer-events:none;z-index:35;overflow:visible}
 .wheel-overlay .radial-wrap{pointer-events:auto}
+.wheel-overlay .radial-wrap{transform:translateZ(0);backface-visibility:hidden}
 .wheel-overlay .radial-wrap.collapsed{filter:none}
 .wheel-overlay .radial-grip{height:16px;width:37px;margin:0 auto 2px}
 .wheel-overlay .radial-footer{height:18px}
@@ -653,3 +654,4 @@
 .timeline .cel-hold,.timeline .cel-art{font-size:8px}
 .timeline .timeline-track>.layer-track-heading{height:31px;min-height:31px;font-size:8px}
 .timeline .layer-track-name,.timeline .layer-cel-row{height:23px;min-height:23px}
+
