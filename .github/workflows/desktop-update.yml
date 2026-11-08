@@ -50,6 +50,8 @@ jobs:
       - run: node tests/sharp-graphs-v209.mjs
       - run: node tests/live-brush-v208.mjs
       - run: node tests/profile-stability-v208.mjs
+      - run: node tests/ink-display-quality-v210.mjs
+      - run: node tests/high-dpi-ink-v210.mjs
       - uses: actions/checkout@v4
         with:
           ref: v0.5.200
