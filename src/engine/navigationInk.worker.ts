@@ -4,7 +4,7 @@ import {drawSolidInkV10} from './solidInkV10';
 import {drawFlatInk} from './flatInk';
 type Job={token:number;layer:string;width:number;height:number;append:boolean;parts:Stroke[];base?:ImageBitmap};
 const layers=new Map<string,OffscreenCanvas>();
-const native=(s:Stroke)=>!s.pressureOpacity&&!s.taperStart&&!s.taperEnd&&!(s.pressure&&s.pressureWidth!==false)&&!s.velocityTaper&&['technical','eraser-hard'].includes(s.brushKind??'technical');
+const native=(s:Stroke)=>!s.inkProfileVersion&&!s.inkTipVersion&&!s.pressureOpacity&&!s.taperStart&&!s.taperEnd&&!(s.pressure&&s.pressureWidth!==false)&&!s.velocityTaper&&['technical','eraser-hard'].includes(s.brushKind??'technical');
 function draw(ctx:OffscreenCanvasRenderingContext2D,s:Stroke){
  const g=strokeGeometry(s);if(!g.points.length)return;ctx.save();if(s.transform)ctx.transform(...s.transform);
  if(native(s)){ctx.fillStyle=ctx.strokeStyle=s.color;const p=new Path2D();if(!g.cubics.length){p.arc(g.points[0].x,g.points[0].y,s.size/2,0,Math.PI*2);ctx.fill(p);}else{p.moveTo(g.points[0].x,g.points[0].y);for(const c of g.cubics)p.bezierCurveTo(c.c1.x,c.c1.y,c.c2.x,c.c2.y,c.b.x,c.b.y);ctx.lineWidth=s.size;ctx.lineCap=ctx.lineJoin='round';ctx.stroke(p);}}
@@ -25,3 +25,4 @@ self.onmessage=async({data:j}:MessageEvent<Job>)=>{try{
  while(layers.size>1&&(layers.size>4||bytes>64*1024*1024)){const key=layers.keys().next().value!,c=layers.get(key)!;bytes-=c.width*c.height*4;c.width=c.height=0;layers.delete(key);}
  const bitmap=await createImageBitmap(out!);(self as unknown as Worker).postMessage({token:j.token,bitmap},[bitmap]);
  }catch(error){(self as unknown as Worker).postMessage({token:j.token,error:String(error)});}finally{j.base?.close();}};
+
