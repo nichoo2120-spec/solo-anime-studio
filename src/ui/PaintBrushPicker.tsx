@@ -9,6 +9,7 @@ const TipCard=memo(function TipCard({preset,active,onChoose}:{preset:BrushPreset
  const tip=isColoringTip(s.brushTip)?colorNibs.find(n=>n.id===(s.colorNib??defaultColorNib(s.brushTip)))?.name??'Nib':s.brushTip==='round'?(s.brushKind==='airbrush'?'Soft round':'Original tip'):paintTips.find(t=>t.id===s.brushTip)?.name??'Original tip';
  return <button type="button" className={'paint-tip-card'+(active?' selected':'')} title={preset.name+' · '+tip} aria-label={'Use '+preset.name} aria-pressed={active} onClick={()=>onChoose(preset.id)}><canvas ref={canvas} width="140" height="48" aria-label={preset.name+' stroke preview'}/><span>{preset.name}</span><small>{tip}</small></button>;
 });
-export const PaintBrushPicker=memo(function PaintBrushPicker({presets,selected,family,onChoose}:{presets:BrushPreset[];selected:string;family?:BrushPreset['family'];onChoose:(id:string)=>void}){
- return <div className="paint-tip-picker" role="group" aria-label="Paint brush tips">{presets.filter(p=>p.category==='Paint'&&(!family||p.family===family)).map(p=><TipCard key={p.id} preset={p} active={p.id===selected} onChoose={onChoose}/>)}</div>;
+export const PaintBrushPicker=memo(function PaintBrushPicker({presets,selected,family,onChoose,category='Paint'}:{presets:BrushPreset[];selected:string;family?:BrushPreset['family'];category?:BrushPreset['category'];onChoose:(id:string)=>void}){
+ return <div className="paint-tip-picker" role="group" aria-label={category==='Paint'?'Paint brush tips':'Brush tip presets'}>{presets.filter(p=>p.category===category&&(!family||p.family===family)).map(p=><TipCard key={p.id} preset={p} active={p.id===selected} onChoose={onChoose}/>)}</div>;
 });
+
