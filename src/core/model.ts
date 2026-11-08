@@ -1,3 +1,4 @@
+import {validCurve} from './brushCurves';
 import {validWidthPoints,canEditStrokeWidth,type WidthPointControls} from './widthPoints';
 import {validImportedGrain} from './importedGrain';
 import type {InkFlowControls} from './inkFlow';
@@ -139,6 +140,7 @@ export function validateProject(value:unknown):Project {
     if(o.brushTip!==undefined&&!isPaintTip(o.brushTip))throw Error('Unknown brush tip.');
     if(o.tipAngle!==undefined&&(!Number.isFinite(o.tipAngle)||o.tipAngle< -180||o.tipAngle>180))throw Error('Invalid tip angle.');
     if(o.tipSpacing!==undefined&&(!Number.isFinite(o.tipSpacing)||o.tipSpacing<.02||o.tipSpacing>.5))throw Error('Invalid tip spacing.');
+    if(o.inkProfileVersion!==undefined&&(o.inkProfileVersion!==1||o.engineVersion!==10||!['studio-ink','contour-flow','technical','g-pen','mapping','brush-pen'].includes(o.brushKind??'')||!validCurve(o.inkProfile,false))||o.inkProfile!==undefined&&(o.inkProfileVersion!==1||!validCurve(o.inkProfile,false))||o.inkProfileLength!==undefined&&!bounded(o.inkProfileLength,24,1000))throw Error('Invalid brush width profile.');
     if(o.widthPointVersion!==undefined&&(o.widthPointVersion!==1||!canEditStrokeWidth(o)||!validWidthPoints(o.widthPoints))||o.widthPoints!==undefined&&(o.widthPointVersion!==1||!validWidthPoints(o.widthPoints)))throw Error('Invalid stroke width points.');
     if(o.inkImage!==undefined&&(!validImportedGrain(o.inkImage)||o.inkTipVersion!==1)||o.inkImageAmount!==undefined&&!bounded(o.inkImageAmount,0,1)||o.inkImageScale!==undefined&&!bounded(o.inkImageScale,.25,8)||o.inkImageInvert!==undefined&&typeof o.inkImageInvert!=='boolean')throw Error('Invalid imported brush texture.');
     if(o.inkTipVersion!==undefined&&(o.inkTipVersion!==1||!['studio-ink','contour-flow','technical','g-pen','mapping','brush-pen'].includes(o.brushKind??'')))throw Error('Invalid ink tip.');
@@ -151,7 +153,7 @@ export function validateProject(value:unknown):Project {
     if(o.captureZoom!==undefined&&!bounded(o.captureZoom,.25,8))throw Error('Invalid captured zoom for stroke.');
     for(const [key,min,max] of [['stabilization',0,1],['smoothness',0,100],['taperStart',0,1],['taperEnd',0,1],['textureStrength',0,1],['minSize',0,1],['maxSize',0,1],['minOpacity',0,1],['maxOpacity',0,1]] as const)if(o[key]!==undefined&&!bounded(o[key],min,max))throw Error('Invalid stroke setting.');
     if((o.minSize??0)>(o.maxSize??1)||(o.minOpacity??0)>(o.maxOpacity??1))throw Error('Minimum pressure response exceeds maximum.');
-    if(o.pressureCurve!==undefined&&(!Array.isArray(o.pressureCurve)||o.pressureCurve.length!==5||o.pressureCurve.some((n:any,i:number)=>!n||n.x!==i/4||!bounded(n.y,0,1)||(i>0&&n.y<o.pressureCurve[i-1].y))))throw Error('Invalid pressure curve.');
+    if(o.pressureCurve!==undefined&&(!Array.isArray(o.pressureCurve)||!validCurve(o.pressureCurve)))throw Error('Invalid pressure curve.');
     if(['pressureWidth','pressureOpacity','velocityTaper'].some(key=>o[key]!==undefined&&typeof o[key]!=='boolean'))throw Error('Invalid pressure control.');
    }else if(o.kind==='fill'){
     if(typeof o.png!=='string'||!o.png.startsWith('data:image/png;base64,')||o.png.length>50000000)throw Error('Invalid fill data.');
@@ -173,7 +175,7 @@ export function validateProject(value:unknown):Project {
     for(const key of ['taperStart','taperEnd'] as const)if(o[key]!==undefined&&!bounded(o[key],0,1))throw Error('Invalid vector taper.');
     if(o.minWidthPercent!==undefined&&o.maxWidthPercent!==undefined&&o.minWidthPercent>o.maxWidthPercent)throw Error('Vector width minimum exceeds maximum.');
     if(o.sourceNodes!==undefined&&(!Array.isArray(o.sourceNodes)||o.sourceNodes.length!==o.nodes.length||!o.sourceNodes.every((n:any)=>point(n)&&n.in&&n.out&&[n.in.x,n.in.y,n.out.x,n.out.y].every(finite))))throw Error('Invalid vector source nodes.');
-    if(o.pressureCurve!==undefined&&(!Array.isArray(o.pressureCurve)||o.pressureCurve.length!==5||o.pressureCurve.some((n:any,i:number)=>!n||n.x!==i/4||!bounded(n.y,0,1)||(i>0&&n.y<o.pressureCurve[i-1].y))))throw Error('Invalid vector pressure curve.');
+    if(o.pressureCurve!==undefined&&!validCurve(o.pressureCurve))throw Error('Invalid vector pressure curve.');
    }else throw Error('Unknown drawing operation.');
   }
  }
