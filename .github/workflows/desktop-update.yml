@@ -47,6 +47,7 @@ jobs:
       - run: node tests/width-points-v205.mjs
       - run: node tests/width-entry-v206.mjs
       - run: node tests/compact-brush-v207.mjs
+      - run: node tests/sharp-graphs-v209.mjs
       - run: node tests/live-brush-v208.mjs
       - run: node tests/profile-stability-v208.mjs
       - uses: actions/checkout@v4
@@ -71,7 +72,18 @@ jobs:
       - run: node tests/mix-v179-reference.mjs
       - run: node tests/mix-v179-ui.mjs
       - run: node tests/mix-v179-mirror.mjs
-      - run: npm run dist:win
+      - name: Build Windows installer (retry transient downloads)
+        shell: pwsh
+        run: |
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            npm run dist:win
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($attempt -lt 3) {
+              Write-Host "Installer build failed; retrying in 15 seconds ($attempt/3)."
+              Start-Sleep -Seconds 15
+            }
+          }
+          exit $LASTEXITCODE
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - run: node scripts/release-desktop.cjs verify
