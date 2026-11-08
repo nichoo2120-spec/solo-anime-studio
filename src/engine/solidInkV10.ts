@@ -16,9 +16,9 @@ export type SolidPathInfo={ends:number[];states:PathState[];points?:Point[];tota
  * so overlap forms solid ink without accumulating opacity or cutting holes. */
 export function drawSolidInkV10(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnType<typeof strokeGeometry>,region?:RasterRegion,displayScale=0,paths?:Path2D[],info?:SolidPathInfo):boolean{
  const kind=s.brushKind??'technical';
- const roundInk=kind==='studio-ink'||kind==='contour-flow';
- if(!displayScale&&s.size<64&&!roundInk&&s.inkTipVersion!==1&&s.widthPointVersion!==1||(displayScale?s.pressure&&s.pressureOpacity:s.pressureOpacity)||s.textureStrength||s.inkTipVersion===1&&s.inkImage&&(s.inkImageAmount??1)>0||!['studio-ink','contour-flow','technical','eraser-hard','g-pen','mapping','brush-pen','flat'].includes(kind))return false;
- const points:Point[]=g.cubics.length?g.cubics.flatMap((c,i)=>flattenCubic(c,s.inkFlowVersion===1||s.widthPointVersion===1?.12:.18/Math.max(1,displayScale)).slice(i?1:0)):g.points;
+ const roundInk=kind==='studio-ink'||kind==='contour-flow'||s.inkProfileVersion===1;
+ if(!displayScale&&s.size<64&&!roundInk&&s.inkTipVersion!==1&&s.widthPointVersion!==1&&s.inkProfileVersion!==1||(displayScale?s.pressure&&s.pressureOpacity:s.pressureOpacity)||s.textureStrength||s.inkTipVersion===1&&s.inkImage&&(s.inkImageAmount??1)>0||!['studio-ink','contour-flow','technical','eraser-hard','g-pen','mapping','brush-pen','flat'].includes(kind))return false;
+ const points:Point[]=g.cubics.length?g.cubics.flatMap((c,i)=>flattenCubic(c,s.inkProfileVersion===1||s.inkFlowVersion===1||s.widthPointVersion===1?.12:.18/Math.max(1,displayScale)).slice(i?1:0)):g.points;
  if(!points.length)return true;
  let total=0;for(let i=1;i<points.length;i++)total+=Math.hypot(points[i].x-points[i-1].x,points[i].y-points[i-1].y);
  let resumed:PathState|undefined;
@@ -48,11 +48,11 @@ export function drawSolidInkV10(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnTy
    const response=s.pressure?pressureResponse(Math.pow(p,s.response),s.pressureCurve):1;
    const velocity=s.velocityTaper?(a.v??1)+((b.v??1)-(a.v??1))*t:1;
    const radius=s.size*.5*(s.pressure&&s.pressureWidth!==false||s.velocityTaper?widthResponse(response*velocity,s):1)*taper(along+len*t)*inkFlowFactor(s,along+len*t)*widthPointFactor(s,along+len*t,total);
-   if(radius<.01){if(displayScale||roundInk||s.widthPointVersion===1)previousDab={x,y,radius:0,aspect:1,rotation:0};continue;}
+   if(radius<.01){if(displayScale||roundInk||s.inkProfileVersion===1||s.widthPointVersion===1)previousDab={x,y,radius:0,aspect:1,rotation:0};continue;}
    const customTip=s.inkTipVersion===1?inkTipGeometry(s,angle):undefined;
    const aspect=customTip?.aspect??(kind==='g-pen'?.74:kind==='mapping'?.48:kind==='brush-pen'?.52:1);
    const rotation=customTip?.rotation??(kind==='brush-pen'?angle+.6:kind==='g-pen'||kind==='mapping'||kind==='flat'?-.55:0);
-   if((displayScale||roundInk||s.inkTipVersion===1||s.widthPointVersion===1)&&kind!=='flat'){
+   if((displayScale||roundInk||s.inkTipVersion===1||s.inkProfileVersion===1||s.widthPointVersion===1)&&kind!=='flat'){
     const nextDab={x,y,radius,aspect,rotation};
     if(previousDab){const a=previousDab,dx=x-a.x,dy=y-a.y,len=Math.hypot(dx,dy);if(len){const nx=-dy/len,ny=dx/len,A=support(a,nx,ny),B=support(nextDab,nx,ny);path.moveTo(a.x+A.x,a.y+A.y);path.lineTo(a.x-A.x,a.y-A.y);path.lineTo(x-B.x,y-B.y);path.lineTo(x+B.x,y+B.y);path.closePath();}}
     previousDab=nextDab;

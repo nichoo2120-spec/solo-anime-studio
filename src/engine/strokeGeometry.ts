@@ -58,7 +58,7 @@ export function flattenCubic(c:Cubic,tolerance=.18):Point[]{
  * artwork and keep their precise previous geometry and rendering behavior.
  */
 export const STROKE_FEEL_REFERENCE_ZOOM=1.21;
-const followLiveInkTip=(stroke:Stroke)=>stroke.liveRefinementVersion===3&&['studio-ink','contour-flow','g-pen','mapping','brush-pen'].includes(stroke.brushKind??'');
+const followLiveInkTip=(stroke:Stroke)=>stroke.liveRefinementVersion===3&&(stroke.inkProfileVersion===1||['studio-ink','contour-flow','g-pen','mapping','brush-pen'].includes(stroke.brushKind??''));
 function screenSpaceGeometry(stroke:Stroke,phase:'live'|'final',calculate:(source:Point[])=>{points:Point[];cubics:Cubic[]}){
  const zoom=stroke.captureZoom;
  if(zoom===undefined||!Number.isFinite(zoom)||zoom<=0)return calculate(stroke.points);

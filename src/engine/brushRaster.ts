@@ -31,7 +31,7 @@ export function drawModernStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phas
  const c=mixedBase??=document.createElement('canvas');if(c.width!==ctx.canvas.width)c.width=ctx.canvas.width;if(c.height!==ctx.canvas.height)c.height=ctx.canvas.height;const cc=c.getContext('2d')!;cc.clearRect(0,0,c.width,c.height);drawBaseStroke(cc,{...stroke,mixStops:undefined},phase,geometry,undefined,pass);ctx.drawImage(c,0,0);tintMix(ctx,stroke);
 }
 function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|'final'='final',geometry?:ReturnType<typeof strokeGeometry>,region?:RasterRegion,pass?:PaintPass,origin?:{x:number;y:number}){
- const roundInk=stroke.brushKind==='studio-ink'||stroke.brushKind==='contour-flow';
+ const roundInk=stroke.brushKind==='studio-ink'||stroke.brushKind==='contour-flow'||stroke.inkProfileVersion===1;
  const resolved=geometry??(phase==='final'?finalGeometry(stroke):strokeGeometry(stroke,phase));
  if(stroke.dryBristleVersion===3){drawDryBristleV3(ctx,stroke,resolved,region,pass);return;}
  if(stroke.dryBristleVersion===2){drawDryBristleV2(ctx,stroke,resolved,region,pass);return;}
@@ -44,13 +44,13 @@ function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|
  if(stroke.flatNibVersion===1&&drawFlatInk(ctx,stroke,resolved,region))return;
  const {points,cubics}=resolved;if(!points.length)return;
  const tapered=!!(stroke.taperStart||stroke.taperEnd),varyingWidth=stroke.pressure&&stroke.pressureWidth!==false||!!stroke.velocityTaper;
- if(!stroke.widthPointVersion&&!stroke.inkTipVersion&&!stroke.pressureOpacity&&!tapered&&!varyingWidth&&(!stroke.brushKind||stroke.brushKind==='technical'||stroke.brushKind==='eraser-hard')){
+ if(!stroke.inkProfileVersion&&!stroke.widthPointVersion&&!stroke.inkTipVersion&&!stroke.pressureOpacity&&!tapered&&!varyingWidth&&(!stroke.brushKind||stroke.brushKind==='technical'||stroke.brushKind==='eraser-hard')){
   ctx.save();ctx.strokeStyle=stroke.color;ctx.fillStyle=stroke.color;ctx.lineWidth=stroke.size;ctx.lineCap='round';ctx.lineJoin='round';
   if(!cubics.length){ctx.beginPath();ctx.arc(points[0].x,points[0].y,stroke.size/2,0,Math.PI*2);ctx.fill();}else{ctx.beginPath();ctx.moveTo(points[0].x,points[0].y);for(const c of cubics)ctx.bezierCurveTo(c.c1.x,c.c1.y,c.c2.x,c.c2.y,c.b.x,c.b.y);ctx.stroke();}ctx.restore();return;
  }
  if(stroke.engineVersion===10&&drawSolidInkV10(ctx,stroke,resolved,region))return;
  const optimizedWash=stroke.engineVersion===7&&stroke.brushKind==='watercolor';
- const samples:Point[]=pass?.samples.points??(cubics.length?cubics.flatMap((c,i)=>flattenCubic(c,optimizedWash?.7:stroke.inkFlowVersion===1||stroke.widthPointVersion===1?.12:.18).slice(i?1:0)):points);
+ const samples:Point[]=pass?.samples.points??(cubics.length?cubics.flatMap((c,i)=>flattenCubic(c,optimizedWash?.7:stroke.inkProfileVersion===1||stroke.inkFlowVersion===1||stroke.widthPointVersion===1?.12:.18).slice(i?1:0)):points);
  const pad=stroke.size*(stroke.paintNibVersion===1?.5:1)+3;let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
  for(const p of samples){minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);}
  const x=Math.max(region?.x??0,Math.floor(minX-pad)),y=Math.max(region?.y??0,Math.floor(minY-pad)),w=Math.min(region?region.x+region.width:ctx.canvas.width,Math.ceil(maxX+pad))-x,h=Math.min(region?region.y+region.height:ctx.canvas.height,Math.ceil(maxY+pad))-y;if(w<=0||h<=0)return;

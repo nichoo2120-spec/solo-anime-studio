@@ -1,10 +1,12 @@
+import {brushProfileFactor,type BrushProfileControls} from './brushCurves';
 import type {InkTipControls} from './inkTip';
-export type InkFlowControls={inkFlowAmount?:number;inkFlowLength?:number}&InkTipControls;
+export type InkFlowControls={inkFlowAmount?:number;inkFlowLength?:number}&InkTipControls&BrushProfileControls;
 export type InkFlowStroke=InkFlowControls&{inkFlowVersion?:1;size:number};
 export const isFlowInk=(kind:string|undefined)=>kind==='studio-ink'||kind==='contour-flow';
 /** Distance from pen-down is the phase anchor. Never use elapsed time or the
  * unfinished total length: extending a stroke cannot move its settled pulses. */
 export function inkFlowFactor(stroke:InkFlowStroke,distance:number){
+ if(stroke.inkProfileVersion===1)return brushProfileFactor(stroke,distance);
  if(stroke.inkFlowVersion!==1)return 1;
  const amount=Math.max(0,Math.min(1,stroke.inkFlowAmount??0));
  const spacing=Math.max(24,stroke.size*3,stroke.inkFlowLength??160);
