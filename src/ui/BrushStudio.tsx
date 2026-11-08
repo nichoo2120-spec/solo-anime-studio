@@ -1,10 +1,10 @@
+import {BrushPreview} from './BrushPreview';
 import {CurveEditor} from './CurveEditor';
 import {defaultBrushProfile} from '../core/brushCurves';
 import {TipShapeDial} from './TipShapeDial';
 import {importGrainImage} from '../core/importedGrain';
 import {supportsInkTip} from '../core/inkTip';
 import {isColoringTip,colorNibs,coloringNibs,defaultColorNib,type ColorNib} from '../core/coloring';
-import {coloringPreview} from '../engine/coloringPreview';
 import {watercolorShapes,defaultWatercolorShape} from '../engine/watercolorShapes';
 import type {WatercolorShape,WatercolorMode} from '../core/model';
 import {brushStrokeMetadata,selectablePaintTips,isNewWatercolorTip,isMixTip,type PaintTip,type TipMixControls} from '../core/paintTips';
@@ -18,7 +18,7 @@ import {linearPressure} from '../engine/strokeGeometry';
 import type {BrushSettings} from '../engine/StudioEngine';
 function Slider(props:ExactRangeProps){return <ExactRange {...props} live/>;}
 export const BrushStudio=memo(function BrushStudio({library,eraser,onChange,notify,onToggleMode}:{library:BrushLibrary;eraser:boolean;onChange:(library:BrushLibrary|((old:BrushLibrary)=>BrushLibrary))=>void;notify:(message:string)=>void;onToggleMode?:(mode:'paint'|'mix')=>void}){
- const preset=activePreset(library,eraser),s=preset.settings,inputPreset=activeInputPreset(library,eraser),preview=useRef<HTMLCanvasElement>(null);
+ const preset=activePreset(library,eraser),s=preset.settings,inputPreset=activeInputPreset(library,eraser);
  const [settingsCollapsed,setSettingsCollapsed]=useState(false),[helpOpen,setHelpOpen]=useState(false),[helpText,setHelpText]=useState(''),[settingsOpen,setSettingsOpen]=useState(false),[settingsSection,setSettingsSection]=useState('width');
  const settingsPanel=useRef<HTMLElement>(null),settingsTrigger=useRef<HTMLButtonElement>(null),sectionRefs=useRef<Record<string,HTMLElement|null>>({});
  const closeSettings=()=>{setSettingsOpen(false);settingsTrigger.current?.focus();};
@@ -33,7 +33,7 @@ export const BrushStudio=memo(function BrushStudio({library,eraser,onChange,noti
  const [allPaint,setAllPaint]=useState(false),paintFamily=allPaint?undefined:preset.family;
  const patch=(p:Partial<BrushSettings>)=>onChange(old=>{const current=activePreset(old,eraser);return updatePreset(old,current.id,{...current.settings,...p});});
  const choose=useCallback((id:string)=>onChange(old=>{const current=activePreset(old,eraser),target=old.presets.find(p=>p.id===id);let next=old;if(!eraser&&isColoringTip(current.settings.brushTip)&&target&&isColoringTip(target.settings.brushTip)){const a=current.settings,nib=a.colorNib??defaultColorNib(a.brushTip);next=updatePreset(old,id,{...target.settings,colorNib:!!a.smudgeVersion||!!target.settings.smudgeVersion?target.settings.colorNib??defaultColorNib(target.settings.brushTip):coloringNibs(target.settings.brushTip).includes(nib)?nib:defaultColorNib(target.settings.brushTip),size:a.size,color:a.color});}if(!eraser&&isNewWatercolorTip(current.settings.brushTip)&&target&&isNewWatercolorTip(target.settings.brushTip)){const a=current.settings;next=updatePreset(old,id,{...target.settings,watercolorShape:a.watercolorShape??defaultWatercolorShape(a.brushTip),watercolorMode:a.watercolorMode??'even',size:a.size,color:a.color,tipAngle:a.tipAngle});}return {...next,[eraser?'eraserId':'brushId']:id};}),[onChange,eraser]);
- useEffect(()=>{const frame=requestAnimationFrame(()=>{const c=preview.current;if(!c)return;const ctx=c.getContext('2d')!;ctx.save();ctx.clearRect(0,0,c.width,c.height);const points=Array.from({length:60},(_,i)=>({x:18+i*(c.width-36)/59,y:c.height*.5-Math.sin(i/59*Math.PI*2)*c.height*.15+(settingsSection==='smoothing'?Math.sin(i*2.1)*2:0),p:.2+Math.sin(i/59*Math.PI)*.8}));coloringPreview(ctx,{...inputPreset.settings,kind:'stroke',id:'preview',tool:'brush',...brushStrokeMetadata(inputPreset.settings),points,size:Math.min(36,Math.sqrt(inputPreset.settings.size/150)*36),color:'#d9e2e5',pressure:inputPreset.settings.pressure});ctx.globalCompositeOperation='destination-in';ctx.globalAlpha=s.opacity;ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.restore();});return()=>cancelAnimationFrame(frame);},[s,inputPreset.settings,settingsOpen,settingsSection]);
+
  const [importingTexture,setImportingTexture]=useState(false);
  const inkTip=supportsInkTip(s.brushKind);
  const patchInkTip=(p:Partial<BrushSettings>)=>patch({inkTipVersion:1,inkTipShape:s.inkTipShape??(['g-pen','mapping','brush-pen'].includes(s.brushKind??'')?'oval':'round'),inkTipRoundness:s.inkTipRoundness??(s.brushKind==='g-pen'?.74:s.brushKind==='mapping'?.48:.52),inkTipAngle:s.inkTipAngle??(s.brushKind==='brush-pen'?34:-32),inkTipFollow:s.inkTipFollow??s.brushKind==='brush-pen',...p});
@@ -93,7 +93,7 @@ export const BrushStudio=memo(function BrushStudio({library,eraser,onChange,noti
  {s.inkImage&&<><p className="hint" role="status">Texture: {s.inkImage.name}</p><fieldset className="ink-tip-controls" disabled={mixMode}><Slider name="Imported texture strength" value={Math.round((s.inkImageAmount??1)*100)} unit="%" set={v=>patch({inkImageAmount:v/100})}/><Slider name="Imported texture scale" min={25} max={800} value={Math.round((s.inkImageScale??1)*100)} unit="%" set={v=>patch({inkImageScale:v/100})}/><label className="check-row"><span>Invert imported texture</span><input aria-label="Invert imported texture" type="checkbox" checked={!!s.inkImageInvert} onChange={e=>patch({inkImageInvert:e.target.checked})}/></label></fieldset><button type="button" onClick={()=>patch({inkImage:undefined})}>Remove imported texture</button></>}{mixMode&&<p className="hint">Switch to Paint mode to import and use an ink texture.</p>}</>:<p className="hint">Image grain currently supports the Ink brushes. Paint materials and fixed pencil tips keep their own texture systems.</p>}  {(s.opacity===0||painting&&s.flow===0||s.pressure&&s.pressureWidth!==false&&s.maxSize===0||s.pressure&&s.pressureOpacity&&s.maxOpacity===0)&&<p className="hint" role="status">This preset has zero opacity, zero flow or a zero pressure ceiling. Increase it to paint visible marks; your saved settings are preserved.</p>}
 <p className="hint">Save a custom preset to keep a separate copy of this brush. Reset restores only this brush's defaults.</p>  </section>
  </div></div>
- <div className="brush-settings-preview"><canvas ref={preview} width="500" height="54" className="brush-studio-preview" aria-label="Rendered brush preview"/><span>Live preview · changes apply to new strokes</span></div>
+ <div className="brush-settings-preview"><BrushPreview settings={inputPreset.settings} section={settingsSection}/><span>Live preview · changes apply to new strokes</span></div>
 <footer className="brush-settings-footer"><button type="button" onClick={()=>onChange(old=>{const current=activePreset(old,eraser);return updatePreset(old,current.id,{...current.defaults});})}>Reset brush</button><button type="button" className="primary" onClick={closeSettings}>Done</button></footer>
  </aside>,document.body)}</div>;
 });

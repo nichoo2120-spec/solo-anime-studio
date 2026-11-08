@@ -47,6 +47,7 @@ jobs:
       - run: node tests/width-points-v205.mjs
       - run: node tests/width-entry-v206.mjs
       - run: node tests/compact-brush-v207.mjs
+      - run: node tests/sharp-graphs-v209.mjs
       - run: node tests/live-brush-v208.mjs
       - run: node tests/profile-stability-v208.mjs
       - uses: actions/checkout@v4
