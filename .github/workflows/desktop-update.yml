@@ -33,6 +33,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - run: npx tsc -b
       - run: npm test -- --maxWorkers=2
       - run: node --test tests/desktop-update.test.cjs tests/desktop-release.test.cjs
       - run: npx playwright install chromium
