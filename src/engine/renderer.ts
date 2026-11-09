@@ -12,7 +12,7 @@ import {drawVector} from './vector';
 import {finalGeometry} from './geometryCache';
 import {mapPoint,scaleOf} from './strokeSelection';
 import {projectPoint} from './perspectiveWarp';
-import {flattenCubic} from './strokeGeometry';
+import {projectiveInkGeometry} from './projectiveInkGeometry';
 import {SparseStrokeTiles,supportsSparseStroke} from './SparseStrokeTiles';
 export const makeCanvas=(w:number,h:number)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
 export const context=(c:HTMLCanvasElement)=>c.getContext('2d',{willReadFrequently:true})!;
@@ -33,12 +33,8 @@ export function drawStroke(ctx:CanvasRenderingContext2D,s:Stroke,phase:'live'|'f
  if(phase==='final'&&s.nativeMixVersion===3&&s.dryBristleVersion===3)resetDryBristleV3MixModel(s);
  if(s.rasterTransformVersion===1&&s.transform){const c=reflectedSurface??=makeCanvas(ctx.canvas.width,ctx.canvas.height);if(c.width!==ctx.canvas.width)c.width=ctx.canvas.width;if(c.height!==ctx.canvas.height)c.height=ctx.canvas.height;const cc=c.getContext('2d')!;cc.clearRect(0,0,c.width,c.height);drawStroke(cc,{...s,id:s.rasterSourceId??s.id,transform:undefined,rasterTransformVersion:undefined},phase,geometry);ctx.save();ctx.transform(...s.transform);ctx.drawImage(c,0,0);ctx.restore();return;}
  if(s.perspective){
-  const g=geometry??finalGeometry(s),raw=g.cubics.length?g.cubics.flatMap((c,i)=>flattenCubic(c,1.0).slice(i?1:0)):g.points;
-  const pts=raw.map(pt=>projectPoint(pt,s.perspective!));
-  // Straight micro-Beziers preserve a projectively curved line, including endpoint pressure.
-  const cubics=pts.slice(1).map((b,i)=>{const a=pts[i];return {a,c1:{...a,x:a.x+(b.x-a.x)/3,y:a.y+(b.y-a.y)/3},c2:{...b,x:a.x+(b.x-a.x)*2/3,y:a.y+(b.y-a.y)*2/3},b};});
-  const warped={points:pts,cubics};
-  drawStroke(ctx,{...s,id:s.rasterSourceId??s.id,perspective:undefined,transform:undefined,points:pts},phase,warped);return;
+  const warped=projectiveInkGeometry(s,geometry??finalGeometry(s));
+  drawStroke(ctx,{...s,id:s.rasterSourceId??s.id,perspective:undefined,transform:undefined,points:warped.points},phase,warped);return;
  }
  if(s.transform){ctx.save();ctx.transform(...s.transform);drawStroke(ctx,{...s,transform:undefined},phase,geometry);ctx.restore();return;}
  if((s.dryBristleVersion===1||s.dryBristleVersion===2||s.dryBristleVersion===3)){drawModernStroke(ctx,s,phase,geometry);return;}

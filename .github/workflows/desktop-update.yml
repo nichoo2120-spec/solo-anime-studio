@@ -33,10 +33,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - run: npx tsc -b
       - run: npm test -- --maxWorkers=2
       - run: node --test tests/desktop-update.test.cjs tests/desktop-release.test.cjs
       - run: npx playwright install chromium
       - run: npx playwright test tests/browser/distort-preview-v214.spec.ts tests/browser/transform-v116.spec.ts tests/browser/transform-modes-v116.spec.ts
+      - run: npx playwright test tests/browser/reselection-loop-v215.spec.ts
       - run: node tests/offscreen-drawing-v186.mjs
       - run: node tests/drawing-latency-v187.mjs
       - run: node tests/project-tabs-v199.mjs
@@ -56,6 +58,7 @@ jobs:
       - run: node tests/profile-stability-v208.mjs
       - run: node tests/ink-display-quality-v210.mjs
       - run: node tests/high-dpi-ink-v210.mjs
+      - run: node tests/projective-reopen-v215.mjs
       - uses: actions/checkout@v4
         with:
           ref: v0.5.200
