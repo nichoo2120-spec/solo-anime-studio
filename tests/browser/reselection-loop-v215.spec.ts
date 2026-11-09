@@ -21,7 +21,7 @@ test('Stroke Select can pick the same edited ink over and over, including after 
    const {e,store}=(window as any).__repeatSelection;
    const doc=store.getSnapshot(),op=doc.layers.find((l:any)=>l.id===doc.activeLayerId).operations[0];
    const pts=polyline(op),p=pts[Math.floor(pts.length*.5)];
-   const r=e.canvas.getBoundingClientRect();
+   const r=(window as any).__repeatSelection.canvas.getBoundingClientRect();
    return {x:r.left+p.x,y:r.top+p.y};
   });
   await page.mouse.click(target.x,target.y);
