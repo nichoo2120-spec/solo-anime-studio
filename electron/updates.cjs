@@ -1,5 +1,13 @@
 // Keep updater state out of the drawing renderer. Paper/project storage is untouched.
-function createUpdates({ app, dialog, getWindow, loadUpdater, log = () => {}, later = setTimeout, every = setInterval, defer = setImmediate }) {
+/** Retry temporary gateway/network errors, not configuration, auth or invalid feed errors. */
+function isTransientUpdateError(error) {
+  const status = error?.statusCode ?? error?.status;
+  if ([408, 429, 500, 502, 503, 504].includes(status)) return true;
+  const message = String(error?.message || error);
+  return /(?:^|[^\d])(?:408|429|500|502|503|504)(?!\d)|ETIMEDOUT|ECONNRESET|EAI_AGAIN|ENOTFOUND|ERR_NETWORK|gateway timeout|network timeout|temporarily unavailable/i.test(message);
+}
+
+function createUpdates({ app, dialog, getWindow, loadUpdater, log = () => {}, later = setTimeout, every = setInterval, defer = setImmediate, pause = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
   let updater, state = 'idle', version = '', checking, prompt, installing = false;
   let configured = false;
 
@@ -19,12 +27,23 @@ function createUpdates({ app, dialog, getWindow, loadUpdater, log = () => {}, la
 
   function runCheck() {
     if (checking) return checking;
+    // Coalesce automatic and manual requests, and retry only transient server
+    // failures. Never launch parallel electron-updater download/check sessions.
     checking = Promise.resolve().then(async () => {
       state = 'checking';
-      try { return await updater.checkForUpdates(); }
-      catch (error) { state = 'error'; throw error; }
-      finally { checking = undefined; }
-    });
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try { return await updater.checkForUpdates(); }
+        catch (error) {
+          if (attempt === 2 || !isTransientUpdateError(error)) {
+            state = 'error';
+            throw error;
+          }
+          log('update check temporarily unavailable; retrying', error);
+          await pause(attempt === 0 ? 1500 : 4000);
+          state = 'checking';
+        }
+      }
+    }).finally(() => { checking = undefined; });
     return checking;
   }
 
@@ -39,7 +58,11 @@ function createUpdates({ app, dialog, getWindow, loadUpdater, log = () => {}, la
       return `You have the latest version (${app.getVersion()}).`;
     } catch (error) {
       log('check failed', error);
-      return `Could not check for updates. Your drawing is safe; try again later. ${String(error.message || error).split('\n')[0].slice(0, 160)}`;
+      const detail = String(error.message || error).split('\n')[0].slice(0, 100);
+      const fallback = isTransientUpdateError(error)
+        ? ' The update server is temporarily unavailable. You can install the latest release from github.com/nichoo2120-spec/solo-anime-studio/releases/latest without uninstalling.'
+        : '';
+      return `Could not check for updates. Your drawing is safe; try again later. ${detail}${fallback}`;
     }
   }
 
