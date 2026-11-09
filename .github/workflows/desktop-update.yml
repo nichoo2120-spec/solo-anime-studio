@@ -36,6 +36,7 @@ jobs:
       - run: npm test -- --maxWorkers=2
       - run: node --test tests/desktop-update.test.cjs tests/desktop-release.test.cjs
       - run: npx playwright install chromium
+      - run: npx playwright test tests/browser/distort-preview-v214.spec.ts tests/browser/transform-v116.spec.ts tests/browser/transform-modes-v116.spec.ts
       - run: node tests/offscreen-drawing-v186.mjs
       - run: node tests/drawing-latency-v187.mjs
       - run: node tests/project-tabs-v199.mjs

@@ -1,4 +1,4 @@
-import type {Project,Layer,Point,Operation,Matrix} from '../../core/model';
+import type {Project,Layer,Point,Operation,Matrix,Stroke} from '../../core/model';
 import {uid} from '../../core/model';
 import type {StudioEngine} from '../../engine/StudioEngine';
 import {blendOperation,makeCanvas,context,LayerRenderer} from '../../engine/renderer';
@@ -42,6 +42,7 @@ export class TransformTool{
  readonly original:Project;readonly box:Box;readonly source:OffscreenCanvas|HTMLCanvasElement;readonly meshArtworkSource:OffscreenCanvas|HTMLCanvasElement;readonly meshArtworkBox:Box;readonly base:OffscreenCanvas|HTMLCanvasElement;readonly polygon:Pt[];readonly editableIds:Set<string>;
  readonly session:Session;
  interpolation:Interpolation='bicubic';private gesture:Gesture|null=null;private isDirty=false;private frame=0;private disposed=false;private layerId:string;
+ private precisePreviewBrushes:Stroke[]=[];private precisePreviewRenderer:LayerRenderer|undefined;
  private flipShowPivot=true;private flipPreviewOutline=true;private flipKeepPosition=false;private flipAxis:'h'|'v'|null=null;private flipTarget:'selection'|'layer'|'selected'|'visible'='selection';
  private backdrop:HTMLCanvasElement;private backdropCtx:CanvasRenderingContext2D;private backgroundDirty=true;private cursorKind='';private lastPointerForCursor:{x:number;y:number}|null=null;private perspectiveArrow:{pointer:Pt;direction:Pt}|null=null;private deformArrow:{pointer:Pt;direction:Pt;mode:'skew'|'distort'}|null=null;private previousDeformPoint:Pt|null=null;private previousPerspectivePoint:Pt|null=null;private overlay:HTMLCanvasElement;private ctx:CanvasRenderingContext2D;private view:View;private meshEdited=false;private placingMeshPin=false;private selectedFreePin=-1;private transformUndo:{grid:Grid;quad:Quad;pivot:Pt;dirty:boolean;meshEdited:boolean;selectedPin:number}[]=[];private transformRedo:typeof this.transformUndo=[];private direction:Pt|null=null;private layerOpacity=1;private layerBlend:Layer['blend'];private previewSubdivisions:number;
  onValues:((o:Options)=>void)|null=null;
@@ -71,6 +72,12 @@ export class TransformTool{
   this.polygon=selected.length?rectQuad(this.box):selection.length?selection:rectQuad(this.box);
   this.source=cacheSurface(this.box.w,this.box.h);
   const allEditable=active.operations.every(op=>op.kind==='vector'||op.kind==='stroke'&&op.tool==='brush');
+  // A few selected brush strokes can be previewed with their FINAL saved
+  // projective geometry. Bitmap triangulation visibly inflates thin ink into
+  // dark wedges when a Distort corner is pulled sharply (v0.5.212 regression).
+  // Keep the fast bitmap preview for large selections and non-brush artwork.
+  if(allEditable&&selected.length>0&&selected.length<=4&&selected.every(op=>op.kind==='stroke'&&op.tool==='brush'))
+   this.precisePreviewBrushes=selected as Stroke[];
   const selectedRenderer=this.editableIds.size&&allEditable&&selected.length<active.operations.length?new LayerRenderer():null;
   const selectedLayer=selectedRenderer?{...active,operations:selected}:active;
   const sc=cacheContext(this.source);sc.drawImage(selectedRenderer?selectedRenderer.get(selectedLayer,this.original):sourceLayer,this.box.x,this.box.y,this.box.w,this.box.h,0,0,this.box.w,this.box.h);
@@ -103,7 +110,7 @@ export class TransformTool{
   this.previewSubdivisions=Math.max(4,Math.min(12,Math.round(Math.max(this.box.w,this.box.h)/130)));
   this.paint();
  }
- destroy(){if(this.disposed)return;this.disposed=true;cancelAnimationFrame(this.frame);this.frame=0;this.source.width=0;this.source.height=0;this.meshArtworkSource.width=0;this.meshArtworkSource.height=0;this.base.width=0;this.base.height=0;this.overlay.style.cursor='';}
+ destroy(){if(this.disposed)return;this.disposed=true;this.precisePreviewRenderer?.clear();this.precisePreviewRenderer=undefined;cancelAnimationFrame(this.frame);this.frame=0;this.source.width=0;this.source.height=0;this.meshArtworkSource.width=0;this.meshArtworkSource.height=0;this.base.width=0;this.base.height=0;this.overlay.style.cursor='';}
  setView(v:View){this.view=v;this.backgroundDirty=true;this.schedule();}
  setMode(m:Mode){if(m!=='mesh')this.placingMeshPin=false;this.perspectiveArrow=null;this.previousPerspectivePoint=null;this.deformArrow=null;this.previousDeformPoint=null;if(m==='mesh'&&this.session.mode!=='mesh'&&!this.meshEdited){const meshQuad=rectQuad(this.meshDocumentBounds(this.session.meshScope??'layer'));this.session.grid=this.buildScopedMesh(this.session.meshScope??'layer',this.session.grid.rows,this.session.grid.cols);this.session.initialGrid=cloneGrid(this.session.grid);}this.session.mode=m;this.engine.recorder.event('transform-mode',{mode:m,layerId:this.layerId,selectionIds:[...this.editableIds],bounds:this.box});this.lastPointerForCursor=null;this.setCursor(m==='move'?smallTargetCursor:'default');this.schedule();this.emit();}
  addMeshDivision(axis:'row'|'column',at:number=.5){
@@ -374,7 +381,27 @@ const s=this.session,pt=this.toDoc(e);const keys:PointerModifiers={shift:e.shift
   if((g.pins??[]).some(pin=>Math.abs(pin.dx)>1e-7||Math.abs(pin.dy)>1e-7))return false;
   return g.nodes.every((node,i)=>Math.hypot(node.x-initial.nodes[i].x,node.y-initial.nodes[i].y)<1e-7);
  }
- private paintArtwork(c:CanvasRenderingContext2D,source:CanvasImageSource,srcBox:Box){const s=this.session;c.save();c.imageSmoothingEnabled=this.interpolation!=='nearest';c.imageSmoothingQuality=this.interpolation==='bicubic'?'high':'low';
+ private paintArtwork(c:CanvasRenderingContext2D,source:CanvasImageSource,srcBox:Box){
+  const s=this.session;
+  // Distort/Perspective previously previewed stretched pixels, then committed
+  // re-rendered brush strokes. A thin line could turn into a black triangular
+  // smear while dragging and jump to a different contour on Enter.
+  // For small, isolated ink selections, preview EXACTLY the stroke operations
+  // that commit() will store. Other tools and larger selections keep the fast
+  // established raster path without any changes to their behavior.
+  if(!this.meshEdited&&this.precisePreviewBrushes.length&&
+     (s.mode==='distort'||s.mode==='perspective')){
+   const h=projectiveMapping(s.initial,s.quad);
+   if(h&&(Math.abs(h[6])>1e-10||Math.abs(h[7])>1e-10)){
+    const active=this.original.layers.find(layer=>layer.id===this.layerId)!;
+    const layer={...active,id:active.id+':precise-transform-preview',
+     operations:this.precisePreviewBrushes.map(stroke=>projectiveStroke(stroke,h))};
+    this.precisePreviewRenderer??=new LayerRenderer();
+    c.drawImage(this.precisePreviewRenderer.get(layer,this.original),0,0);
+    return;
+   }
+  }
+  c.save();c.imageSmoothingEnabled=this.interpolation!=='nearest';c.imageSmoothingQuality=this.interpolation==='bicubic'?'high':'low';
   const origin=s.initial,dest=s.quad;
   // A freshly constructed contour lattice is a control overlay, NOT an image warp.
   // Painting identity as hundreds of affine triangles resamples the ink and may
