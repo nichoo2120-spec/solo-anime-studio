@@ -74,7 +74,7 @@ export function hitStroke(layer:Layer,p:{x:number;y:number},zoom:number):Selecta
   const radius=(op.kind==='stroke'?op.size*widthPointExtent(op):op.width)/2;
   const points=polyline(op);let distance=Infinity;
   const affine=op.kind==='stroke'&&!op.perspective?op.transform:undefined;
-  if(affine){
+  if(op.kind==='stroke'&&affine){
    const [a,b,c,d,x,y]=affine,det=a*d-b*c;
    if(Math.abs(det)>1e-8){
     const local=(q:{x:number;y:number})=>({x:(d*(q.x-x)-c*(q.y-y))/det,y:(a*(q.y-y)-b*(q.x-x))/det});
