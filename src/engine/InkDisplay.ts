@@ -1,5 +1,6 @@
 import type {ArtworkOrigin,Layer,Stroke,Project} from '../core/model';
 import {finalGeometry} from './geometryCache';
+import {projectiveInkGeometry} from './projectiveInkGeometry';
 import {blendOperation,type LayerRenderer} from './renderer';
 import {drawSolidInkV10} from './solidInkV10';
 import {drawFlatInk} from './flatInk';
@@ -15,7 +16,7 @@ type Pending={token:number;layer:string;key:Key;operations:Layer['operations'];b
 type ViewPending={token:number;layer:string;key:Key;base?:Key;timer:ReturnType<typeof setTimeout>};
 // Distance-anchored width profiles retain their shape at display resolution;
 // routing them through a page bitmap made high-DPI and enlarged views pixelated.
-export const displayCleanInk=(s:Stroke&ArtworkOrigin)=>!s.widthPointVersion&&!s.inShot&&!s.inPreviousStage&&!s.nativeMixVersion&&!s.mixStops&&!s.paintTipVersion&&!s.perspective&&!s.textureStrength&&!(s.inkTipVersion===1&&s.inkImage&&(s.inkImageAmount??1)>0)&&!(s.pressure&&s.pressureOpacity)&&(
+export const displayCleanInk=(s:Stroke&ArtworkOrigin)=>!s.widthPointVersion&&!s.inShot&&!s.inPreviousStage&&!s.nativeMixVersion&&!s.mixStops&&!s.paintTipVersion&&!s.textureStrength&&!(s.inkTipVersion===1&&s.inkImage&&(s.inkImageAmount??1)>0)&&!(s.pressure&&s.pressureOpacity)&&(
  !!s.engineVersion&&['studio-ink','contour-flow','technical','eraser-hard','g-pen','mapping','brush-pen'].includes(s.brushKind??'technical')||s.flatNibVersion===1
 );
 const native=(s:Stroke)=>!s.inkProfileVersion&&!s.inkTipVersion&&!s.pressureOpacity&&!s.taperStart&&!s.taperEnd&&!(s.pressure&&s.pressureWidth!==false)&&!s.velocityTaper&&['technical','eraser-hard'].includes(s.brushKind??'technical');
@@ -44,6 +45,11 @@ export class InkDisplay{
   const generation=this.navigationGeneration;
   let firstClean=0;for(let i=layer.operations.length-1;i>=0;i--){const op=layer.operations[i];if(op.kind!=='stroke'||!clean(op)){firstClean=i+1;break;}}
   if(firstClean===layer.operations.length)return;
+  // Navigation workers only know the original stroke geometry. A warped ink
+  // stroke must not be painted at its unwarped coordinates by that worker.
+  // Keep the established raster navigation fallback; settled frames use
+  // the sharp main-thread ink path below.
+  if(layer.operations.slice(firstClean).some(op=>op.kind==='stroke'&&op.perspective))return;
   const previous=this.navigationStates.get(layer.id),append=!!previous&&previous.renderer===renderer&&previous.revision===renderer.displayRevision&&previous.width===p.width&&previous.height===p.height&&previous.firstClean===firstClean&&previous.operations.length<=layer.operations.length&&previous.operations.every((op,i)=>op===layer.operations[i]);
   let base:ImageBitmap|undefined;
   try{
@@ -72,7 +78,7 @@ export class InkDisplay{
  private prepare(s:Stroke,liveGeometry?:Geometry,cache=true):Prepared{
   const cached=cache&&!liveGeometry&&this.prepared.get(s);
   if(cached){this.prepared.delete(s);this.prepared.set(s,cached);return cached;}
-  const geometry=liveGeometry??finalGeometry(s);let x=Infinity,y=Infinity,right=-Infinity,bottom=-Infinity;
+  const geometry=liveGeometry??(s.perspective?projectiveInkGeometry(s):finalGeometry(s));let x=Infinity,y=Infinity,right=-Infinity,bottom=-Infinity;
   const visit=(p:{x:number;y:number})=>{x=Math.min(x,p.x);y=Math.min(y,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);};
   geometry.points.forEach(visit);for(const c of geometry.cubics){visit(c.a);visit(c.c1);visit(c.c2);visit(c.b);}
   const pad=s.size*Math.max(1,s.maxSize??1)+2;
@@ -87,7 +93,7 @@ export class InkDisplay{
  private screenBounds(s:Stroke,b:Box,m:DOMMatrix,w:number,h:number):Box|undefined{
   let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const ox of [b.x,b.x+b.w])for(const oy of [b.y,b.y+b.h]){
-   let x=ox,y=oy;if(s.transform){const [a,b,c,d,e,f]=s.transform;const X=a*x+c*y+e;y=b*x+d*y+f;x=X;}
+   let x=ox,y=oy;if(s.transform&&!s.perspective){const [a,b,c,d,e,f]=s.transform;const X=a*x+c*y+e;y=b*x+d*y+f;x=X;}
    const X=m.a*x+m.c*y+m.e,Y=m.b*x+m.d*y+m.f;
    left=Math.min(left,X);top=Math.min(top,Y);right=Math.max(right,X);bottom=Math.max(bottom,Y);
   }
@@ -114,7 +120,7 @@ export class InkDisplay{
  }
  private draw(ctx:CanvasRenderingContext2D,s:Stroke,p:Prepared,scale:number){
   const g=p.geometry;if(!g.points.length)return;
-  ctx.save();if(s.transform)ctx.transform(...s.transform);
+  ctx.save();if(s.transform&&!s.perspective)ctx.transform(...s.transform);
   if(native(s)){
    if(!p.nativePath){const path=new Path2D(),dot=!g.cubics.length;if(dot)path.arc(g.points[0].x,g.points[0].y,s.size/2,0,Math.PI*2);else{path.moveTo(g.points[0].x,g.points[0].y);for(const c of g.cubics)path.bezierCurveTo(c.c1.x,c.c1.y,c.c2.x,c.c2.y,c.b.x,c.b.y);}p.nativePath={path,dot};}
    if(p.nativePath.dot){ctx.fillStyle=s.color;ctx.fill(p.nativePath.path);}else{ctx.strokeStyle=s.color;ctx.lineWidth=s.size;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke(p.nativePath.path);}
@@ -134,6 +140,10 @@ export class InkDisplay{
   * responsive while a complex pressure-ink layer is refined. */
  primeView(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer):boolean{
   if(this.viewFailed||typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined'||typeof createImageBitmap==='undefined')return true;
+  // Post-navigation worker paths rebuild unprojected geometry. Skip only
+  // that worker when a projective clean-ink stroke is present; the settled
+  // main-thread paint still redraws at the full device pixel ratio.
+  if(layer.operations.some(op=>op.kind==='stroke'&&op.perspective))return true;
   let firstClean=0;for(let i=layer.operations.length-1;i>=0;i--){const op=layer.operations[i];if(op.kind!=='stroke'||!clean(op)){firstClean=i+1;break;}}if(firstClean===layer.operations.length)return true;
   const m=ctx.getTransform(),matrix=[m.a,m.b,m.c,m.d,m.e,m.f],w=ctx.canvas.width,h=ctx.canvas.height,cached=this.layers.get(layer.id),key:Key={operations:layer.operations,matrix,firstClean,width:w,height:h,frameWidth:p.width,frameHeight:p.height,renderer,rendererRevision:firstClean?renderer.displayRevision:0};
   if(cached&&cached.key.operations===key.operations&&cached.key.renderer===renderer&&cached.key.rendererRevision===key.rendererRevision&&cached.key.width===w&&cached.key.height===h&&cached.key.frameWidth===p.width&&cached.key.frameHeight===p.height&&cached.key.matrix.every((v,i)=>v===matrix[i]))return true;
@@ -168,7 +178,7 @@ export class InkDisplay{
   const scale=Math.hypot(m.a,m.b);
    for(const s of strokes){
     if(s.opacity===0)continue;
-    if(!native(s)&&s.flatNibVersion!==1&&!s.transform&&(s===live||this.solidLive.matches(s))){const direct=s.tool==='brush'&&s.opacity===1,picture=this.solidLive.paint(s,s===live&&geometry?geometry:finalGeometry(s),m,w,h,direct?out.canvas:undefined,direct?{}:undefined);this.rememberLivePaths(s,this.solidLive.lastPaths,s===live);out.resetTransform();out.globalAlpha=s.opacity;out.globalCompositeOperation=s.tool==='eraser'?'destination-out':'source-over';if(direct)out.clearRect(0,0,w,h);out.drawImage(picture,0,0);continue;}
+    if(!native(s)&&s.flatNibVersion!==1&&!s.transform&&!s.perspective&&(s===live||this.solidLive.matches(s))){const direct=s.tool==='brush'&&s.opacity===1,picture=this.solidLive.paint(s,s===live&&geometry?geometry:finalGeometry(s),m,w,h,direct?out.canvas:undefined,direct?{}:undefined);this.rememberLivePaths(s,this.solidLive.lastPaths,s===live);out.resetTransform();out.globalAlpha=s.opacity;out.globalCompositeOperation=s.tool==='eraser'?'destination-out':'source-over';if(direct)out.clearRect(0,0,w,h);out.drawImage(picture,0,0);continue;}
     if(s.flatNibVersion===1&&!s.transform&&!s.perspective&&(s===live||this.flatLive.matches(s))){const picture=this.flatLive.paint(s,s===live&&geometry?geometry:finalGeometry(s),m,w,h);if(s!==live&&this.flatLive.lastPaths){const prepared=this.prepare(s),paths=this.flatLive.lastPaths;if(this.prepared.get(s)===prepared&&paths.items.length<=2048){this.pathBatches-=prepared.paths?.items.length??0;prepared.paths=paths;this.pathBatches+=paths.items.length;this.trim();}}out.resetTransform();out.globalAlpha=s.opacity;out.globalCompositeOperation=s.tool==='eraser'?'destination-out':'source-over';out.drawImage(picture,0,0);continue;}
     const prepared=this.prepare(s,s===live?geometry:undefined,s!==live),rect=this.screenBounds(s,prepared.bounds,m,w,h);if(!rect)continue;
     // Opaque paint is associative source-over. A native stroke is one Canvas
