@@ -17,7 +17,7 @@ test('distort brush preview equals committed ink and stays reselectable',async({
    c.setPointerCapture=()=>{};c.hasPointerCapture=()=>true;return c;
   });
   const e=new StudioEngine(canvases[0],store,()=>{});e.setView({x:0,y:0,zoom:1,rotation:0});
-  e.setStrokeIds(['ink']);
+  e.selectAllStrokes();
   const t=new TransformTool(e,canvases[1],canvases[2],e.view,{frameIds:[],layerIds:[]});
   t.setMode('distort');
   const q=t.session.quad[1],rect=canvases[1].getBoundingClientRect();
