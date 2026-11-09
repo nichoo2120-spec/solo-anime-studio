@@ -37,8 +37,11 @@ const shape=fs.readFileSync(path.join(__dirname,'../src/engine/StudioEngine.ts')
 assert(shape.includes("this.strokeMode==='select'||this.strokeMode==='lasso'"));
 assert(shape.includes("if(!snapshotPreview&&this.tool==='stroke-select'&&this.strokeIds.length)"));
 assert(shape.includes("['scale','rotate','perspective','freeform'].includes(this.strokeMode)"));
-assert(ui.includes('label="Stroke selection and transform tools"'));
-for(const name of ['Select','Lasso'])assert(ui.includes(`<span>${name}</span>`),name);
+// Selection controls were moved into the Stroke Select inspector; the old
+// floating toolbar is intentionally disabled, so test the active controls.
+assert(ui.includes('<Section title="STROKE SELECT · S"'),'Stroke Select inspector remains visible');
+assert(ui.includes('aria-label="Stroke lasso behavior"'),'Stroke lasso behavior remains configurable');
+for(const name of ['touch','enclose'])assert(ui.includes(`value="${name}"`),name+' picking');
 assert(ui.includes("chooseTool('transform')"),'Selected artwork opens the full transform tool');
 assert(ui.includes('<TransformOverlay engine={engineReady}'),'Full transform controls remain wired');
 assert(shape.includes("strokeScope:'current'|'visible'='current'"),'Selection engine retains current/visible scope');

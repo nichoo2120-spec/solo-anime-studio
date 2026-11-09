@@ -36,6 +36,17 @@ export function boundsOf(ops:Selectable[]){let minX=Infinity,minY=Infinity,maxX=
   const [a,b,c,d]=op.kind==='stroke'&&!op.perspective?op.transform??IDENTITY:IDENTITY;
   const xPad=radius*Math.hypot(a,c),yPad=radius*Math.hypot(b,d);
   for(const p of polyline(op)){minX=Math.min(minX,p.x-xPad);minY=Math.min(minY,p.y-yPad);maxX=Math.max(maxX,p.x+xPad);maxY=Math.max(maxY,p.y+yPad);}
+  if(op.kind==='stroke'&&op.perspective){
+   // Perspective changes the width too, not only the stroke centre. Include
+   // projected nib corners so the selection box still encloses enlarged ink.
+   const samples=finalGeometry(op).points,step=Math.max(1,Math.floor(samples.length/64));
+   for(let i=0;i<samples.length;i+=step){const q=samples[i];
+    for(const dx of [-radius,radius])for(const dy of [-radius,radius]){
+     const p=projectPoint({x:q.x+dx,y:q.y+dy},op.perspective);
+     minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);
+    }
+   }
+  }
  }
  return isFinite(minX)?{x:minX,y:minY,w:Math.max(1,maxX-minX),h:Math.max(1,maxY-minY)}:null;
 }
@@ -47,7 +58,7 @@ const hitBounds=new WeakMap<Selectable,ReturnType<typeof boundsOf>>();
 export function hitStroke(layer:Layer,p:{x:number;y:number},zoom:number):Selectable|undefined{
  const ops=selectable(layer),tolerance=7/Math.max(.25,zoom);let winner:Selectable|undefined,best=Infinity;
  for(let i=ops.length-1;i>=0;i--){const op=ops[i];let b=hitBounds.get(op);if(b===undefined){b=boundsOf([op]);hitBounds.set(op,b);}if(!b)continue;
-  if(p.x<b.x-tolerance||p.x>b.x+b.w+tolerance||p.y<b.y-tolerance||p.y>b.y+b.h+tolerance)continue;
+  if(!('perspective' in op&&op.perspective)&&(p.x<b.x-tolerance||p.x>b.x+b.w+tolerance||p.y<b.y-tolerance||p.y>b.y+b.h+tolerance))continue;
   const radius=(op.kind==='stroke'?op.size*widthPointExtent(op):op.width)/2;
   const points=polyline(op);let distance=Infinity;
   const affine=op.kind==='stroke'&&!op.perspective?op.transform:undefined;
@@ -58,7 +69,23 @@ export function hitStroke(layer:Layer,p:{x:number;y:number},zoom:number):Selecta
     const tip=local(p),origin=points.map(local);
     let localDistance=origin.length===1?Math.hypot(tip.x-origin[0].x,tip.y-origin[0].y):Infinity;
     for(let j=1;j<origin.length;j++)localDistance=Math.min(localDistance,segmentDistance(tip.x,tip.y,origin[j-1],origin[j]));
-    if(localDistance<=radius){const score=localDistance/Math.max(radius,1);if(score<best){best=score;winner=op;}if(best<.0001)break;continue;}
+    const localTolerance=tolerance*Math.max(Math.hypot(d,b),Math.hypot(c,a))/Math.abs(det);
+    if(localDistance<=radius+localTolerance){const score=localDistance/Math.max(radius,1);if(score<best){best=score;winner=op;}if(best<.0001)break;continue;}
+   }
+  }
+  if(op.kind==='stroke'&&op.perspective){
+   const [a,b,c,d,e,f,g,h,i]=op.perspective;
+   const determinant=a*(e*i-f*h)-b*(d*i-f*g)+c*(d*h-e*g);
+   if(Math.abs(determinant)>1e-12){
+    const inverse:H=[(e*i-f*h)/determinant,(c*h-b*i)/determinant,(b*f-c*e)/determinant,
+     (f*g-d*i)/determinant,(a*i-c*g)/determinant,(c*d-a*f)/determinant,
+     (d*h-e*g)/determinant,(b*g-a*h)/determinant,(a*e-b*d)/determinant];
+    const tip=projectPoint(p,inverse),origin=points.map(q=>projectPoint(q,inverse));
+    const xp=projectPoint({x:p.x+tolerance,y:p.y},inverse),yp=projectPoint({x:p.x,y:p.y+tolerance},inverse);
+    const localTolerance=Math.max(Math.hypot(xp.x-tip.x,xp.y-tip.y),Math.hypot(yp.x-tip.x,yp.y-tip.y));
+    let localDistance=origin.length===1?Math.hypot(tip.x-origin[0].x,tip.y-origin[0].y):Infinity;
+    for(let j=1;j<origin.length;j++)localDistance=Math.min(localDistance,segmentDistance(tip.x,tip.y,origin[j-1],origin[j]));
+    if(localDistance<=radius+localTolerance){const score=localDistance/Math.max(radius,1);if(score<best){best=score;winner=op;}if(best<.0001)break;continue;}
    }
   }
   if(points.length===1)distance=Math.hypot(p.x-points[0].x,p.y-points[0].y);
@@ -86,7 +113,8 @@ export function nearSelection(p:{x:number;y:number},poly:Point[],tol=0){if(inPol
 export function transformedStroke(op:Stroke,m:Matrix):Stroke{
  if(op.worldStroke)return op;
  const {inShot:_inShot,inPreviousStage:_inPreviousStage,...editable}=op as Stroke&ArtworkOrigin;
- return op.perspective?{...editable,perspective:multiplyH(affineH(m),op.perspective)}:{...editable,transform:mul(m,op.transform??IDENTITY)};
+ return op.perspective?{...editable,perspective:multiplyH(affineH(m),op.perspective)}
+  :{...editable,transform:mul(m,op.transform??IDENTITY),rasterTransformVersion:1,rasterSourceId:op.rasterSourceId??op.id};
 }
 /** Apply a fresh projective change outside all previously committed transforms. */
 export function projectiveStroke(op:Stroke,h:H):Stroke{

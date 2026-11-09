@@ -1,8 +1,8 @@
-import type {Project,Layer,Point,Operation} from '../../core/model';
+import type {Project,Layer,Point,Operation,Matrix} from '../../core/model';
 import {uid} from '../../core/model';
 import type {StudioEngine} from '../../engine/StudioEngine';
 import {blendOperation,makeCanvas,context,LayerRenderer} from '../../engine/renderer';
-import {boundsOf,selectable,projectiveStroke,polyline} from '../../engine/strokeSelection';
+import {boundsOf,selectable,projectiveStroke,transformedStroke,polyline} from '../../engine/strokeSelection';
 import {finalGeometry} from '../../engine/geometryCache';
 import {projectiveVector} from '../../engine/vector';
 import {isLayerHeld} from '../../animation/timeline';
@@ -592,8 +592,11 @@ const s=this.session,pt=this.toDoc(e);const keys:PointerModifiers={shift:e.shift
    const currentIds=!useSelection||layerId!==this.layerId?new Set(old.filter(op=>op.kind==='stroke'&&op.tool==='brush'||op.kind==='vector').map(op=>op.id)):this.editableIds;
    const selectedOps=currentIds.size?old.filter(op=>currentIds.has(op.id)):[];
    const allEditable=old.every(op=>op.kind==='vector'||op.kind==='stroke'&&op.tool==='brush');
+   // Brush operations must remain strokes after perspective/distort, not become
+   // one image that can never be picked with Stroke Select again.
+   const editableBrushSelection=selectedOps.length>0&&selectedOps.every(op=>op.kind==='stroke'&&op.tool==='brush');
    let next:Operation[];
-   if(selectedOps.length&&(meshWarp||projectiveWarp||this.session.mode==='perspective'||this.session.mode==='distort')){
+   if(selectedOps.length&&(meshWarp||projectiveWarp||this.session.mode==='perspective'||this.session.mode==='distort')&&!(editableBrushSelection&&!meshWarp)){
     // The live preview deforms a rendered image. Reconstructing individual paths
     // at commit uses a DIFFERENT rendering algorithm and can radically reshape
     // brush lines, pressure widths and Bezier curves. Bake the exact preview
@@ -668,7 +671,11 @@ const s=this.session,pt=this.toDoc(e);const keys:PointerModifiers={shift:e.shift
       // Vector node positions and tangents must remain editable.
       if(op.kind==='vector')return {...op,nodes:op.nodes.map(node=>{const uv=pointToGridUV(this.session.grid,node),uvIn=pointToGridUV(this.session.grid,{x:node.x+node.in.x,y:node.y+node.in.y}),uvOut=pointToGridUV(this.session.grid,{x:node.x+node.out.x,y:node.y+node.out.y});const a=gridPoint(this.session.grid,uv.u,uv.v),aIn=gridPoint(this.session.grid,uvIn.u,uvIn.v),aOut=gridPoint(this.session.grid,uvOut.u,uvOut.v);return {...node,...a,in:{x:aIn.x-a.x,y:aIn.y-a.y},out:{x:aOut.x-a.x,y:aOut.y-a.y}};})};
      }
-     return op.kind==='vector'?projectiveVector(op,h!):op.kind==='stroke'?projectiveStroke(op,h!):op;
+     // Affine changes retain the original brush raster, pressure and texture.
+     // Do not route scale/rotate/move through projective path reconstruction.
+     const affine:Matrix|undefined=h&&Math.abs(h[6])<1e-10&&Math.abs(h[7])<1e-10&&Math.abs(h[8])>1e-12
+      ?[h[0]/h[8],h[3]/h[8],h[1]/h[8],h[4]/h[8],h[2]/h[8],h[5]/h[8]]:undefined;
+     return op.kind==='vector'?projectiveVector(op,h!):op.kind==='stroke'?(affine?transformedStroke(op,affine):projectiveStroke(op,h!)):op;
     });
    }else{
     if(layer.kind==='vector')return {changed:0,error:'No editable artwork was selected on this vector layer.'};

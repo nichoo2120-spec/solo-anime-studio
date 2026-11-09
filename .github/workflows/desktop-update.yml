@@ -49,6 +49,8 @@ jobs:
       - run: node tests/compact-brush-v207.mjs
       - run: node tests/sharp-graphs-v209.mjs
       - run: node tests/live-brush-v208.mjs
+      - run: node tests/stroke-reselection-v212.cjs
+      - run: node tests/stroke-selection-v2.cjs
       - run: node tests/continuous-preview-v211.mjs
       - run: node tests/profile-stability-v208.mjs
       - run: node tests/ink-display-quality-v210.mjs
