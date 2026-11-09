@@ -56,6 +56,7 @@ jobs:
       - run: node tests/profile-stability-v208.mjs
       - run: node tests/ink-display-quality-v210.mjs
       - run: node tests/high-dpi-ink-v210.mjs
+      - run: node tests/projective-reopen-v215.mjs
       - uses: actions/checkout@v4
         with:
           ref: v0.5.200
