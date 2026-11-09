@@ -15,6 +15,18 @@ export function mapPoint(p:{x:number;y:number},m:Matrix){return {x:m[0]*p.x+m[2]
 export function scaleOf(m:Matrix){return Math.sqrt(Math.max(0.0001,Math.abs(m[0]*m[3]-m[1]*m[2])));}
 export function selectable(layer:Layer):Selectable[]{return layer.operations.filter((o):o is Selectable=>o.kind==='vector'||o.kind==='stroke'&&o.tool==='brush'&&!o.worldStroke);}
 const pathCache=new WeakMap<Selectable,{x:number;y:number}[]>();
+const sourcePathCache=new WeakMap<Stroke,{x:number;y:number}[]>();
+/** Pick in the original pen coordinates after undoing the rendered transform.
+ * Re-inverting a flattened, already transformed polyline introduces selection
+ * drift each time a curved stroke is scaled or distorted again.
+ */
+function sourcePolyline(op:Stroke):{x:number;y:number}[]{
+ const cached=sourcePathCache.get(op);if(cached)return cached;
+ const g=op.engineVersion?finalGeometry(op):undefined;
+ const path=g?.cubics.length?g.cubics.flatMap((curve,index)=>flattenCubic(curve,.35).slice(index?1:0)):(g?.points??op.points);
+ sourcePathCache.set(op,path);
+ return path;
+}
 export function polyline(op:Selectable):{x:number;y:number}[]{
  const cached=pathCache.get(op);if(cached)return cached;
  if(op.kind==='stroke'){
@@ -66,7 +78,7 @@ export function hitStroke(layer:Layer,p:{x:number;y:number},zoom:number):Selecta
    const [a,b,c,d,x,y]=affine,det=a*d-b*c;
    if(Math.abs(det)>1e-8){
     const local=(q:{x:number;y:number})=>({x:(d*(q.x-x)-c*(q.y-y))/det,y:(a*(q.y-y)-b*(q.x-x))/det});
-    const tip=local(p),origin=points.map(local);
+    const tip=local(p),origin=sourcePolyline(op);
     let localDistance=origin.length===1?Math.hypot(tip.x-origin[0].x,tip.y-origin[0].y):Infinity;
     for(let j=1;j<origin.length;j++)localDistance=Math.min(localDistance,segmentDistance(tip.x,tip.y,origin[j-1],origin[j]));
     const localTolerance=tolerance*Math.max(Math.hypot(d,b),Math.hypot(c,a))/Math.abs(det);
@@ -80,7 +92,7 @@ export function hitStroke(layer:Layer,p:{x:number;y:number},zoom:number):Selecta
     const inverse:H=[(e*i-f*h)/determinant,(c*h-b*i)/determinant,(b*f-c*e)/determinant,
      (f*g-d*i)/determinant,(a*i-c*g)/determinant,(c*d-a*f)/determinant,
      (d*h-e*g)/determinant,(b*g-a*h)/determinant,(a*e-b*d)/determinant];
-    const tip=projectPoint(p,inverse),origin=points.map(q=>projectPoint(q,inverse));
+    const tip=projectPoint(p,inverse),origin=sourcePolyline(op);
     const xp=projectPoint({x:p.x+tolerance,y:p.y},inverse),yp=projectPoint({x:p.x,y:p.y+tolerance},inverse);
     const localTolerance=Math.max(Math.hypot(xp.x-tip.x,xp.y-tip.y),Math.hypot(yp.x-tip.x,yp.y-tip.y));
     let localDistance=origin.length===1?Math.hypot(tip.x-origin[0].x,tip.y-origin[0].y):Infinity;
