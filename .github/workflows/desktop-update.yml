@@ -55,6 +55,7 @@ jobs:
       - run: node tests/stroke-reselection-v212.cjs
       - run: node tests/stroke-selection-v2.cjs
       - run: node tests/continuous-preview-v211.mjs
+      - run: node tests/natural-preview-v216.mjs
       - run: node tests/profile-stability-v208.mjs
       - run: node tests/ink-display-quality-v210.mjs
       - run: node tests/high-dpi-ink-v210.mjs
