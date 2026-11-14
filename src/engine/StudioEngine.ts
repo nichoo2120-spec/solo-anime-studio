@@ -672,7 +672,7 @@ export class StudioEngine {
     else{this.previewStrokeId='';this.previewBase=undefined;this.previewBaseOperations=undefined;}
     this.previewFootprint=bounds;
     c=preview;}
-   if(denseStroke&&l.id===this.strokeTarget?.layer&&!this.strokeMirror&&this.inkDisplay.paintNativePreview(ctx,displayed,p,this.renderer,denseStroke,c,this.liveGeometry))continue;
+   if(denseStroke&&l.id===this.strokeTarget?.layer&&!this.strokeMirror&&(!dirtyFrame||dirtyFrame.width>0&&dirtyFrame.height>0)&&this.inkDisplay.paintNativePreview(ctx,displayed,p,this.renderer,denseStroke,c,this.liveGeometry))continue;
    ctx.globalAlpha=l.opacity;ctx.drawImage(c,0,0);
   }if(snapshotPending&&snapshotPassed){this.editingSnapshot.capture(ctx,snapshotKey!);snapshotPending=false;}
   // Animation can change cels again before a navigation preview is useful.
