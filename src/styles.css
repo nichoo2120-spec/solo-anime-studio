@@ -713,3 +713,5 @@
 .onion-opacity input[type=range]{width:100%;min-width:0;height:18px;margin:0}
 .onion-opacity output{flex:0 0 28px;font-size:10px;text-align:right;font-variant-numeric:tabular-nums}
 .onion-compact-options{display:flex;flex-wrap:wrap;gap:2px 12px;border-top:1px solid #30454e;padding-top:4px}
+
+.onion-heading button{width:auto;min-width:48px;padding:2px 6px;font-size:10px;border:1px solid #38535e;border-radius:4px;color:#c4d8dc}

@@ -83,6 +83,7 @@ jobs:
           MIX_PHASE: after
       - run: node tests/mix-v179-reference.mjs
       - run: node tests/mix-v179-ui.mjs
+      - run: node tests/native-mix-worker-v220.mjs
       - run: node tests/mix-v179-mirror.mjs
       - name: Build Windows installer (retry transient downloads)
         shell: pwsh
@@ -115,6 +116,7 @@ jobs:
           path: |
             validation/desktop-*
             validation/mix-v179/**
+            validation/mix-v220/**
 
   publish:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
