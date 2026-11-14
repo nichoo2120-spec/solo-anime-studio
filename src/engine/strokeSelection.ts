@@ -7,6 +7,7 @@ import {finalGeometry} from './geometryCache';
 import {vectorCubics} from './vector';
 import {flattenCubic} from './strokeGeometry';
 import {affineH,multiplyH,projectPoint,type H} from './perspectiveWarp';
+import {preservesFlowContour,projectedFlowBounds} from './projectiveFlowInk';
 export type Selectable=Stroke|VectorLine;
 export type PickMode='touch'|'enclose';
 export const IDENTITY:Matrix=[1,0,0,1,0,0];
@@ -45,6 +46,7 @@ export function polyline(op:Selectable):{x:number;y:number}[]{
 }
 export function boundsOf(ops:Selectable[]){let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
  for(const op of ops){const radius=(op.kind==='stroke'?op.size*widthPointExtent(op):op.width)/2;
+  if(op.kind==='stroke'&&op.perspective&&preservesFlowContour(op)){const b=projectedFlowBounds(op,finalGeometry(op),radius)!;minX=Math.min(minX,b.left);minY=Math.min(minY,b.top);maxX=Math.max(maxX,b.right);maxY=Math.max(maxY,b.bottom);continue;}
   const [a,b,c,d]=op.kind==='stroke'&&!op.perspective?op.transform??IDENTITY:IDENTITY;
   const xPad=radius*Math.hypot(a,c),yPad=radius*Math.hypot(b,d);
   for(const p of polyline(op)){minX=Math.min(minX,p.x-xPad);minY=Math.min(minY,p.y-yPad);maxX=Math.max(maxX,p.x+xPad);maxY=Math.max(maxY,p.y+yPad);}
@@ -134,4 +136,3 @@ export function projectiveStroke(op:Stroke,h:H):Stroke{
  const {inShot:_inShot,inPreviousStage:_inPreviousStage,...editable}=op as Stroke&ArtworkOrigin;
  return {...editable,transform:undefined,perspective:multiplyH(h,op.perspective??affineH(op.transform??IDENTITY))};
 }
-

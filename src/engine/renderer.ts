@@ -13,6 +13,7 @@ import {finalGeometry} from './geometryCache';
 import {mapPoint,scaleOf} from './strokeSelection';
 import {projectPoint} from './perspectiveWarp';
 import {projectiveInkGeometry} from './projectiveInkGeometry';
+import {drawProjectiveFlowInk,preservesFlowContour} from './projectiveFlowInk';
 import {SparseStrokeTiles,supportsSparseStroke} from './SparseStrokeTiles';
 export const makeCanvas=(w:number,h:number)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
 export const context=(c:HTMLCanvasElement)=>c.getContext('2d',{willReadFrequently:true})!;
@@ -31,8 +32,9 @@ export function paintVectorLayer(ctx:CanvasRenderingContext2D,layer:Layer){
 export function polygonPath(ctx:CanvasRenderingContext2D,points:Point[]){ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();}
 export function drawStroke(ctx:CanvasRenderingContext2D,s:Stroke,phase:'live'|'final'='final',geometry?:ReturnType<typeof strokeGeometry>){
  if(phase==='final'&&s.nativeMixVersion===3&&s.dryBristleVersion===3)resetDryBristleV3MixModel(s);
- if(s.rasterTransformVersion===1&&s.transform){const c=reflectedSurface??=makeCanvas(ctx.canvas.width,ctx.canvas.height);if(c.width!==ctx.canvas.width)c.width=ctx.canvas.width;if(c.height!==ctx.canvas.height)c.height=ctx.canvas.height;const cc=c.getContext('2d')!;cc.clearRect(0,0,c.width,c.height);drawStroke(cc,{...s,id:s.rasterSourceId??s.id,transform:undefined,rasterTransformVersion:undefined},phase,geometry);ctx.save();ctx.transform(...s.transform);ctx.drawImage(c,0,0);ctx.restore();return;}
+ if(s.rasterTransformVersion===1&&s.transform&&!preservesFlowContour(s)){const c=reflectedSurface??=makeCanvas(ctx.canvas.width,ctx.canvas.height);if(c.width!==ctx.canvas.width)c.width=ctx.canvas.width;if(c.height!==ctx.canvas.height)c.height=ctx.canvas.height;const cc=c.getContext('2d')!;cc.clearRect(0,0,c.width,c.height);drawStroke(cc,{...s,id:s.rasterSourceId??s.id,transform:undefined,rasterTransformVersion:undefined},phase,geometry);ctx.save();ctx.transform(...s.transform);ctx.drawImage(c,0,0);ctx.restore();return;}
  if(s.perspective){
+  if(drawProjectiveFlowInk(ctx,s,geometry??finalGeometry(s),Math.hypot(ctx.getTransform().a,ctx.getTransform().b)))return;
   const warped=projectiveInkGeometry(s,geometry??finalGeometry(s));
   drawStroke(ctx,{...s,id:s.rasterSourceId??s.id,perspective:undefined,transform:undefined,points:warped.points},phase,warped);return;
  }

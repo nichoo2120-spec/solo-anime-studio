@@ -14,7 +14,7 @@ export type SolidPathInfo={ends:number[];states:PathState[];points?:Point[];tota
 /** Solid nib union: bounded Canvas fills, no pixel readback or size-squared CPU pass.
  * Saved older strokes keep their renderer. All subpaths have identical winding,
  * so overlap forms solid ink without accumulating opacity or cutting holes. */
-export function drawSolidInkV10(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnType<typeof strokeGeometry>,region?:RasterRegion,displayScale=0,paths?:Path2D[],info?:SolidPathInfo):boolean{
+export function drawSolidInkV10(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnType<typeof strokeGeometry>,region?:RasterRegion,displayScale=0,paths?:Path2D[],info?:SolidPathInfo,pathFactory:()=>Path2D=()=>new Path2D()):boolean{
  const kind=s.brushKind??'technical';
  const roundInk=kind==='studio-ink'||kind==='contour-flow'||s.inkProfileVersion===1;
  if(!displayScale&&s.size<64&&!roundInk&&s.inkTipVersion!==1&&s.widthPointVersion!==1&&s.inkProfileVersion!==1||(displayScale?s.pressure&&s.pressureOpacity:s.pressureOpacity)||s.textureStrength||s.inkTipVersion===1&&s.inkImage&&(s.inkImageAmount??1)>0||!['studio-ink','contour-flow','technical','eraser-hard','g-pen','mapping','brush-pen','flat'].includes(kind))return false;
@@ -37,7 +37,7 @@ export function drawSolidInkV10(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnTy
  ctx.save();if(region){ctx.beginPath();ctx.rect(region.x,region.y,region.width,region.height);ctx.clip();}ctx.fillStyle=s.color;
  let previousDab:Dab|undefined=resumed?.previousDab;
  const support=(d:Dab,nx:number,ny:number)=>{const c=Math.cos(d.rotation),sn=Math.sin(d.rotation),u=nx*c+ny*sn,v=-nx*sn+ny*c,rr=d.radius*d.radius,aa=d.aspect*d.aspect,den=Math.sqrt(rr*(u*u+aa*v*v));return den?{x:(rr*u*c-rr*aa*v*sn)/den,y:(rr*u*sn+rr*aa*v*c)/den}:{x:0,y:0};};
- let path=new Path2D(),dabs=0;const flush=(state?:PathState)=>{if(paths)paths.push(path);else ctx.fill(path);if(info&&state){info.ends.push(state.i);info.states.push(state);}path=new Path2D();dabs=0;};let along=resumed?.along??0;
+ let path=pathFactory(),dabs=0;const flush=(state?:PathState)=>{if(paths)paths.push(path);else ctx.fill(path);if(info&&state){info.ends.push(state.i);info.states.push(state);}path=pathFactory();dabs=0;};let along=resumed?.along??0;
  for(let i=resumed?.i??0;i<points.length;i++){
   const a=points[Math.max(0,i-1)],b=points[i],next=points[Math.min(points.length-1,i+1)];
   const len=Math.hypot(b.x-a.x,b.y-a.y),tip=i||s.engineVersion!==10?b:next,angle=Math.atan2(tip.y-a.y,tip.x-a.x);
@@ -68,4 +68,3 @@ export function drawSolidInkV10(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnTy
  }
  flush();ctx.restore();return true;
 }
-
