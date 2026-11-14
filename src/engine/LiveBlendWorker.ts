@@ -33,7 +33,9 @@ export class LiveBlendWorker{
   if(!this.job||this.job.id!==s.id||this.job.source!==source||this.job.signature!==signature){
    this.cancel();const token=++this.token,j:Job={token,id:s.id,source,signature,ready:false,inFlight:false};this.job=j;
    this.surface.width=source.width;this.surface.height=source.height;this.surface.getContext('2d')!.drawImage(source,0,0);
-   createImageBitmap(source).then(bitmap=>{if(this.job!==j){bitmap.close();return;}this.worker!.postMessage({kind:'begin',token,width:source.width,height:source.height,base:bitmap},[bitmap]);j.ready=true;this.flush(j);}).catch(()=>this.fail());
+   // Native pigment Mix only draws canvases; keep hardware acceleration available.
+   // Legacy pixel-sampling smudges retain their readback-optimized context.
+   createImageBitmap(source).then(bitmap=>{if(this.job!==j){bitmap.close();return;}this.worker!.postMessage({kind:'begin',token,width:source.width,height:source.height,base:bitmap,readFrequently:!s.nativeMixVersion},[bitmap]);j.ready=true;this.flush(j);}).catch(()=>this.fail());
   }
   const j=this.job!;if(j.geometry!==geometry){j.geometry=geometry;j.queued={stroke:s,final:false};this.flush(j);}return this.surface;
  }

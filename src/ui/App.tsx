@@ -1158,7 +1158,7 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
       <IconButton label={onionSettings.enabled?'Hide onion skin (O)':'Show onion skin (O)'} active={onionSettings.enabled} onClick={()=>setOnionSettings(s=>({...s,enabled:!s.enabled}))}>{onionSettings.enabled?<Eye size={15}/>:<EyeOff size={15}/>}</IconButton>
       <IconButton label="Onion skin settings" active={onionSettingsOpen} onClick={()=>{if(!onionSettingsOpen&&timelineMenu.current)timelineMenu.current.open=true;setOnionSettingsOpen(o=>!o);}}><SlidersHorizontal size={14}/></IconButton>
       {onionSettingsOpen&&<div className="onion-settings" role="group" aria-label="Onion skin settings">
-       <header className="onion-heading"><strong>Onion skin</strong><button type="button" aria-label="Close onion skin settings" onClick={()=>setOnionSettingsOpen(false)}>×</button></header>
+       <header className="onion-heading"><strong>Onion skin</strong><button type="button" aria-label="Close onion skin settings" title="Close onion skin settings" onClick={()=>setOnionSettingsOpen(false)}>Close ×</button></header>
        <div className="onion-column-labels" aria-hidden="true"><span>Drawings</span><span>Count</span><span>Opacity</span></div>
        {(['previous','next'] as const).map(kind=>{const previous=kind==='previous',name=previous?'Previous':'Next',opacity=previous?onionSettings.previousOpacity:onionSettings.nextOpacity;return <div className="onion-compact-row" key={kind}>
         <label className="onion-check" title={name+' drawings'}><input type="checkbox" aria-label={name+' drawing'} checked={onionSettings[kind]} onChange={e=>setOnionSettings(s=>({...s,[kind]:e.target.checked}))}/><span className={'onion-swatch '+kind}/>{name}</label>
