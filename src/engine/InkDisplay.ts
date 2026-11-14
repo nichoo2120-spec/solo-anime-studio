@@ -11,7 +11,10 @@ import {drawFlatInk} from './flatInk';
 import {FlatLiveRaster} from './FlatLiveRaster';
 import {SolidLiveRaster} from './SolidLiveRaster';
 import type {strokeGeometry} from './strokeGeometry';
-import type {BlendDelta} from './LiveBlendWorker';
+import type {BlendDelta,BlendBaseline,NativeMixSeed} from './LiveBlendWorker';
+import type {RasterRegion} from './liveRaster';
+
+type MixGroup={operations:Layer['operations'];renderer:LayerRenderer;revision:number;matrix:number[];width:number;height:number;frameWidth:number;frameHeight:number;sharp:HTMLCanvasElement;baseline:BlendBaseline;bytes:number};
 
 type Geometry=ReturnType<typeof strokeGeometry>;
 type Box={x:number;y:number;w:number;h:number};
@@ -37,8 +40,9 @@ export class InkDisplay{
  private key?:Key;private liveKey?:{base:Key;stroke:Stroke;geometry?:Geometry};
  private layers=new Map<string,{key:Key;surface:HTMLCanvasElement}>();
  private prefixes=new Map<string,{operations:Layer['operations'];canvas:HTMLCanvasElement;renderer:LayerRenderer;revision:number}>();
+ private mixGroups=new Map<string,MixGroup>();private mixGroupBytes=0;private readonly mixGroupBudget=64*1024*1024;
  private nativeFallback?:{base:Key;stroke:string;rect?:Box};
- private nativePreview?:{base:Key;stroke:string;result:HTMLCanvasElement;delta:BlendDelta;cutMask:HTMLCanvasElement;cutPatch:HTMLCanvasElement;rect?:Box;revision:number};
+ private nativePreview?:{base:Key;stroke:string;result:HTMLCanvasElement;delta:BlendDelta;group?:MixGroup;box?:Box;cutMask:HTMLCanvasElement;cutPatch:HTMLCanvasElement;rect?:Box;revision:number};
  private lastLive?:{id:string;base:Key;picture:HTMLCanvasElement};private worker?:Worker;private pending?:Pending;private serial=0;
  constructor(private request:()=>void=()=>{}){}
  private prepared=new Map<Stroke,Prepared>();private preparedWeight=0;private pathBatches=0;
@@ -72,6 +76,7 @@ export class InkDisplay{
   }catch{base?.close();}
  }
  clear(){
+  for(const group of this.mixGroups.values()){group.sharp.width=group.sharp.height=0;const seed=group.baseline.seed;if(seed)seed.mask.width=seed.mask.height=seed.paint.width=seed.paint.height=0;}this.mixGroups.clear();this.mixGroupBytes=0;
   this.navigationGeneration++;this.navigationWorker?.terminate();this.navigationWorker=undefined;this.navigationStates.clear();for(const job of this.navigationJobs.values()){clearTimeout(job.timer);job.finish({error:"Navigation cancelled"});}this.navigationJobs.clear();
   this.viewSerial++;this.viewWorker?.terminate();this.viewWorker=undefined;if(this.viewPending)clearTimeout(this.viewPending.timer);this.viewPending=undefined;this.viewFailed=false;
   this.serial++;this.worker?.terminate();this.worker=undefined;if(this.pending){clearTimeout(this.pending.timer);this.pending.base.width=this.pending.base.height=0;}this.pending=undefined;this.lastLive=undefined;
@@ -120,7 +125,7 @@ export class InkDisplay{
   // A first ink/eraser stroke above paint already has an exact native layer
   // bitmap. Preserve its operation-array identity so getDisplay can reuse it;
   // slicing the whole array forced every underlying paint stroke to replay.
-  const operations=end===layer.operations.length?layer.operations:layer.operations.slice(0,end),source=renderer.getDisplay({...layer,operations},p),bytes=p.width*p.height*4;
+  const operations=end===layer.operations.length?layer.operations:layer.operations.slice(0,end),source=renderer.prefixSnapshot(layer,p,end),bytes=p.width*p.height*4;
   if(bytes>32*1024*1024)return source;
   if(cached){cached.canvas.width=cached.canvas.height=0;this.prefixes.delete(layer.id);}
   let total=bytes;for(const item of this.prefixes.values())total+=item.canvas.width*item.canvas.height*4;
@@ -131,7 +136,7 @@ export class InkDisplay{
   * native edit actually changes are replaced by its canonical raster result. */
  private paintPrefix(out:CanvasRenderingContext2D,layer:Layer,p:Project,end:number,renderer:LayerRenderer,m:DOMMatrix,w:number,h:number){
   const ops=layer.operations.slice(0,end),first=ops.findIndex(op=>op.kind==='stroke'&&clean(op));
-  const bitmap=(n:number)=>renderer.getDisplay({...layer,operations:ops.slice(0,n)},p);
+  const bitmap=(n:number)=>renderer.prefixSnapshot(layer,p,n);
   const place=(source:CanvasImageSource,x=0,y=0)=>{out.save();out.setTransform(m);out.globalAlpha=1;out.imageSmoothingEnabled=Math.hypot(m.a,m.b)<=1+1e-7;out.imageSmoothingQuality='high';out.drawImage(source,x,y);out.restore();};
   if(first<0){place(this.prefix(layer,p,end,renderer));return;}
   if(first)place(bitmap(first));
@@ -140,20 +145,24 @@ export class InkDisplay{
    const start=i,isInk=ops[i].kind==='stroke'&&clean(ops[i] as Stroke);while(i<ops.length&&(ops[i].kind==='stroke'&&clean(ops[i] as Stroke))===isInk)i++;
    if(isInk){this.paintStrokes(out,ops.slice(start,i) as Stroke[],m,w,h);continue;}
    let rx=p.width,ry=p.height,rr=0,rb=0;for(const op of ops.slice(start,i)){const b=op.kind==='stroke'?strokeRasterBounds(op,p.width,p.height):op.kind==='image'?{x:op.x,y:op.y,width:op.width,height:op.height}:{x:0,y:0,width:p.width,height:p.height};rx=Math.min(rx,b.x);ry=Math.min(ry,b.y);rr=Math.max(rr,b.x+b.width);rb=Math.max(rb,b.y+b.height);}rx=Math.max(0,Math.floor(rx));ry=Math.max(0,Math.floor(ry));rr=Math.min(p.width,Math.ceil(rr));rb=Math.min(p.height,Math.ceil(rb));const rw=rr-rx,rh=rb-ry;if(rw<=0||rh<=0)continue;
-   const before=bitmap(start).getContext('2d')!.getImageData(rx,ry,rw,rh).data,after=bitmap(i).getContext('2d')!.getImageData(rx,ry,rw,rh).data;
-   this.nativePatch(out,before,after,rx,ry,rw,rh,m);
+   const nativeBefore=bitmap(start),before=nativeBefore.getContext('2d')!.getImageData(rx,ry,rw,rh).data;
+   const group=i===end&&end===layer.operations.length?this.rememberMixGroup(layer,p,renderer,m,out.canvas,nativeBefore,{x:rx,y:ry,width:rw,height:rh}):undefined;
+   const after=bitmap(i).getContext('2d')!.getImageData(rx,ry,rw,rh).data;
+   const seed=this.nativePatch(out,before,after,rx,ry,rw,rh,m,!!group);if(group)this.retainMixCuts(group,seed);
   }
   out.globalCompositeOperation='source-over';out.globalAlpha=1;
  }
- private nativePatch(out:CanvasRenderingContext2D,before:Uint8ClampedArray,after:Uint8ClampedArray,rx:number,ry:number,rw:number,rh:number,m:DOMMatrix){
+ private nativePatch(out:CanvasRenderingContext2D,before:Uint8ClampedArray,after:Uint8ClampedArray,rx:number,ry:number,rw:number,rh:number,m:DOMMatrix,retain=false):NativeMixSeed|undefined{
   const place=(source:CanvasImageSource,x=0,y=0)=>{out.save();out.setTransform(m);out.globalAlpha=1;out.imageSmoothingEnabled=Math.hypot(m.a,m.b)<=1+1e-7;out.imageSmoothingQuality='high';out.drawImage(source,x,y);out.restore();};
    let left=rw,top=rh,right=0,bottom=0;const changed=(k:number)=>nativePixelsDiffer(before,after,k);
    for(let k=0;k<before.length;k+=4)if(changed(k)){const index=k/4,x=index%rw,y=Math.floor(index/rw);left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x+1);bottom=Math.max(bottom,y+1);}
    if(right<=left||bottom<=top)return;
+   const tileLeft=Math.floor((rx+left)/64),tileTop=Math.floor((ry+top)/64),tilesWide=Math.ceil((rx+right)/64)-tileLeft,tileBoxes:(Box|undefined)[]=retain?new Array(tilesWide*(Math.ceil((ry+bottom)/64)-tileTop)):[];
    const W=right-left,H=bottom-top,mask=document.createElement('canvas'),patch=document.createElement('canvas');mask.width=patch.width=W;mask.height=patch.height=H;const mc=mask.getContext('2d')!,pc=patch.getContext('2d')!,ownership=mc.createImageData(W,H),pixels=pc.createImageData(W,H);
-   for(let y=0;y<H;y++)for(let x=0;x<W;x++){const from=((top+y)*rw+left+x)*4,to=(y*W+x)*4;if(changed(from)){ownership.data[to+3]=255;pixels.data[to]=after[from];pixels.data[to+1]=after[from+1];pixels.data[to+2]=after[from+2];pixels.data[to+3]=after[from+3];}}
-   mc.putImageData(ownership,0,0);pc.putImageData(pixels,0,0);out.globalCompositeOperation='destination-out';place(mask,rx+left,ry+top);out.globalCompositeOperation='source-over';place(patch,rx+left,ry+top);mask.width=mask.height=patch.width=patch.height=0;
-  out.globalCompositeOperation='source-over';out.globalAlpha=1;
+   for(let y=0;y<H;y++)for(let x=0;x<W;x++){const from=((top+y)*rw+left+x)*4,to=(y*W+x)*4;if(changed(from)){ownership.data[to+3]=255;pixels.data[to]=after[from];pixels.data[to+1]=after[from+1];pixels.data[to+2]=after[from+2];pixels.data[to+3]=after[from+3];if(retain){const gx=rx+left+x,gy=ry+top+y,index=(Math.floor(gy/64)-tileTop)*tilesWide+Math.floor(gx/64)-tileLeft,old=tileBoxes[index];if(old){const right=Math.max(old.x+old.w,gx+1),bottom=Math.max(old.y+old.h,gy+1);old.x=Math.min(old.x,gx);old.y=Math.min(old.y,gy);old.w=right-old.x;old.h=bottom-old.y;}else tileBoxes[index]={x:gx,y:gy,w:1,h:1};}}}
+   mc.putImageData(ownership,0,0);pc.putImageData(pixels,0,0);out.globalCompositeOperation='destination-out';place(mask,rx+left,ry+top);out.globalCompositeOperation='source-over';place(patch,rx+left,ry+top);out.globalCompositeOperation='source-over';out.globalAlpha=1;
+   if(retain){const tiles=new Map<string,Box>();for(const box of tileBoxes)if(box)tiles.set(Math.floor(box.x/64)*64+','+Math.floor(box.y/64)*64,box);return{mask,paint:patch,box:{x:rx+left,y:ry+top,w:W,h:H},tiles};}
+   mask.width=mask.height=patch.width=patch.height=0;
  }
  private draw(ctx:CanvasRenderingContext2D,s:Stroke,p:Prepared,scale:number){
   const g=p.geometry;if(!g.points.length)return;
@@ -195,7 +204,54 @@ export class InkDisplay{
    base.then(bitmap=>{if(this.viewPending!==job){bitmap?.close();return;}worker.postMessage({token,width:w,height:h,matrix,parts,base:bitmap},bitmap?[bitmap]:[]);}).catch(()=>{if(this.viewPending===job)fail();});return false;
   }catch{fail();return true;}
  }
+ private rememberMixGroup(layer:Layer,p:Project,renderer:LayerRenderer,m:DOMMatrix,sharp:HTMLCanvasElement,native:HTMLCanvasElement,region:RasterRegion){
+  const bytes=p.width*p.height*4+sharp.width*sharp.height*4;if(bytes>this.mixGroupBudget)return undefined;
+  const old=this.mixGroups.get(layer.id);if(old){this.mixGroupBytes-=old.bytes;old.sharp.width=old.sharp.height=0;const seed=old.baseline.seed;if(seed)seed.mask.width=seed.mask.height=seed.paint.width=seed.paint.height=0;this.mixGroups.delete(layer.id);}
+  const copy=document.createElement('canvas');copy.width=sharp.width;copy.height=sharp.height;copy.getContext('2d')!.drawImage(sharp,0,0);
+  const group:MixGroup={operations:layer.operations,renderer,revision:renderer.displayRevision,matrix:[m.a,m.b,m.c,m.d,m.e,m.f],width:sharp.width,height:sharp.height,frameWidth:p.width,frameHeight:p.height,sharp:copy,baseline:{pixels:native.getContext('2d')!.getImageData(0,0,p.width,p.height).data,region},bytes};
+  this.mixGroups.set(layer.id,group);this.mixGroupBytes+=bytes;
+  while(this.mixGroupBytes>this.mixGroupBudget){const id=this.mixGroups.keys().next().value!,entry=this.mixGroups.get(id)!;this.mixGroups.delete(id);this.mixGroupBytes-=entry.bytes;entry.sharp.width=entry.sharp.height=0;const seed=entry.baseline.seed;if(seed)seed.mask.width=seed.mask.height=seed.paint.width=seed.paint.height=0;}
+  return group;
+ }
+ private retainMixCuts(group:MixGroup,seed:NativeMixSeed|undefined){
+  const old=group.baseline.seed,oldBytes=old?old.mask.width*old.mask.height*8:0,newBytes=seed?seed.mask.width*seed.mask.height*8:0;
+  if(old){old.mask.width=old.mask.height=old.paint.width=old.paint.height=0;}group.baseline.seed=undefined;this.mixGroupBytes-=oldBytes;group.bytes-=oldBytes;
+  if(!seed)return false;
+  if(group.bytes+newBytes>this.mixGroupBudget){seed.mask.width=seed.mask.height=seed.paint.width=seed.paint.height=0;return false;}
+  group.baseline.seed=seed;group.bytes+=newBytes;this.mixGroupBytes+=newBytes;
+  while(this.mixGroupBytes>this.mixGroupBudget){const id=this.mixGroups.keys().next().value!,entry=this.mixGroups.get(id)!;this.mixGroups.delete(id);this.mixGroupBytes-=entry.bytes;entry.sharp.width=entry.sharp.height=0;const seed=entry.baseline.seed;if(seed)seed.mask.width=seed.mask.height=seed.paint.width=seed.paint.height=0;}
+  return true;
+ }
+ /** Compare the entire last native group against its stable sharp base. This
+  * also restores sharp ink when later Mix passes undo an earlier pixel change. */
+ mixBaseline(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer):BlendBaseline|undefined{
+  let end=0;for(let i=layer.operations.length-1;i>=0;i--)if(layer.operations[i].kind!=='stroke'||!clean(layer.operations[i] as Stroke)){end=i+1;break;}
+  this.paintRegion(ctx,layer,p,end,undefined,undefined,renderer,false);
+  const m=ctx.getTransform(),matrix=[m.a,m.b,m.c,m.d,m.e,m.f],old=this.mixGroups.get(layer.id),same=old&&old.renderer===renderer&&old.revision===renderer.displayRevision&&old.width===ctx.canvas.width&&old.height===ctx.canvas.height&&old.frameWidth===p.width&&old.frameHeight===p.height&&old.operations.length===layer.operations.length&&old.operations.every((op,i)=>op===layer.operations[i])&&matrix.every((v,i)=>v===old.matrix[i]);
+  if(same){this.mixGroups.delete(layer.id);this.mixGroups.set(layer.id,old);return old.baseline;}
+  if(old){this.mixGroups.delete(layer.id);this.mixGroupBytes-=old.bytes;old.sharp.width=old.sharp.height=0;const seed=old.baseline.seed;if(seed)seed.mask.width=seed.mask.height=seed.paint.width=seed.paint.height=0;}
+  if(!layer.operations.length||clean(layer.operations.at(-1) as Stroke))return this.rememberMixGroup(layer,p,renderer,m,this.surface!,renderer.prefixSnapshot(layer,p),{x:0,y:0,width:0,height:0})?.baseline;
+  const out=this.surface!.getContext('2d')!;out.resetTransform();out.clearRect(0,0,this.surface!.width,this.surface!.height);this.paintPrefix(out,layer,p,end,renderer,m,this.surface!.width,this.surface!.height);
+  return this.mixGroups.get(layer.id)?.baseline;
+ }
+ /** A committed native stroke already has a sharp, worker-updated view.
+  * Keep that view while finalizing, then promote it without replaying old paint. */
+ private presentCommittedMix(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer){
+  const n=this.nativePreview,entry=this.layers.get(layer.id),key=entry?.key,last=layer.operations.at(-1);
+  if(!n||!n.group||!n.group.sharp.width||!key||key!==n.base||!last||last.kind!=='stroke'||last.id!==n.stroke||layer.operations.length!==key.operations.length+1||!key.operations.every((op,i)=>op===layer.operations[i]))return false;
+  const m=ctx.getTransform(),matrix=[m.a,m.b,m.c,m.d,m.e,m.f];
+  if(key.renderer!==renderer||key.width!==ctx.canvas.width||key.height!==ctx.canvas.height||key.frameWidth!==p.width||key.frameHeight!==p.height||!matrix.every((v,i)=>v===key.matrix[i]))return false;
+  const previous={...layer,operations:key.operations};
+  if(!this.paintNativePreview(ctx,previous,p,renderer,last,n.result,finalGeometry(last),n.delta))return false;
+  if(n.delta.final){
+   const sharp=this.preview!,scratch=this.surface!;
+   this.key={...key,operations:layer.operations,firstClean:layer.operations.length,rendererRevision:renderer.displayRevision};this.surface=sharp;this.preview=scratch;
+   this.layers.set(layer.id,{key:this.key,surface:sharp});n.group.operations=layer.operations;n.group.revision=renderer.displayRevision;if(n.delta.support)n.group.baseline.region=n.delta.support;const keep=n.box&&n.delta.tiles.size?this.retainMixCuts(n.group,{mask:n.cutMask,paint:n.cutPatch,box:n.box,tiles:new Map(n.delta.tiles)}):(this.retainMixCuts(n.group,undefined),false);this.clearNativePreview(!!keep);this.request();
+  }
+  return true;
+ }
  paint(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,live?:Stroke,geometry?:Geometry,renderer?:LayerRenderer):boolean{
+  if(!live&&renderer&&this.presentCommittedMix(ctx,layer,p,renderer))return true;
   const m=ctx.getTransform(),scale=Math.hypot(m.a,m.b);
   if(!ctx.canvas.width||!ctx.canvas.height||!Number.isFinite(scale)||scale<=0||!layer.operations.length&&!live||live&&!clean(live))return false;
   let firstClean=0;
@@ -205,7 +261,7 @@ export class InkDisplay{
  }
  /** Apply a live native paint result only where it changes the sharp layer.
   * Restoring its dirty footprint avoids a whole-layer sharp/blur switch. */
- private clearNativePreview(){const n=this.nativePreview;if(n)for(const c of [n.cutMask,n.cutPatch])c.width=c.height=0;this.nativePreview=undefined;this.nativeFallback=undefined;}
+ private clearNativePreview(keepCuts=false){const n=this.nativePreview;if(n&&!keepCuts)for(const c of [n.cutMask,n.cutPatch])c.width=c.height=0;this.nativePreview=undefined;this.nativeFallback=undefined;}
  paintNativePreview(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer,live:Stroke,result:HTMLCanvasElement,geometry?:Geometry,delta?:BlendDelta){
   if(!delta)return this.paintNativeFallback(ctx,layer,p,renderer,live,result,geometry);
   if(clean(live)||!layer.operations.some(op=>op.kind==='stroke'&&clean(op)))return false;
@@ -216,21 +272,39 @@ export class InkDisplay{
   if(preview.width!==w)preview.width=w;if(preview.height!==h)preview.height=h;
   if(!same){this.clearNativePreview();this.nativePreview={base:this.key!,stroke:live.id,result,delta,cutMask:document.createElement('canvas'),cutPatch:document.createElement('canvas'),revision:-1};}
   const n=this.nativePreview!;
+  const candidate=this.mixGroups.get(layer.id);n.group=candidate?.baseline===delta.group?candidate:undefined;
+  const seed=n.group?.baseline.seed;
+  if(seed&&n.revision===-1&&!n.box){
+   for(const [cut,source]of [[n.cutMask,seed.mask],[n.cutPatch,seed.paint]]){cut.width=source.width;cut.height=source.height;cut.getContext('2d',{willReadFrequently:true})!.drawImage(source,0,0);}
+   n.box={...seed.box};
+  }
   if(n.revision!==delta.revision){
    let left=p.width,top=p.height,right=0,bottom=0;for(const b of delta.tiles.values()){left=Math.min(left,b.x);top=Math.min(top,b.y);right=Math.max(right,b.x+b.w);bottom=Math.max(bottom,b.y+b.h);}
-   const W=right-left,H=bottom-top,rawRect=delta.tiles.size?this.screenBounds(live,{x:left,y:top,w:W,h:H},m,w,h):undefined;
-   const rect=rawRect?{x:Math.max(0,rawRect.x-2),y:Math.max(0,rawRect.y-2),w:Math.min(w,rawRect.x+rawRect.w+2)-Math.max(0,rawRect.x-2),h:Math.min(h,rawRect.y+rawRect.h+2)-Math.max(0,rawRect.y-2)}:undefined;
-   const pc=preview.getContext('2d')!;pc.resetTransform();pc.globalAlpha=1;pc.globalCompositeOperation='source-over';
-   if(!same){pc.clearRect(0,0,w,h);pc.drawImage(this.surface!,0,0);}else if(rect||n.rect){const a=rect??n.rect!,b=n.rect??a,x=Math.min(a.x,b.x),y=Math.min(a.y,b.y),W=Math.max(a.x+a.w,b.x+b.w)-x,H=Math.max(a.y+a.h,b.y+b.h)-y;pc.clearRect(x,y,W,H);pc.drawImage(this.surface!,x,y,W,H,x,y,W,H);}
-   n.rect=rect;
-   // Canvas copies recreate the original tight delta, retaining exact edge
-   // sampling at fractional zoom and rotation. All pixel comparisons and
-   // ownership updates already happened in the background worker.
-   if(delta.tiles.size){
-    for(const [cut,source]of [[n.cutMask,delta.mask],[n.cutPatch,delta.patch]]){if(cut.width!==W)cut.width=W;if(cut.height!==H)cut.height=H;const cc=cut.getContext('2d')!;cc.clearRect(0,0,W,H);cc.drawImage(source,left,top,W,H,0,0,W,H);}
-    pc.save();pc.setTransform(m);pc.globalAlpha=1;pc.imageSmoothingEnabled=Math.hypot(m.a,m.b)<=1+1e-7;pc.imageSmoothingQuality='high';pc.globalCompositeOperation='destination-out';pc.drawImage(n.cutMask,left,top);pc.globalCompositeOperation='source-over';pc.drawImage(n.cutPatch,left,top);pc.restore();
+   const W=right-left,H=bottom-top,box=delta.tiles.size?{x:left,y:top,w:W,h:H}:undefined,oldBox=n.box;
+   const sameBox=!!box&&!!oldBox&&box.x===oldBox.x&&box.y===oldBox.y&&box.w===oldBox.w&&box.h===oldBox.h;
+   const expand=(b:Box|undefined,pad=2)=>b?{x:Math.max(0,b.x-pad),y:Math.max(0,b.y-pad),w:Math.min(w,b.x+b.w+pad)-Math.max(0,b.x-pad),h:Math.min(h,b.y+b.h+pad)-Math.max(0,b.y-pad)}:undefined;
+   const rect=box?expand(this.screenBounds(live,box,m,w,h)):undefined;
+   const partial=same&&sameBox&&!!delta.dirty&&delta.revision>0&&!delta.final,dirty=delta.dirty;
+   const clip=partial&&dirty?expand(this.screenBounds(live,{x:dirty.x,y:dirty.y,w:dirty.width,h:dirty.height},m,w,h),4):undefined;
+   const pc=preview.getContext('2d')!;pc.resetTransform();pc.globalAlpha=1;pc.globalCompositeOperation='source-over';const stable=n.group?.sharp??this.surface!;
+   if(!delta.revision){
+    pc.clearRect(0,0,w,h);pc.drawImage(this.surface!,0,0);
+    const region=n.group?.baseline.region;n.rect=rect??(region&&region.width&&region.height?expand(this.screenBounds(live,{x:region.x,y:region.y,w:region.width,h:region.height},m,w,h)):undefined);
+   }else{
+    if(!same||delta.final){pc.clearRect(0,0,w,h);pc.drawImage(stable,0,0);}
+    else if(partial){if(clip){pc.clearRect(clip.x,clip.y,clip.w,clip.h);pc.drawImage(stable,clip.x,clip.y,clip.w,clip.h,clip.x,clip.y,clip.w,clip.h);}}
+    else if(rect||n.rect){const a=rect??n.rect!,b=n.rect??a,x=Math.min(a.x,b.x),y=Math.min(a.y,b.y),W=Math.max(a.x+a.w,b.x+b.w)-x,H=Math.max(a.y+a.h,b.y+b.h)-y;pc.clearRect(x,y,W,H);pc.drawImage(stable,x,y,W,H,x,y,W,H);}
+    if(box){
+     for(const [cut,source]of [[n.cutMask,delta.mask],[n.cutPatch,delta.patch]]){
+      const cc=cut.getContext('2d',{willReadFrequently:true})!;
+      if(!sameBox||cut.width!==W||cut.height!==H||!dirty){if(cut.width!==W)cut.width=W;if(cut.height!==H)cut.height=H;cc.clearRect(0,0,W,H);cc.drawImage(source,left,top,W,H,0,0,W,H);}
+      else{const x=Math.max(left,dirty.x),y=Math.max(top,dirty.y),right=Math.min(left+W,dirty.x+dirty.width),bottom=Math.min(top+H,dirty.y+dirty.height);if(right>x&&bottom>y){cc.clearRect(x-left,y-top,right-x,bottom-y);cc.drawImage(source,x,y,right-x,bottom-y,x-left,y-top,right-x,bottom-y);}}
+     }
+     if(!partial||clip){pc.save();if(partial&&clip){pc.beginPath();pc.rect(clip.x,clip.y,clip.w,clip.h);pc.clip();}pc.setTransform(m);pc.globalAlpha=1;pc.imageSmoothingEnabled=Math.hypot(m.a,m.b)<=1+1e-7;pc.imageSmoothingQuality='high';pc.globalCompositeOperation='destination-out';pc.drawImage(n.cutMask,left,top);pc.globalCompositeOperation='source-over';pc.drawImage(n.cutPatch,left,top);pc.restore();}
+    }
+    n.box=box;n.rect=rect;
    }
-   n.revision=delta.revision;
+   delta.dirty=undefined;n.revision=delta.revision;
   }
   this.liveKey=undefined;ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.drawImage(preview,0,0);ctx.restore();return true;
  }

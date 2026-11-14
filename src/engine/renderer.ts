@@ -83,7 +83,7 @@ export class LayerRenderer {
  private pendingLayer?:{layer:Layer;project:Project;stroke:Stroke;base:HTMLCanvasElement;preview:HTMLCanvasElement;done:Promise<HTMLCanvasElement|undefined>};
  private finalWorker?:Worker;private finalSerial=0;
  private pendingFinal?:{token:number;stroke:Stroke;layer:string;width:number;height:number;preview:LayerRenderer;request:()=>void;done:Promise<void>;resolve:()=>void;timer:ReturnType<typeof setTimeout>};
- private scratch?:HTMLCanvasElement;private caches=new Map<string,{layer:Layer;canvas:HTMLCanvasElement;frame?:string}>();private bitmaps=new Map<string,HTMLImageElement>();
+ private scratch?:HTMLCanvasElement;private caches=new Map<string,{layer:Layer;canvas:HTMLCanvasElement;frame?:string}>();private bitmaps=new Map<string,HTMLImageElement|ImageBitmap>();private decodedBitmaps=new Set<ImageBitmap>();
  private celRasters:{layer:Layer;canvas:HTMLCanvasElement}[]=[];
  private celRasterBytes=0;
  private readonly celRasterBudget=96*1024*1024;
@@ -137,14 +137,14 @@ export class LayerRenderer {
   const images=project.layers.flatMap(l=>l.operations).filter(o=>o.kind==='fill'||o.kind==='image');
   await Promise.all(images.map(async o=>{
    let image=this.bitmaps.get(o.png);
-   if(!image){image=new Image();image.src=o.png;await image.decode();}
+   if(!image){if(typeof Image==='undefined'){const match=/^data:([^;,]+);base64,(.*)$/s.exec(o.png);if(!match)throw Error('Unsupported preview image');const raw=atob(match[2]),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);image=await createImageBitmap(new Blob([bytes],{type:match[1]}));this.decodedBitmaps.add(image);}else{image=new Image();image.src=o.png;await image.decode();}}
    const bounds=bitmapOrigin(project,o)??project;
    if(o.kind==='fill'&&(image.width!==bounds.width||image.height!==bounds.height))throw Error('Fill bitmap dimensions do not match the project.');
    if(image.width*image.height>16777216)throw Error('Image exceeds the decode limit.');
    this.bitmaps.set(o.png,image);
   }));
  }
- clear(){for(const entry of this.outsideLayers.values())entry.tiles.dispose();this.outsideLayers.clear();this.pendingLayer=undefined;this.cancelFinal();this.finalWorker?.terminate();this.finalWorker=undefined;for(const c of this.caches.values())c.canvas.width=c.canvas.height=0;this.caches.clear();while(this.celRasters.length){const {canvas}=this.releaseCelRaster(this.celRasters.length-1);canvas.width=canvas.height=0;}if(this.scratch)this.scratch.width=this.scratch.height=0;this.scratch=undefined;this.bitmaps.clear();while(this.strokeRasters.size)this.dropStroke();for(const c of this.checkpoints){c.canvas.width=0;c.canvas.height=0;}for(const d of this.deltas)d.patch.clear();this.checkpoints=[];this.checkpointBytes=0;this.deltas=[];this.deltaLookup.clear();this.deltaBytes=0;}
+ clear(){for(const entry of this.prefixSnapshots)entry.canvas.width=entry.canvas.height=0;this.prefixSnapshots=[];this.prefixSnapshotBytes=0;for(const entry of this.outsideLayers.values())entry.tiles.dispose();this.outsideLayers.clear();this.pendingLayer=undefined;this.cancelFinal();this.finalWorker?.terminate();this.finalWorker=undefined;for(const c of this.caches.values())c.canvas.width=c.canvas.height=0;this.caches.clear();while(this.celRasters.length){const {canvas}=this.releaseCelRaster(this.celRasters.length-1);canvas.width=canvas.height=0;}if(this.scratch)this.scratch.width=this.scratch.height=0;this.scratch=undefined;for(const image of this.decodedBitmaps)image.close();this.decodedBitmaps.clear();this.bitmaps.clear();while(this.strokeRasters.size)this.dropStroke();for(const c of this.checkpoints){c.canvas.width=0;c.canvas.height=0;}for(const d of this.deltas)d.patch.clear();this.checkpoints=[];this.checkpointBytes=0;this.deltas=[];this.deltaLookup.clear();this.deltaBytes=0;}
  private cancelFinal(){const job=this.pendingFinal;if(job){clearTimeout(job.timer);job.preview.clear();this.pendingFinal=undefined;job.resolve();this.displayRevision++;}}
  private failedFinal(){const request=this.pendingFinal?.request;this.cancelFinal();this.finalWorker?.terminate();this.finalWorker=undefined;request?.();}
  /** A temporary renderer serves only on-screen drawing. Canonical get(), PNG
@@ -152,9 +152,9 @@ export class LayerRenderer {
  getDisplay(layer:Layer,p:Project){const pending=this.pendingLayer,cached=this.caches.get(layer.id);if(pending&&pending.layer.id===layer.id&&pending.project.id===p.id&&pending.project.width===p.width&&pending.project.height===p.height&&pending.layer.operations.length===layer.operations.length&&pending.layer.operations.every((o,i)=>o===layer.operations[i])&&cached?.layer.operations!==layer.operations)return pending.preview;const job=this.pendingFinal;return job&&job.layer===layer.id&&job.width===p.width&&job.height===p.height&&layer.operations.includes(job.stroke)?job.preview.get(layer,p):this.get(layer,p);}
  /** Provisional display pixels stay separate until the worker returns a
   * complete canonical layer. Exports and synchronous get() never use them. */
- deferLayerResult(layer:Layer,p:Project,stroke:Stroke,base:HTMLCanvasElement,preview:HTMLCanvasElement,done:Promise<HTMLCanvasElement|undefined>,request:()=>void){
+ deferLayerResult(layer:Layer,p:Project,stroke:Stroke,base:HTMLCanvasElement,preview:HTMLCanvasElement,done:Promise<HTMLCanvasElement|undefined>,request:()=>void,onFinal?:(result:HTMLCanvasElement|undefined)=>void){
   const job={layer,project:p,stroke,base,preview,done};this.pendingLayer=job;
-  done.then(result=>{if(this.pendingLayer===job){this.pendingLayer=undefined;if(result){const old=this.adoptLayerResult(layer,p,stroke,base,result);if(old){old.width=old.height=0;}else if(![...this.caches.values()].some(c=>c.canvas===result))result.width=result.height=0;}request();}else if(result&&![...this.caches.values()].some(c=>c.canvas===result))result.width=result.height=0;});
+  done.then(result=>{try{onFinal?.(result);}catch(error){console.warn('Frame guide preview unavailable:',error);}if(this.pendingLayer===job){this.pendingLayer=undefined;if(result){const old=this.adoptLayerResult(layer,p,stroke,base,result);if(old){old.width=old.height=0;}else if(![...this.caches.values()].some(c=>c.canvas===result))result.width=result.height=0;}request();}else if(result&&![...this.caches.values()].some(c=>c.canvas===result))result.width=result.height=0;});
  }
  whenSettled(){return Promise.all([this.pendingLayer?.done,this.pendingFinal?.done]).then(()=>undefined);}
  /** A new stroke must pick up exact previous paint, never a provisional layer.
@@ -198,12 +198,48 @@ export class LayerRenderer {
   if(renderer.scratch)renderer.scratch.width=renderer.scratch.height=0;
   return end;
  }
+ /** Return a composite only when all visible native layers are already ready. */
+ cachedComposite(p:Project,overrides?:ReadonlyMap<string,HTMLCanvasElement>):HTMLCanvasElement|undefined{
+  const sources=new Map<string,HTMLCanvasElement>(),matches=(layer:Layer,entry:{layer:Layer;canvas:HTMLCanvasElement})=>entry.layer.id===layer.id&&entry.canvas.width===p.width&&entry.canvas.height===p.height&&entry.layer.operations.length===layer.operations.length&&entry.layer.operations.every((op,i)=>op===layer.operations[i]);
+  for(const layer of p.layers)if(layer.visible&&!layer.reference&&layer.operations.length){
+   let source=overrides?.get(layer.id),cached=this.caches.get(layer.id);const pending=this.pendingLayer;
+   if(!source&&cached&&matches(layer,cached))source=cached.canvas;
+   if(!source&&pending&&pending.project.id===p.id&&matches(layer,{layer:pending.layer,canvas:pending.preview}))source=pending.preview;
+   if(!source)source=this.celRasters.find(entry=>matches(layer,entry))?.canvas;
+   if(!source||source.width!==p.width||source.height!==p.height)return undefined;sources.set(layer.id,source);
+  }
+  const canvas=makeCanvas(p.width,p.height),ctx=context(canvas);
+  for(const layer of [...p.layers].reverse()){const source=sources.get(layer.id);if(source){ctx.globalAlpha=layer.opacity;ctx.globalCompositeOperation=blendOperation(layer.blend);ctx.drawImage(source,0,0);}}
+  return canvas;
+ }
+ private prefixSnapshots:{id:string;operations:Layer['operations'];canvas:HTMLCanvasElement;bytes:number}[]=[];
+ private prefixSnapshotBytes=0;private readonly prefixSnapshotBudget=64*1024*1024;
+ /** Immutable native prefixes must never rewind the editable layer cache.
+  * A rewind can invalidate an in-flight Mix base and replay its entire history. */
+ prefixSnapshot(layer:Layer,p:Project,end=layer.operations.length):HTMLCanvasElement{
+  const operations=end===layer.operations.length?layer.operations:layer.operations.slice(0,end),matches=(entry:typeof this.prefixSnapshots[number],length=operations.length)=>entry.id===layer.id&&entry.canvas.width===p.width&&entry.canvas.height===p.height&&entry.operations.length===length&&entry.operations.every((op,i)=>op===operations[i]);
+  const index=this.prefixSnapshots.findIndex(entry=>matches(entry));
+  if(index>=0){const [entry]=this.prefixSnapshots.splice(index,1);this.prefixSnapshots.push(entry);return entry.canvas;}
+  const cached=this.caches.get(layer.id);let result:HTMLCanvasElement;
+  if(cached&&cached.canvas.width===p.width&&cached.canvas.height===p.height&&cached.layer.operations.length===operations.length&&cached.layer.operations.every((op,i)=>op===operations[i])){
+   result=makeCanvas(p.width,p.height);context(result).drawImage(cached.canvas,0,0);
+  }else{
+   const previous=this.prefixSnapshots.filter(entry=>entry.operations.length<operations.length&&matches(entry,entry.operations.length)).sort((a,b)=>b.operations.length-a.operations.length)[0],fork=new LayerRenderer(false);
+   fork.bitmaps=new Map(this.bitmaps);
+   if(previous){const copy=makeCanvas(p.width,p.height);context(copy).drawImage(previous.canvas,0,0);fork.caches.set(layer.id,{layer:{...layer,operations:previous.operations},canvas:copy,frame:p.animation?.activeFrameId});}
+   result=fork.get({...layer,operations},p);fork.caches.delete(layer.id);fork.clear();
+  }
+  const bytes=p.width*p.height*4;if(bytes>this.prefixSnapshotBudget)return result;
+  this.prefixSnapshots.push({id:layer.id,operations,canvas:result,bytes});this.prefixSnapshotBytes+=bytes;
+  while(this.prefixSnapshotBytes>this.prefixSnapshotBudget){const oldest=this.prefixSnapshots.shift()!;this.prefixSnapshotBytes-=oldest.bytes;oldest.canvas.width=oldest.canvas.height=0;}
+  return result;
+ }
  get(layer:Layer,p:Project){
   const frame=p.animation?.activeFrameId;
   let cached=this.caches.get(layer.id);
   if(cached&&cached.canvas.width===p.width&&cached.canvas.height===p.height){
    const previous=cached.layer.operations,next=layer.operations;
-   if(previous===next||frame!==cached.frame&&previous.length===next.length&&previous.every((op,i)=>op===next[i])){
+   if(previous===next||previous.length===next.length&&previous.every((op,i)=>op===next[i])){
     if(frame!==cached.frame||previous!==next)this.caches.set(layer.id,{layer,canvas:cached.canvas,frame});
     return cached.canvas;
    }

@@ -1,7 +1,8 @@
 import type {Project} from '../core/model';
 import type {View} from '../core/geometry';
 import {flipCandidate,flipVisibleLayers,type FlipDirection} from '../animation/flipbook';
-import type {DrawingFrame} from '../animation/timeline';
+import {frameList,currentFrameIndex,type DrawingFrame} from '../animation/timeline';
+import {FramePreviewWorker} from './FramePreviewWorker';
 import {LayerRenderer,makeCanvas,context} from './renderer';
 
 type Cached={frame:DrawingFrame;picture:HTMLCanvasElement};
@@ -16,11 +17,23 @@ export class FlipbookOverlay {
  private direction:FlipDirection|null=null;
  private cache=new Map<string,Cached>();
  private signature='';private generation=0;private disposed=false;
- private task?:number;private rendering=false;private failed=new Map<string,DrawingFrame>();
+ private previewWorker=new FramePreviewWorker();private renderingFrame?:DrawingFrame;private staleFrames=new Set<string>();
+ private task?:number;private taskKind?:'idle'|'timeout';private rendering=false;private failed=new Map<string,DrawingFrame>();
  constructor(parent:HTMLElement,project:Project,private isDrawing:()=>boolean){
   this.project=project;this.surface=document.createElement('canvas');
   this.surface.className='flipbook-overlay';this.surface.setAttribute('aria-hidden','true');
   parent.appendChild(this.surface);this.update(project);
+ }
+ refresh(frameId:string){this.staleFrames.add(frameId);this.schedule();}
+ warm(){this.previewWorker.warm();}
+ capture(project:Project,renderer:LayerRenderer,overrides?:ReadonlyMap<string,HTMLCanvasElement>){
+  if(project.id!==this.project.id||project.width!==this.project.width||project.height!==this.project.height)return;
+  const frame=frameList(project)[currentFrameIndex(project)],current=frameList(this.project).find(f=>f.id===frame.id);
+  if(!current||current!==frame||project.layers.length!==this.project.layers.length||project.layers.some((l,i)=>{const other=this.project.layers[i];return !other||l.id!==other.id||l.visible!==other.visible||l.opacity!==other.opacity||l.blend!==other.blend||l.kind!==other.kind||l.reference!==other.reference;}))return;
+  const layers=project.layers.filter(l=>l.visible&&!l.reference);if(!layers.some(l=>l.operations.length))return;
+  const picture=renderer.cachedComposite({...project,layers},overrides);if(!picture)return;
+  this.staleFrames.delete(frame.id);this.cache.set(frame.id,{frame,picture});
+  while(this.cache.size>3||this.cache.size>1&&this.cache.size*picture.width*picture.height*4>32*1024*1024)this.cache.delete(this.cache.keys().next().value!);this.paint();
  }
  get previewActive(){return this.direction!==null;}
  /** Press/release (keyboard), or click same direction again to clear (toolbar). */
@@ -30,7 +43,7 @@ export class FlipbookOverlay {
   this.direction=direction;this.paint();
   if(direction!==null){
    const requested=flipCandidate(this.project,direction);
-   if(requested&&!this.cache.has(requested.id)&&this.failed.get(requested.id)!==requested&&!this.rendering){
+   if(requested&&(!this.cache.has(requested.id)||this.staleFrames.has(requested.id))&&this.failed.get(requested.id)!==requested&&!this.rendering){
     this.cancelTask();void this.prepareOne(requested,this.generation);
    }else this.schedule();
   }
@@ -40,13 +53,14 @@ export class FlipbookOverlay {
   const old=this.project;this.project=project;
   const signature=[project.id,project.width,project.height,
     ...project.layers.filter(l=>l.visible&&!l.reference).map(l=>`${l.id}:${l.opacity}:${l.blend??'normal'}:${l.kind}`)].join('|');
+  if(signature===this.signature&&old.id===project.id&&old.animation?.activeFrameId===project.animation?.activeFrameId&&([-1,1] as FlipDirection[]).every(d=>flipCandidate(old,d)===flipCandidate(project,d))){this.schedule();return;}
   if(signature!==this.signature){this.signature=signature;this.cache.clear();this.failed.clear();}
   const dirs:[FlipDirection,FlipDirection]=[-1,1];
   const next=dirs.map(d=>flipCandidate(project,d)).filter((f):f is DrawingFrame=>f!==null);
   for(const [id,item] of this.cache)if(!project.animation?.frames.some(f=>f===item.frame))this.cache.delete(id);
   for(const [id,failedFrame] of this.failed)if(!next.some(f=>f===failedFrame))this.failed.delete(id);
   if(old.animation?.activeFrameId!==project.animation?.activeFrameId||old.id!==project.id)this.direction=null;
-  this.generation++;this.cancelTask();this.paint();this.schedule();
+  this.generation++;this.previewWorker.cancel();this.cancelTask();this.paint();this.schedule();
  }
  setView(view:View,width:number,height:number,dpr:number){
   this.view=view;
@@ -58,40 +72,41 @@ export class FlipbookOverlay {
   this.requestPaint();
  }
  private cancelTask(){if(this.task===undefined)return;
-  if('cancelIdleCallback' in window)window.cancelIdleCallback(this.task);
-  else clearTimeout(this.task);this.task=undefined;
+  if(this.taskKind==='idle'&&'cancelIdleCallback' in window)window.cancelIdleCallback(this.task);
+  else clearTimeout(this.task);this.task=undefined;this.taskKind=undefined;
  }
  private schedule(){
-  if(this.disposed||this.rendering||this.task!==undefined||this.isDrawing())return;
+  if(this.disposed||this.rendering||this.task!==undefined||this.isDrawing()&&!this.previewWorker.available)return;
   const missing=([-1,1] as FlipDirection[]).map(d=>flipCandidate(this.project,d))
-   .find(f=>f&&!this.cache.has(f.id)&&this.failed.get(f.id)!==f
+   .find(f=>f&&(!this.cache.has(f.id)||this.staleFrames.has(f.id))&&this.failed.get(f.id)!==f
     &&(this.direction!==null&&f===flipCandidate(this.project,this.direction)
        ||Object.values(f.drawings).reduce((count,ops)=>count+ops.length,0)<=120));
   if(!missing)return;
   const generation=this.generation;
-  const run=()=>{this.task=undefined;if(!this.disposed&&generation===this.generation&&!this.isDrawing())void this.prepareOne(missing,generation);};
+  const run=()=>{this.task=undefined;this.taskKind=undefined;if(!this.disposed&&generation===this.generation&&(!this.isDrawing()||this.previewWorker.available))void this.prepareOne(missing,generation);};
   // Keep expensive offscreen rendering away from active drawing frames.
-  if('requestIdleCallback' in window)this.task=window.requestIdleCallback(run,{timeout:600});
-  else this.task=setTimeout(run,90) as unknown as number;
+  if(this.previewWorker.available){this.taskKind='timeout';this.task=setTimeout(run,0) as unknown as number;}
+  else if('requestIdleCallback' in window){this.taskKind='idle';this.task=window.requestIdleCallback(run,{timeout:600});}
+  else{this.taskKind='timeout';this.task=setTimeout(run,90) as unknown as number;}
  }
  private async prepareOne(frame:DrawingFrame,generation:number){
-  if(this.disposed||this.rendering||this.isDrawing())return;
-  this.rendering=true;
+  if(this.disposed||this.rendering||this.isDrawing()&&!this.previewWorker.available)return;
+  this.rendering=true;this.renderingFrame=frame;
   const renderer=new LayerRenderer(),snapshot=flipVisibleLayers(this.project,frame);
   try{
-   await renderer.prepare(snapshot);
-   if(this.disposed||generation!==this.generation||this.isDrawing())return;
-   const picture=renderer.composite(snapshot,{transparent:true,includeReferences:false});
+   let picture:HTMLCanvasElement;
+   if(this.previewWorker.available){const bitmap=await this.previewWorker.render(snapshot);if(this.disposed||generation!==this.generation){bitmap.close();return;}picture=makeCanvas(bitmap.width,bitmap.height);context(picture).drawImage(bitmap,0,0);bitmap.close();}
+   else{await renderer.prepare(snapshot);if(this.disposed||generation!==this.generation||this.isDrawing())return;picture=renderer.composite(snapshot,{transparent:true,includeReferences:false});}
    if(!this.disposed&&generation===this.generation){
-    this.cache.set(frame.id,{frame,picture});
+    this.staleFrames.delete(frame.id);this.cache.set(frame.id,{frame,picture});
     while(this.cache.size>3||this.cache.size>1&&this.cache.size*picture.width*picture.height*4>32*1024*1024){
      const oldest=this.cache.keys().next().value!;
      this.cache.delete(oldest);
     }
     this.paint();
    }
-  }catch(error){if(generation===this.generation)this.failed.set(frame.id,frame);console.warn('Flipbook preview not available:',error);}
-  finally{renderer.clear();this.rendering=false;
+  }catch(error){if(!this.disposed&&generation===this.generation){this.staleFrames.delete(frame.id);this.failed.set(frame.id,frame);console.warn('Flipbook preview not available:',error);}}
+  finally{renderer.clear();this.rendering=false;this.renderingFrame=undefined;
    if(!this.disposed)this.schedule();}
  }
  private requestPaint(){if(this.disposed||this.paintFrame||!(this.direction!==null)&&!this.hasContent)return;this.paintFrame=requestAnimationFrame(()=>{this.paintFrame=0;this.paint();});}
@@ -110,5 +125,5 @@ export class FlipbookOverlay {
   ctx.beginPath();ctx.rect(0,0,this.project.width,this.project.height);ctx.clip();
   ctx.drawImage(cached.picture,0,0);ctx.restore();
  }
- dispose(){if(this.paintFrame)cancelAnimationFrame(this.paintFrame);this.paintFrame=0;this.disposed=true;this.generation++;this.cancelTask();this.cache.clear();this.surface.remove();}
+ dispose(){if(this.paintFrame)cancelAnimationFrame(this.paintFrame);this.paintFrame=0;this.disposed=true;this.generation++;this.cancelTask();this.previewWorker.dispose();this.staleFrames.clear();this.cache.clear();this.surface.remove();}
 }
