@@ -1,4 +1,5 @@
 import type {ArtworkOrigin,Layer,Stroke,Project} from '../core/model';
+import {nativePixelsDiffer} from './nativePixelDelta';
 import {finalGeometry} from './geometryCache';
 import {projectiveInkGeometry} from './projectiveInkGeometry';
 import {drawProjectiveFlowInk,preservesFlowContour,projectedFlowBounds} from './projectiveFlowInk';
@@ -10,6 +11,7 @@ import {drawFlatInk} from './flatInk';
 import {FlatLiveRaster} from './FlatLiveRaster';
 import {SolidLiveRaster} from './SolidLiveRaster';
 import type {strokeGeometry} from './strokeGeometry';
+import type {BlendDelta} from './LiveBlendWorker';
 
 type Geometry=ReturnType<typeof strokeGeometry>;
 type Box={x:number;y:number;w:number;h:number};
@@ -35,7 +37,8 @@ export class InkDisplay{
  private key?:Key;private liveKey?:{base:Key;stroke:Stroke;geometry?:Geometry};
  private layers=new Map<string,{key:Key;surface:HTMLCanvasElement}>();
  private prefixes=new Map<string,{operations:Layer['operations'];canvas:HTMLCanvasElement;renderer:LayerRenderer;revision:number}>();
- private nativePreview?:{base:Key;stroke:string;rect?:Box};
+ private nativeFallback?:{base:Key;stroke:string;rect?:Box};
+ private nativePreview?:{base:Key;stroke:string;result:HTMLCanvasElement;delta:BlendDelta;cutMask:HTMLCanvasElement;cutPatch:HTMLCanvasElement;rect?:Box;revision:number};
  private lastLive?:{id:string;base:Key;picture:HTMLCanvasElement};private worker?:Worker;private pending?:Pending;private serial=0;
  constructor(private request:()=>void=()=>{}){}
  private prepared=new Map<Stroke,Prepared>();private preparedWeight=0;private pathBatches=0;
@@ -77,7 +80,7 @@ export class InkDisplay{
   for(const c of [this.surface,this.scratch,this.preview,...[...this.layers.values()].map(v=>v.surface),...[...this.prefixes.values()].map(v=>v.canvas)])if(c)c.width=c.height=0;
   this.prefixes.clear();
   this.layers.clear();
-  this.surface=this.scratch=this.preview=undefined;this.key=undefined;this.liveKey=undefined;this.nativePreview=undefined;this.prepared.clear();this.preparedWeight=0;this.pathBatches=0;
+  this.clearNativePreview();this.surface=this.scratch=this.preview=undefined;this.key=undefined;this.liveKey=undefined;this.prepared.clear();this.preparedWeight=0;this.pathBatches=0;
  }
  private prepare(s:Stroke,liveGeometry?:Geometry,cache=true):Prepared{
   const cached=cache&&!liveGeometry&&this.prepared.get(s);
@@ -144,7 +147,7 @@ export class InkDisplay{
  }
  private nativePatch(out:CanvasRenderingContext2D,before:Uint8ClampedArray,after:Uint8ClampedArray,rx:number,ry:number,rw:number,rh:number,m:DOMMatrix){
   const place=(source:CanvasImageSource,x=0,y=0)=>{out.save();out.setTransform(m);out.globalAlpha=1;out.imageSmoothingEnabled=Math.hypot(m.a,m.b)<=1+1e-7;out.imageSmoothingQuality='high';out.drawImage(source,x,y);out.restore();};
-   let left=rw,top=rh,right=0,bottom=0;const changed=(k:number)=>before[k]!==after[k]||before[k+1]!==after[k+1]||before[k+2]!==after[k+2]||before[k+3]!==after[k+3];
+   let left=rw,top=rh,right=0,bottom=0;const changed=(k:number)=>nativePixelsDiffer(before,after,k);
    for(let k=0;k<before.length;k+=4)if(changed(k)){const index=k/4,x=index%rw,y=Math.floor(index/rw);left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x+1);bottom=Math.max(bottom,y+1);}
    if(right<=left||bottom<=top)return;
    const W=right-left,H=bottom-top,mask=document.createElement('canvas'),patch=document.createElement('canvas');mask.width=patch.width=W;mask.height=patch.height=H;const mc=mask.getContext('2d')!,pc=patch.getContext('2d')!,ownership=mc.createImageData(W,H),pixels=pc.createImageData(W,H);
@@ -202,16 +205,45 @@ export class InkDisplay{
  }
  /** Apply a live native paint result only where it changes the sharp layer.
   * Restoring its dirty footprint avoids a whole-layer sharp/blur switch. */
- paintNativePreview(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer,live:Stroke,result:HTMLCanvasElement,geometry?:Geometry){
+ private clearNativePreview(){const n=this.nativePreview;if(n)for(const c of [n.cutMask,n.cutPatch])c.width=c.height=0;this.nativePreview=undefined;this.nativeFallback=undefined;}
+ paintNativePreview(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer,live:Stroke,result:HTMLCanvasElement,geometry?:Geometry,delta?:BlendDelta){
+  if(!delta)return this.paintNativeFallback(ctx,layer,p,renderer,live,result,geometry);
   if(clean(live)||!layer.operations.some(op=>op.kind==='stroke'&&clean(op)))return false;
   let end=0;for(let i=layer.operations.length-1;i>=0;i--)if(layer.operations[i].kind!=='stroke'||!clean(layer.operations[i] as Stroke)){end=i+1;break;}
   const m=ctx.getTransform(),w=ctx.canvas.width,h=ctx.canvas.height;this.paintRegion(ctx,layer,p,end,undefined,undefined,renderer,false);
-  const b=strokeRasterBounds(live,p.width,p.height,geometry),rect=this.screenBounds(live,{x:b.x,y:b.y,w:b.width,h:b.height},m,w,h),old=this.nativePreview,preview=this.preview??=document.createElement('canvas');if(preview.width!==w)preview.width=w;if(preview.height!==h)preview.height=h;const pc=preview.getContext('2d')!;pc.resetTransform();pc.globalAlpha=1;pc.globalCompositeOperation='source-over';
+  const preview=this.preview??=document.createElement('canvas'),old=this.nativePreview;
+  const same=!!old&&old.base===this.key&&old.stroke===live.id&&old.result===result&&old.delta===delta&&preview.width===w&&preview.height===h;
+  if(preview.width!==w)preview.width=w;if(preview.height!==h)preview.height=h;
+  if(!same){this.clearNativePreview();this.nativePreview={base:this.key!,stroke:live.id,result,delta,cutMask:document.createElement('canvas'),cutPatch:document.createElement('canvas'),revision:-1};}
+  const n=this.nativePreview!;
+  if(n.revision!==delta.revision){
+   let left=p.width,top=p.height,right=0,bottom=0;for(const b of delta.tiles.values()){left=Math.min(left,b.x);top=Math.min(top,b.y);right=Math.max(right,b.x+b.w);bottom=Math.max(bottom,b.y+b.h);}
+   const W=right-left,H=bottom-top,rawRect=delta.tiles.size?this.screenBounds(live,{x:left,y:top,w:W,h:H},m,w,h):undefined;
+   const rect=rawRect?{x:Math.max(0,rawRect.x-2),y:Math.max(0,rawRect.y-2),w:Math.min(w,rawRect.x+rawRect.w+2)-Math.max(0,rawRect.x-2),h:Math.min(h,rawRect.y+rawRect.h+2)-Math.max(0,rawRect.y-2)}:undefined;
+   const pc=preview.getContext('2d')!;pc.resetTransform();pc.globalAlpha=1;pc.globalCompositeOperation='source-over';
+   if(!same){pc.clearRect(0,0,w,h);pc.drawImage(this.surface!,0,0);}else if(rect||n.rect){const a=rect??n.rect!,b=n.rect??a,x=Math.min(a.x,b.x),y=Math.min(a.y,b.y),W=Math.max(a.x+a.w,b.x+b.w)-x,H=Math.max(a.y+a.h,b.y+b.h)-y;pc.clearRect(x,y,W,H);pc.drawImage(this.surface!,x,y,W,H,x,y,W,H);}
+   n.rect=rect;
+   // Canvas copies recreate the original tight delta, retaining exact edge
+   // sampling at fractional zoom and rotation. All pixel comparisons and
+   // ownership updates already happened in the background worker.
+   if(delta.tiles.size){
+    for(const [cut,source]of [[n.cutMask,delta.mask],[n.cutPatch,delta.patch]]){if(cut.width!==W)cut.width=W;if(cut.height!==H)cut.height=H;const cc=cut.getContext('2d')!;cc.clearRect(0,0,W,H);cc.drawImage(source,left,top,W,H,0,0,W,H);}
+    pc.save();pc.setTransform(m);pc.globalAlpha=1;pc.imageSmoothingEnabled=Math.hypot(m.a,m.b)<=1+1e-7;pc.imageSmoothingQuality='high';pc.globalCompositeOperation='destination-out';pc.drawImage(n.cutMask,left,top);pc.globalCompositeOperation='source-over';pc.drawImage(n.cutPatch,left,top);pc.restore();
+   }
+   n.revision=delta.revision;
+  }
+  this.liveKey=undefined;ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.drawImage(preview,0,0);ctx.restore();return true;
+ }
+ private paintNativeFallback(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer,live:Stroke,result:HTMLCanvasElement,geometry?:Geometry){
+  if(clean(live)||!layer.operations.some(op=>op.kind==='stroke'&&clean(op)))return false;
+  let end=0;for(let i=layer.operations.length-1;i>=0;i--)if(layer.operations[i].kind!=='stroke'||!clean(layer.operations[i] as Stroke)){end=i+1;break;}
+  const m=ctx.getTransform(),w=ctx.canvas.width,h=ctx.canvas.height;this.paintRegion(ctx,layer,p,end,undefined,undefined,renderer,false);
+  const b=strokeRasterBounds(live,p.width,p.height,geometry),rect=this.screenBounds(live,{x:b.x,y:b.y,w:b.width,h:b.height},m,w,h),old=this.nativeFallback,preview=this.preview??=document.createElement('canvas');if(preview.width!==w)preview.width=w;if(preview.height!==h)preview.height=h;const pc=preview.getContext('2d')!;pc.resetTransform();pc.globalAlpha=1;pc.globalCompositeOperation='source-over';
   let restore=old&&old.base===this.key&&old.stroke===live.id?rect:undefined;
   if(restore&&old?.rect){const x=Math.min(restore.x,old.rect.x),y=Math.min(restore.y,old.rect.y);restore={x,y,w:Math.max(restore.x+restore.w,old.rect.x+old.rect.w)-x,h:Math.max(restore.y+restore.h,old.rect.y+old.rect.h)-y};}
   if(restore){pc.clearRect(restore.x,restore.y,restore.w,restore.h);pc.drawImage(this.surface!,restore.x,restore.y,restore.w,restore.h,restore.x,restore.y,restore.w,restore.h);}else{pc.clearRect(0,0,w,h);pc.drawImage(this.surface!,0,0);}
   if(b.width&&b.height){const baseline=renderer.getDisplay(layer,p);if(baseline!==result){const before=baseline.getContext('2d')!.getImageData(b.x,b.y,b.width,b.height).data,after=result.getContext('2d')!.getImageData(b.x,b.y,b.width,b.height).data;this.nativePatch(pc,before,after,b.x,b.y,b.width,b.height,m);}}
-  this.nativePreview={base:this.key!,stroke:live.id,rect};this.liveKey=undefined;ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.drawImage(preview,0,0);ctx.restore();return true;
+  this.nativeFallback={base:this.key!,stroke:live.id,rect};this.liveKey=undefined;ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.drawImage(preview,0,0);ctx.restore();return true;
  }
  baseReady(layer:Layer,p:Project,matrix:number[],width:number,height:number,renderer:LayerRenderer){const key=this.layers.get(layer.id)?.key;return !!key&&key.operations===layer.operations&&key.frameWidth===p.width&&key.frameHeight===p.height&&key.width===width&&key.height===height&&key.renderer===renderer&&key.rendererRevision===(key.firstClean?renderer.displayRevision:0)&&matrix.every((v,i)=>v===key.matrix[i]);}
  /** Prepare the existing native paint prefix before the first clean-ink
