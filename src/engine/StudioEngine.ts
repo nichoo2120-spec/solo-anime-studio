@@ -653,7 +653,7 @@ export class StudioEngine {
    if(!(denseStroke&&l.id===this.strokeTarget?.layer&&this.initialPressurePending&&denseStroke.points.length===1)&&!this.mirrorDrawing.enabled&&(selectionStable||!displayed.operations.some(o=>selectedStrokeIds.has(o.id)))&&!(l.id===p.activeLayerId&&this.selection.length&&!selectionStable)&&this.inkDisplay.paint(ctx,displayed,p,denseStroke&&l.id===this.strokeTarget?.layer?denseStroke:undefined,denseStroke&&l.id===this.strokeTarget?.layer?this.liveGeometry:undefined,this.renderer)){if(cachedDrawing||warmDrawing)this.drawingFrames.rememberInk(l.id,this.inkDisplay.cachedSurface(l.id));continue;}
    let c=this.renderer.getDisplay(displayed,p);
    if(!selectionStable&&displayed.operations.some(o=>selectedStrokeIds.has(o.id))){ctx.globalAlpha=l.opacity;ctx.drawImage(this.exactStrokePreview(displayed,p),0,0);continue;}
-   const workerPreview=denseStroke&&l.id===this.strokeTarget?.layer&&!this.strokeMirror&&workerBlendEligible(denseStroke)?this.blendWorker.preview(denseStroke,c,this.liveGeometry):undefined;
+   const workerPreview=denseStroke&&l.id===this.strokeTarget?.layer&&!this.strokeMirror&&workerBlendEligible(denseStroke)?this.blendWorker.preview(denseStroke,c,this.liveGeometry,displayed.operations.some(op=>op.kind==='stroke'&&displayCleanInk(op))):undefined;
    if(workerPreview){this.blendSource=c;c=workerPreview;}else if(denseStroke?l.id===this.strokeTarget?.layer:l.id===p.activeLayerId&&this.selection.length&&!selectionStable){const preview=this.previewSurface;if(preview.width!==p.width){preview.width=p.width;this.previewStrokeId='';this.previewRestore=undefined;}if(preview.height!==p.height){preview.height=p.height;this.previewStrokeId='';this.previewRestore=undefined;}const pc=preview.getContext('2d')!,samePreview=denseStroke&&this.previewStrokeId===denseStroke.id&&this.previewBase===c&&this.previewBaseOperations===displayed.operations;
     const bounds=denseStroke&&this.liveGeometry?this.pigmentPreviewBounds(denseStroke,p,this.liveGeometry):undefined,restore=this.previewRestore;
     const dirty=samePreview&&livePainted&&!this.strokeMirror?this.liveRaster.lastRegion:
@@ -672,7 +672,7 @@ export class StudioEngine {
     else{this.previewStrokeId='';this.previewBase=undefined;this.previewBaseOperations=undefined;}
     this.previewFootprint=bounds;
     c=preview;}
-   if(denseStroke&&l.id===this.strokeTarget?.layer&&!this.strokeMirror&&(!dirtyFrame||dirtyFrame.width>0&&dirtyFrame.height>0)&&this.inkDisplay.paintNativePreview(ctx,displayed,p,this.renderer,denseStroke,c,this.liveGeometry))continue;
+   if(denseStroke&&l.id===this.strokeTarget?.layer&&!this.strokeMirror&&(!dirtyFrame||dirtyFrame.width>0&&dirtyFrame.height>0)&&this.inkDisplay.paintNativePreview(ctx,displayed,p,this.renderer,denseStroke,c,this.liveGeometry,workerPreview?this.blendWorker.deltaFor(denseStroke):undefined))continue;
    ctx.globalAlpha=l.opacity;ctx.drawImage(c,0,0);
   }if(snapshotPending&&snapshotPassed){this.editingSnapshot.capture(ctx,snapshotKey!);snapshotPending=false;}
   // Animation can change cels again before a navigation preview is useful.
