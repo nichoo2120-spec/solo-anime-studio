@@ -1,6 +1,9 @@
 import type {ArtworkOrigin,Layer,Stroke,Project} from '../core/model';
 import {finalGeometry} from './geometryCache';
 import {projectiveInkGeometry} from './projectiveInkGeometry';
+import {drawProjectiveFlowInk,preservesFlowContour,projectedFlowBounds} from './projectiveFlowInk';
+import {projectPoint} from './perspectiveWarp';
+import {strokeRasterBounds} from './paintCompositing';
 import {blendOperation,type LayerRenderer} from './renderer';
 import {drawSolidInkV10} from './solidInkV10';
 import {drawFlatInk} from './flatInk';
@@ -32,6 +35,7 @@ export class InkDisplay{
  private key?:Key;private liveKey?:{base:Key;stroke:Stroke;geometry?:Geometry};
  private layers=new Map<string,{key:Key;surface:HTMLCanvasElement}>();
  private prefixes=new Map<string,{operations:Layer['operations'];canvas:HTMLCanvasElement;renderer:LayerRenderer;revision:number}>();
+ private nativePreview?:{base:Key;stroke:string;rect?:Box};
  private lastLive?:{id:string;base:Key;picture:HTMLCanvasElement};private worker?:Worker;private pending?:Pending;private serial=0;
  constructor(private request:()=>void=()=>{}){}
  private prepared=new Map<Stroke,Prepared>();private preparedWeight=0;private pathBatches=0;
@@ -73,15 +77,17 @@ export class InkDisplay{
   for(const c of [this.surface,this.scratch,this.preview,...[...this.layers.values()].map(v=>v.surface),...[...this.prefixes.values()].map(v=>v.canvas)])if(c)c.width=c.height=0;
   this.prefixes.clear();
   this.layers.clear();
-  this.surface=this.scratch=this.preview=undefined;this.key=undefined;this.liveKey=undefined;this.prepared.clear();this.preparedWeight=0;this.pathBatches=0;
+  this.surface=this.scratch=this.preview=undefined;this.key=undefined;this.liveKey=undefined;this.nativePreview=undefined;this.prepared.clear();this.preparedWeight=0;this.pathBatches=0;
  }
  private prepare(s:Stroke,liveGeometry?:Geometry,cache=true):Prepared{
   const cached=cache&&!liveGeometry&&this.prepared.get(s);
   if(cached){this.prepared.delete(s);this.prepared.set(s,cached);return cached;}
-  const geometry=liveGeometry??(s.perspective?projectiveInkGeometry(s):finalGeometry(s));let x=Infinity,y=Infinity,right=-Infinity,bottom=-Infinity;
-  const visit=(p:{x:number;y:number})=>{x=Math.min(x,p.x);y=Math.min(y,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);};
+  const sourceContour=!!s.perspective&&preservesFlowContour(s),geometry=liveGeometry??(s.perspective&&!sourceContour?projectiveInkGeometry(s):finalGeometry(s));let x=Infinity,y=Infinity,right=-Infinity,bottom=-Infinity;
+  const visit=(point:{x:number;y:number})=>{const p=sourceContour?projectPoint(point,s.perspective!):point;x=Math.min(x,p.x);y=Math.min(y,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);};
   geometry.points.forEach(visit);for(const c of geometry.cubics){visit(c.a);visit(c.c1);visit(c.c2);visit(c.b);}
-  const pad=s.size*Math.max(1,s.maxSize??1)+2;
+  let pad=s.size*Math.max(1,s.maxSize??1)+2;
+  if(sourceContour){const b=projectedFlowBounds(s,geometry,pad)!;x=b.left;y=b.top;right=b.right;bottom=b.bottom;pad=0;
+  }
   const result={geometry,bounds:{x:x-pad,y:y-pad,w:right-x+pad*2,h:bottom-y+pad*2},weight:s.points.length+geometry.points.length+geometry.cubics.length*4};
   // This is a cache budget, never a rendering/quality cutoff.
   if(cache&&!liveGeometry&&result.weight<=100000){
@@ -118,6 +124,34 @@ export class InkDisplay{
   while(this.prefixes.size&&(this.prefixes.size>=4||total>32*1024*1024)){const id=this.prefixes.keys().next().value!,old=this.prefixes.get(id)!;total-=old.canvas.width*old.canvas.height*4;old.canvas.width=old.canvas.height=0;this.prefixes.delete(id);}
   const canvas=document.createElement('canvas');canvas.width=p.width;canvas.height=p.height;canvas.getContext('2d')!.drawImage(source,0,0);this.prefixes.set(layer.id,{operations,canvas,renderer,revision:renderer.displayRevision});return canvas;
  }
+ /** Keep earlier ink sharp around later native paint edits. Only pixels a
+  * native edit actually changes are replaced by its canonical raster result. */
+ private paintPrefix(out:CanvasRenderingContext2D,layer:Layer,p:Project,end:number,renderer:LayerRenderer,m:DOMMatrix,w:number,h:number){
+  const ops=layer.operations.slice(0,end),first=ops.findIndex(op=>op.kind==='stroke'&&clean(op));
+  const bitmap=(n:number)=>renderer.getDisplay({...layer,operations:ops.slice(0,n)},p);
+  const place=(source:CanvasImageSource,x=0,y=0)=>{out.save();out.setTransform(m);out.globalAlpha=1;out.imageSmoothingEnabled=Math.hypot(m.a,m.b)<=1+1e-7;out.imageSmoothingQuality='high';out.drawImage(source,x,y);out.restore();};
+  if(first<0){place(this.prefix(layer,p,end,renderer));return;}
+  if(first)place(bitmap(first));
+  let i=first;
+  while(i<ops.length){
+   const start=i,isInk=ops[i].kind==='stroke'&&clean(ops[i] as Stroke);while(i<ops.length&&(ops[i].kind==='stroke'&&clean(ops[i] as Stroke))===isInk)i++;
+   if(isInk){this.paintStrokes(out,ops.slice(start,i) as Stroke[],m,w,h);continue;}
+   let rx=p.width,ry=p.height,rr=0,rb=0;for(const op of ops.slice(start,i)){const b=op.kind==='stroke'?strokeRasterBounds(op,p.width,p.height):op.kind==='image'?{x:op.x,y:op.y,width:op.width,height:op.height}:{x:0,y:0,width:p.width,height:p.height};rx=Math.min(rx,b.x);ry=Math.min(ry,b.y);rr=Math.max(rr,b.x+b.width);rb=Math.max(rb,b.y+b.height);}rx=Math.max(0,Math.floor(rx));ry=Math.max(0,Math.floor(ry));rr=Math.min(p.width,Math.ceil(rr));rb=Math.min(p.height,Math.ceil(rb));const rw=rr-rx,rh=rb-ry;if(rw<=0||rh<=0)continue;
+   const before=bitmap(start).getContext('2d')!.getImageData(rx,ry,rw,rh).data,after=bitmap(i).getContext('2d')!.getImageData(rx,ry,rw,rh).data;
+   this.nativePatch(out,before,after,rx,ry,rw,rh,m);
+  }
+  out.globalCompositeOperation='source-over';out.globalAlpha=1;
+ }
+ private nativePatch(out:CanvasRenderingContext2D,before:Uint8ClampedArray,after:Uint8ClampedArray,rx:number,ry:number,rw:number,rh:number,m:DOMMatrix){
+  const place=(source:CanvasImageSource,x=0,y=0)=>{out.save();out.setTransform(m);out.globalAlpha=1;out.imageSmoothingEnabled=Math.hypot(m.a,m.b)<=1+1e-7;out.imageSmoothingQuality='high';out.drawImage(source,x,y);out.restore();};
+   let left=rw,top=rh,right=0,bottom=0;const changed=(k:number)=>before[k]!==after[k]||before[k+1]!==after[k+1]||before[k+2]!==after[k+2]||before[k+3]!==after[k+3];
+   for(let k=0;k<before.length;k+=4)if(changed(k)){const index=k/4,x=index%rw,y=Math.floor(index/rw);left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x+1);bottom=Math.max(bottom,y+1);}
+   if(right<=left||bottom<=top)return;
+   const W=right-left,H=bottom-top,mask=document.createElement('canvas'),patch=document.createElement('canvas');mask.width=patch.width=W;mask.height=patch.height=H;const mc=mask.getContext('2d')!,pc=patch.getContext('2d')!,ownership=mc.createImageData(W,H),pixels=pc.createImageData(W,H);
+   for(let y=0;y<H;y++)for(let x=0;x<W;x++){const from=((top+y)*rw+left+x)*4,to=(y*W+x)*4;if(changed(from)){ownership.data[to+3]=255;pixels.data[to]=after[from];pixels.data[to+1]=after[from+1];pixels.data[to+2]=after[from+2];pixels.data[to+3]=after[from+3];}}
+   mc.putImageData(ownership,0,0);pc.putImageData(pixels,0,0);out.globalCompositeOperation='destination-out';place(mask,rx+left,ry+top);out.globalCompositeOperation='source-over';place(patch,rx+left,ry+top);mask.width=mask.height=patch.width=patch.height=0;
+  out.globalCompositeOperation='source-over';out.globalAlpha=1;
+ }
  private draw(ctx:CanvasRenderingContext2D,s:Stroke,p:Prepared,scale:number){
   const g=p.geometry;if(!g.points.length)return;
   ctx.save();if(s.transform&&!s.perspective)ctx.transform(...s.transform);
@@ -129,7 +163,7 @@ export class InkDisplay{
    // and wheel/pan frames within that range can reuse the exact same contour.
    const quality=Math.max(1,Math.ceil(scale*2-1e-6)/2);
    let paths=p.paths?.scale===quality?p.paths.items:undefined;
-   if(!paths){paths=[];if(s.flatNibVersion===1)drawFlatInk(ctx,s,g,undefined,quality,paths);else drawSolidInkV10(ctx,s,g,undefined,quality,paths);
+   if(!paths){paths=[];if(s.perspective&&preservesFlowContour(s))drawProjectiveFlowInk(ctx,s,g,quality,paths);else if(s.flatNibVersion===1)drawFlatInk(ctx,s,g,undefined,quality,paths);else drawSolidInkV10(ctx,s,g,undefined,quality,paths);
     if(this.prepared.get(s)===p){this.pathBatches-=p.paths?.items.length??0;p.paths=undefined;if(paths.length<=2048){p.paths={scale:quality,items:paths};this.pathBatches+=paths.length;}this.trim();}
    }
    ctx.fillStyle=s.color;for(const path of paths)ctx.fill(path);
@@ -147,6 +181,7 @@ export class InkDisplay{
   let firstClean=0;for(let i=layer.operations.length-1;i>=0;i--){const op=layer.operations[i];if(op.kind!=='stroke'||!clean(op)){firstClean=i+1;break;}}if(firstClean===layer.operations.length)return true;
   const m=ctx.getTransform(),matrix=[m.a,m.b,m.c,m.d,m.e,m.f],w=ctx.canvas.width,h=ctx.canvas.height,cached=this.layers.get(layer.id),key:Key={operations:layer.operations,matrix,firstClean,width:w,height:h,frameWidth:p.width,frameHeight:p.height,renderer,rendererRevision:firstClean?renderer.displayRevision:0};
   if(cached&&cached.key.operations===key.operations&&cached.key.renderer===renderer&&cached.key.rendererRevision===key.rendererRevision&&cached.key.width===w&&cached.key.height===h&&cached.key.frameWidth===p.width&&cached.key.frameHeight===p.height&&cached.key.matrix.every((v,i)=>v===matrix[i]))return true;
+  if(layer.operations.slice(0,firstClean).some(op=>op.kind==='stroke'&&clean(op)))return true;
   if(this.viewPending)return false;
   const fail=()=>{if(this.viewPending)clearTimeout(this.viewPending.timer);this.viewPending=undefined;this.viewWorker?.terminate();this.viewWorker=undefined;this.viewFailed=true;this.request();};
   try{const worker=this.viewWorker??=new Worker(new URL('./inkView.worker.ts',import.meta.url),{type:'module'}),token=++this.viewSerial,job:ViewPending={token,layer:layer.id,key,base:cached?.key,timer:setTimeout(fail,10000)};this.viewPending=job;
@@ -162,8 +197,21 @@ export class InkDisplay{
   if(!ctx.canvas.width||!ctx.canvas.height||!Number.isFinite(scale)||scale<=0||!layer.operations.length&&!live||live&&!clean(live))return false;
   let firstClean=0;
   for(let i=layer.operations.length-1;i>=0;i--){const op=layer.operations[i];if(op.kind!=='stroke'||!clean(op)){firstClean=i+1;break;}}
-  if(firstClean===layer.operations.length&&!live||firstClean&&!renderer)return false;
+  if(firstClean===layer.operations.length&&!live&&!layer.operations.some(op=>op.kind==='stroke'&&clean(op))||firstClean&&!renderer)return false;
   this.paintRegion(ctx,layer,p,firstClean,live,geometry,renderer);return true;
+ }
+ /** Apply a live native paint result only where it changes the sharp layer.
+  * Restoring its dirty footprint avoids a whole-layer sharp/blur switch. */
+ paintNativePreview(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer,live:Stroke,result:HTMLCanvasElement,geometry?:Geometry){
+  if(clean(live)||!layer.operations.some(op=>op.kind==='stroke'&&clean(op)))return false;
+  let end=0;for(let i=layer.operations.length-1;i>=0;i--)if(layer.operations[i].kind!=='stroke'||!clean(layer.operations[i] as Stroke)){end=i+1;break;}
+  const m=ctx.getTransform(),w=ctx.canvas.width,h=ctx.canvas.height;this.paintRegion(ctx,layer,p,end,undefined,undefined,renderer,false);
+  const b=strokeRasterBounds(live,p.width,p.height,geometry),rect=this.screenBounds(live,{x:b.x,y:b.y,w:b.width,h:b.height},m,w,h),old=this.nativePreview,preview=this.preview??=document.createElement('canvas');if(preview.width!==w)preview.width=w;if(preview.height!==h)preview.height=h;const pc=preview.getContext('2d')!;pc.resetTransform();pc.globalAlpha=1;pc.globalCompositeOperation='source-over';
+  let restore=old&&old.base===this.key&&old.stroke===live.id?rect:undefined;
+  if(restore&&old?.rect){const x=Math.min(restore.x,old.rect.x),y=Math.min(restore.y,old.rect.y);restore={x,y,w:Math.max(restore.x+restore.w,old.rect.x+old.rect.w)-x,h:Math.max(restore.y+restore.h,old.rect.y+old.rect.h)-y};}
+  if(restore){pc.clearRect(restore.x,restore.y,restore.w,restore.h);pc.drawImage(this.surface!,restore.x,restore.y,restore.w,restore.h,restore.x,restore.y,restore.w,restore.h);}else{pc.clearRect(0,0,w,h);pc.drawImage(this.surface!,0,0);}
+  if(b.width&&b.height){const baseline=renderer.getDisplay(layer,p);if(baseline!==result){const before=baseline.getContext('2d')!.getImageData(b.x,b.y,b.width,b.height).data,after=result.getContext('2d')!.getImageData(b.x,b.y,b.width,b.height).data;this.nativePatch(pc,before,after,b.x,b.y,b.width,b.height,m);}}
+  this.nativePreview={base:this.key!,stroke:live.id,rect};this.liveKey=undefined;ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.drawImage(preview,0,0);ctx.restore();return true;
  }
  baseReady(layer:Layer,p:Project,matrix:number[],width:number,height:number,renderer:LayerRenderer){const key=this.layers.get(layer.id)?.key;return !!key&&key.operations===layer.operations&&key.frameWidth===p.width&&key.frameHeight===p.height&&key.width===width&&key.height===height&&key.renderer===renderer&&key.rendererRevision===(key.firstClean?renderer.displayRevision:0)&&matrix.every((v,i)=>v===key.matrix[i]);}
  /** Prepare the existing native paint prefix before the first clean-ink
@@ -228,7 +276,7 @@ export class InkDisplay{
    const surface=this.surface??=document.createElement('canvas');if(surface.width!==w)surface.width=w;if(surface.height!==h)surface.height=h;
    const out=surface.getContext('2d')!;out.resetTransform();out.globalAlpha=1;out.globalCompositeOperation='source-over';
    const append=sameView&&key!.firstClean===firstClean&&key!.operations.length<=layer.operations.length&&key!.operations.every((op,i)=>op===layer.operations[i]);
-   if(!append){out.clearRect(0,0,w,h);if(firstClean&&renderer){out.setTransform(m);out.imageSmoothingEnabled=scale<=1+1e-7;out.imageSmoothingQuality='high';out.drawImage(this.prefix(layer,p,firstClean,renderer),0,0);out.resetTransform();}}
+   if(!append){out.clearRect(0,0,w,h);if(firstClean&&renderer)this.paintPrefix(out,layer,p,firstClean,renderer,m,w,h);out.resetTransform();}
    const added=append?layer.operations.slice(key!.operations.length):[],last=added[0];
    const deferred=added.length===1&&last.kind==='stroke'&&this.deferFinal(layer,last,key!,m,w,h);
    if(!deferred)this.paintStrokes(out,layer.operations.slice(append?key!.operations.length:firstClean) as Stroke[],m,w,h);
@@ -263,4 +311,3 @@ export class InkDisplay{
   if(present){ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.globalCompositeOperation=blendOperation(layer.blend);ctx.drawImage(picture,0,0);ctx.restore();}
  }
 }
-
