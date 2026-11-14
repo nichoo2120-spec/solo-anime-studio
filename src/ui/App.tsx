@@ -1158,15 +1158,15 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
       <IconButton label={onionSettings.enabled?'Hide onion skin (O)':'Show onion skin (O)'} active={onionSettings.enabled} onClick={()=>setOnionSettings(s=>({...s,enabled:!s.enabled}))}>{onionSettings.enabled?<Eye size={15}/>:<EyeOff size={15}/>}</IconButton>
       <IconButton label="Onion skin settings" active={onionSettingsOpen} onClick={()=>{if(!onionSettingsOpen&&timelineMenu.current)timelineMenu.current.open=true;setOnionSettingsOpen(o=>!o);}}><SlidersHorizontal size={14}/></IconButton>
       {onionSettingsOpen&&<div className="onion-settings" role="group" aria-label="Onion skin settings">
-       <strong>ONION SKIN</strong><p>Ghosts are only guides. They are never saved into your drawings.</p>
-       <label className="onion-check"><input type="checkbox" checked={onionSettings.previous} onChange={e=>setOnionSettings(s=>({...s,previous:e.target.checked}))}/><span className="onion-swatch previous"/> Previous drawing</label>
-       <label className="onion-count-row">Previous frames <select aria-label="Number of previous onion skin frames" value={onionSettings.previousCount} onChange={e=>setOnionSettings(s=>({...s,previousCount:+e.target.value}))}>{[0,1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select></label>
-       <Range label="Previous opacity" value={onionSettings.previousOpacity} unit="%" onChange={previousOpacity=>setOnionSettings(s=>({...s,previousOpacity}))}/>
-       <label className="onion-check"><input type="checkbox" checked={onionSettings.next} onChange={e=>setOnionSettings(s=>({...s,next:e.target.checked}))}/><span className="onion-swatch next"/> Next drawing</label>
-       <label className="onion-count-row">Next frames <select aria-label="Number of next onion skin frames" value={onionSettings.nextCount} onChange={e=>setOnionSettings(s=>({...s,nextCount:+e.target.value}))}>{[0,1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select></label>
-       <Range label="Next opacity" value={onionSettings.nextOpacity} unit="%" onChange={nextOpacity=>setOnionSettings(s=>({...s,nextOpacity}))}/>
-       <label className="onion-check"><input type="checkbox" checked={onionSettings.currentLayerOnly} onChange={e=>setOnionSettings(s=>({...s,currentLayerOnly:e.target.checked}))}/> Current drawing layer only</label>
-       <small>Press O to toggle. Color ghosts follow the canvas when you zoom or pan.</small>
+       <header className="onion-heading"><strong>Onion skin</strong><button type="button" aria-label="Close onion skin settings" onClick={()=>setOnionSettingsOpen(false)}>×</button></header>
+       <div className="onion-column-labels" aria-hidden="true"><span>Drawings</span><span>Count</span><span>Opacity</span></div>
+       {(['previous','next'] as const).map(kind=>{const previous=kind==='previous',name=previous?'Previous':'Next',opacity=previous?onionSettings.previousOpacity:onionSettings.nextOpacity;return <div className="onion-compact-row" key={kind}>
+        <label className="onion-check" title={name+' drawings'}><input type="checkbox" aria-label={name+' drawing'} checked={onionSettings[kind]} onChange={e=>setOnionSettings(s=>({...s,[kind]:e.target.checked}))}/><span className={'onion-swatch '+kind}/>{name}</label>
+        <select aria-label={'Number of '+kind+' onion skin frames'} title={name+' drawing count'} value={previous?onionSettings.previousCount:onionSettings.nextCount} onChange={e=>setOnionSettings(s=>({...s,[previous?'previousCount':'nextCount']:+e.target.value}))}>{[0,1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select>
+        <div className="onion-opacity"><input type="range" min="0" max="100" aria-label={name+' opacity'} title={name+' opacity: '+opacity+'%'} value={opacity} onChange={e=>setOnionSettings(s=>({...s,[previous?'previousOpacity':'nextOpacity']:+e.target.value}))}/><output>{opacity}%</output></div>
+       </div>;})}
+       <div className="onion-compact-options"><label className="onion-check" title="Nearby drawings are stronger; distant drawings fade. These guides never change saved artwork."><input type="checkbox" checked={onionSettings.fadeDistance!==false} onChange={e=>setOnionSettings(s=>({...s,fadeDistance:e.target.checked}))}/>Fade by distance</label>
+       <label className="onion-check" title="Show ghosts only for the active drawing layer"><input type="checkbox" checked={onionSettings.currentLayerOnly} onChange={e=>setOnionSettings(s=>({...s,currentLayerOnly:e.target.checked}))}/>Current layer only</label></div>
       </div>}
      </div>},
   {id:"Light Table",control:<div className="light-table-controls" aria-label="Light table controls">

@@ -696,3 +696,20 @@
 .editable-curve-graph{display:block;width:100%;height:96px;background:#12232b;border:1px solid #36515a;border-radius:4px;touch-action:none;cursor:crosshair}.editable-curve-graph .curve-axis{stroke:#3c5862;fill:none;stroke-width:1}.editable-curve-graph .curve-line{stroke:#55d9c4;fill:none;stroke-width:1.8;pointer-events:none}.editable-curve-graph .curve-dot{fill:#d5ece6;stroke:#144d44;stroke-width:1;cursor:grab}.editable-curve-graph .curve-dot.selected{fill:#50d5bd;stroke:#dbfff6;stroke-width:1.3}.curve-actions{display:flex;align-items:center;gap:5px;margin:4px 0 6px}.curve-actions small{margin-right:auto;font-size:9px;color:#97b8bf}.curve-actions button{padding:3px 6px;border:1px solid #36515a;font-size:9px}.compact-brush-panel .range-row.exact-range{grid-template-columns:minmax(65px,86px) minmax(22px,1fr) 48px;gap:4px;margin:6px 0}.compact-brush-panel .exact-range .exact-value{width:48px;height:22px}.compact-brush-panel input[type=range]{height:16px}.compact-brush-panel input[type=range]::-webkit-slider-thumb{width:10px;height:10px}.compact-brush-panel .editable-curve .range-row.exact-range{grid-template-columns:minmax(80px,1fr) minmax(25px,1fr) 48px}.compact-brush-panel .editable-curve .exact-range>label:first-child{font-size:9px;line-height:1.2}.compact-brush-panel .check-row{margin:6px 0}.compact-brush-panel .editable-curve-graph{height:88px}
 .compact-brush-panel .editable-curve-graph{height:104px;box-sizing:border-box}.editable-curve-graph .curve-grid{stroke:#35505b55;stroke-width:.7;fill:none;pointer-events:none}.editable-curve-graph .curve-line{stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}.editable-curve-graph .curve-axis{stroke-width:1;vector-effect:non-scaling-stroke}.editable-curve-graph .curve-caption{font:8px Segoe UI,sans-serif;fill:#789aa4;pointer-events:none;user-select:none}.editable-curve-graph .curve-hit{fill:transparent;stroke:none}.editable-curve-graph .curve-dot{fill:#d7eee9;stroke:#247e73;stroke-width:1;pointer-events:none;vector-effect:non-scaling-stroke}.editable-curve-graph .curve-handle{cursor:grab;outline:none}.editable-curve-graph .curve-handle.selected .curve-dot{fill:#52d7c1;stroke:#d2fff4;stroke-width:1.2}.editable-curve-graph .curve-handle:focus-visible .curve-hit{fill:#5dd6c21a;stroke:#6be4d0;stroke-width:1}.compact-brush-panel .brush-settings-preview .brush-studio-preview{object-fit:fill;image-rendering:auto}
 .compact-brush-panel .brush-preview-note{font-size:9px;line-height:1.4;color:#9db6bd;margin:6px 0}
+
+/* Compact onion controls: fixed small rows, independent of general form sizing. */
+.timeline-tool-row .onion-controls{flex-wrap:wrap;min-width:0;flex:1}
+.timeline-tool-row .onion-settings{flex:0 1 100%;margin-top:4px}
+.onion-settings{width:300px;max-width:100%;box-sizing:border-box;padding:8px 10px;gap:6px}
+.onion-heading{display:flex;align-items:center;justify-content:space-between;min-height:20px}
+.onion-heading strong{font-size:11px;color:#8be4d1}
+.onion-heading button{padding:0;width:22px;height:22px;min-height:0;background:transparent;border:0;font-size:17px}
+.onion-column-labels,.onion-compact-row{display:grid;grid-template-columns:100px 44px minmax(80px,1fr);gap:7px;align-items:center}
+.onion-column-labels{font-size:9px;color:#90a6b0}
+.onion-settings .onion-check{gap:5px;min-height:22px;font-size:10px;white-space:nowrap}
+.onion-settings .onion-check input{width:13px;height:13px;margin:0}
+.onion-compact-row select{width:44px;min-height:24px;height:24px;padding:2px 4px;font-size:11px}
+.onion-opacity{display:flex;align-items:center;gap:4px;min-width:0}
+.onion-opacity input[type=range]{width:100%;min-width:0;height:18px;margin:0}
+.onion-opacity output{flex:0 0 28px;font-size:10px;text-align:right;font-variant-numeric:tabular-nums}
+.onion-compact-options{display:flex;flex-wrap:wrap;gap:2px 12px;border-top:1px solid #30454e;padding-top:4px}
