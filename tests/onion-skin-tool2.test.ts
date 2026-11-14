@@ -39,3 +39,19 @@ describe('Phase 2 / Tool 2 - neighboring drawing onion skin',()=>{
   expect(onionNeighbors(middle,DEFAULT_ONION_SETTINGS)[1].frame.drawings[middle.activeLayerId]).toHaveLength(0);
  });
 });
+
+describe('Onion distance fading preferences',()=>{
+ it('fades distant drawings without changing their order or source artwork',()=>{
+  const p=threeFrames().getSnapshot(),before=JSON.stringify(p),settings={...DEFAULT_ONION_SETTINGS,previousCount:2};
+  const faded=onionNeighbors(p,settings),flat=onionNeighbors(p,{...settings,fadeDistance:false});
+  expect(faded).toHaveLength(2);
+  expect(faded[0].opacity).toBeLessThan(faded[1].opacity);
+  expect(flat[0].opacity).toBe(flat[1].opacity);
+  expect(flat.map(n=>n.frame.id)).toEqual(faded.map(n=>n.frame.id));
+  expect(JSON.stringify(p)).toBe(before);
+ });
+ it('defaults old preferences to fading and keeps an explicit off choice',()=>{
+  expect(sanitizeOnionSettings({}).fadeDistance).toBe(true);
+  expect(sanitizeOnionSettings({fadeDistance:false}).fadeDistance).toBe(false);
+ });
+});
