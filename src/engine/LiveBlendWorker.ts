@@ -40,8 +40,8 @@ export class LiveBlendWorker{
    const basePixels=nativeDelta?source.getContext('2d')!.getImageData(0,0,source.width,source.height).data:undefined,deltaPixels=ownershipBase?.pixels.slice();
    if(nativeDelta){const seed=ownershipBase?.seed;this.delta={mask:canvas(source.width,source.height),patch:canvas(source.width,source.height),tiles:new Map(seed?.tiles),revision:0,group:ownershipBase,box:seed?.box};if(seed){this.delta.mask.getContext('2d')!.drawImage(seed.mask,seed.box.x,seed.box.y);this.delta.patch.getContext('2d')!.drawImage(seed.paint,seed.box.x,seed.box.y);}}
    this.surface.width=source.width;this.surface.height=source.height;this.surface.getContext('2d',{willReadFrequently:nativeDelta})!.drawImage(source,0,0);
-   // Native pigment Mix only draws canvases; keep hardware acceleration available.
-   // Legacy pixel-sampling smudges retain their readback-optimized context.
+   // Pixel ownership uses an exact CPU snapshot inside the worker. GPU copies
+   // can introduce rounding changes that incorrectly replace sharp ink.
    createImageBitmap(source).then(bitmap=>{if(this.job!==j){bitmap.close();return;}this.worker!.postMessage({kind:'begin',token,width:source.width,height:source.height,base:bitmap,readFrequently:!s.nativeMixVersion,nativeDelta,basePixels,deltaPixels,deltaRegion:ownershipBase?.region,seeded:!!ownershipBase?.seed},[bitmap,...(basePixels?[basePixels.buffer as ArrayBuffer]:[]),...(deltaPixels?[deltaPixels.buffer as ArrayBuffer]:[])]);j.ready=true;this.flush(j);}).catch(()=>this.fail());
   }
   const j=this.job!;if(j.geometry!==geometry){j.geometry=geometry;j.queued={stroke:s,final:false};this.flush(j);}return this.surface;
