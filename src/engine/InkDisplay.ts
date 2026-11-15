@@ -236,13 +236,13 @@ export class InkDisplay{
  }
  /** A committed native stroke already has a sharp, worker-updated view.
   * Keep that view while finalizing, then promote it without replaying old paint. */
- private presentCommittedMix(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer){
+ private presentCommittedMix(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer,present=true){
   const n=this.nativePreview,entry=this.layers.get(layer.id),key=entry?.key,last=layer.operations.at(-1);
   if(!n||!n.group||!n.group.sharp.width||!key||key!==n.base||!last||last.kind!=='stroke'||last.id!==n.stroke||layer.operations.length!==key.operations.length+1||!key.operations.every((op,i)=>op===layer.operations[i]))return false;
   const m=ctx.getTransform(),matrix=[m.a,m.b,m.c,m.d,m.e,m.f];
   if(key.renderer!==renderer||key.width!==ctx.canvas.width||key.height!==ctx.canvas.height||key.frameWidth!==p.width||key.frameHeight!==p.height||!matrix.every((v,i)=>v===key.matrix[i]))return false;
   const previous={...layer,operations:key.operations};
-  if(!this.paintNativePreview(ctx,previous,p,renderer,last,n.result,finalGeometry(last),n.delta))return false;
+  if(!this.paintNativePreview(ctx,previous,p,renderer,last,n.result,finalGeometry(last),n.delta,present))return false;
   if(n.delta.final){
    const sharp=this.preview!,scratch=this.surface!;
    this.key={...key,operations:layer.operations,firstClean:layer.operations.length,rendererRevision:renderer.displayRevision};this.surface=sharp;this.preview=scratch;
@@ -250,6 +250,7 @@ export class InkDisplay{
   }
   return true;
  }
+ finishNativePreview(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer){this.presentCommittedMix(ctx,layer,p,renderer,false);}
  paint(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,live?:Stroke,geometry?:Geometry,renderer?:LayerRenderer):boolean{
   if(!live&&renderer&&this.presentCommittedMix(ctx,layer,p,renderer))return true;
   const m=ctx.getTransform(),scale=Math.hypot(m.a,m.b);
@@ -262,7 +263,7 @@ export class InkDisplay{
  /** Apply a live native paint result only where it changes the sharp layer.
   * Restoring its dirty footprint avoids a whole-layer sharp/blur switch. */
  private clearNativePreview(keepCuts=false){const n=this.nativePreview;if(n&&!keepCuts)for(const c of [n.cutMask,n.cutPatch])c.width=c.height=0;this.nativePreview=undefined;this.nativeFallback=undefined;}
- paintNativePreview(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer,live:Stroke,result:HTMLCanvasElement,geometry?:Geometry,delta?:BlendDelta){
+ paintNativePreview(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer,live:Stroke,result:HTMLCanvasElement,geometry?:Geometry,delta?:BlendDelta,present=true){
   if(!delta)return this.paintNativeFallback(ctx,layer,p,renderer,live,result,geometry);
   if(clean(live)||!layer.operations.some(op=>op.kind==='stroke'&&clean(op)))return false;
   let end=0;for(let i=layer.operations.length-1;i>=0;i--)if(layer.operations[i].kind!=='stroke'||!clean(layer.operations[i] as Stroke)){end=i+1;break;}
@@ -306,7 +307,7 @@ export class InkDisplay{
    }
    delta.dirty=undefined;n.revision=delta.revision;
   }
-  this.liveKey=undefined;ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.drawImage(preview,0,0);ctx.restore();return true;
+  this.liveKey=undefined;if(present){ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.drawImage(preview,0,0);ctx.restore();}return true;
  }
  private paintNativeFallback(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer,live:Stroke,result:HTMLCanvasElement,geometry?:Geometry){
   if(clean(live)||!layer.operations.some(op=>op.kind==='stroke'&&clean(op)))return false;

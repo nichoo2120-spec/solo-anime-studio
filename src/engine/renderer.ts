@@ -156,6 +156,7 @@ export class LayerRenderer {
   const job={layer,project:p,stroke,base,preview,done};this.pendingLayer=job;
   done.then(result=>{try{onFinal?.(result);}catch(error){console.warn('Frame guide preview unavailable:',error);}if(this.pendingLayer===job){this.pendingLayer=undefined;if(result){const old=this.adoptLayerResult(layer,p,stroke,base,result);if(old){old.width=old.height=0;}else if(![...this.caches.values()].some(c=>c.canvas===result))result.width=result.height=0;}request();}else if(result&&![...this.caches.values()].some(c=>c.canvas===result))result.width=result.height=0;});
  }
+ hasPendingLayerResult(){return !!this.pendingLayer;}
  whenSettled(){return Promise.all([this.pendingLayer?.done,this.pendingFinal?.done]).then(()=>undefined);}
  /** A new stroke must pick up exact previous paint, never a provisional layer.
   * If an unusually slow worker is still pending, retain the synchronous path. */
