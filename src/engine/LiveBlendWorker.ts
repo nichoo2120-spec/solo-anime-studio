@@ -5,7 +5,7 @@ export const workerBlendEligible=(s:Pick<Stroke,'tool'|'coloringEngine'|'colorin
 export type NativeMixSeed={mask:HTMLCanvasElement;paint:HTMLCanvasElement;box:{x:number;y:number;w:number;h:number};tiles:Map<string,{x:number;y:number;w:number;h:number}>};
 export type BlendBaseline={pixels:Uint8ClampedArray;region:RasterRegion;seed?:NativeMixSeed};
 export type BlendDelta={mask:HTMLCanvasElement;patch:HTMLCanvasElement;tiles:Map<string,{x:number;y:number;w:number;h:number}>;revision:number;final?:boolean;group?:BlendBaseline;support?:RasterRegion;dirty?:RasterRegion;box?:{x:number;y:number;w:number;h:number}};
-type Reply={token:number;serial:number;deltaMask?:ImageBitmap;deltaPaint?:ImageBitmap;tiles?:{x:number;y:number;w:number;h:number}[];support?:RasterRegion;bitmap?:ImageBitmap;region?:RasterRegion;final?:boolean;error?:string};
+type Reply={maskData?:Uint8ClampedArray;paintData?:Uint8ClampedArray;token:number;serial:number;deltaMask?:ImageBitmap;deltaPaint?:ImageBitmap;tiles?:{x:number;y:number;w:number;h:number}[];support?:RasterRegion;bitmap?:ImageBitmap;region?:RasterRegion;final?:boolean;error?:string};
 type Job={token:number;id:string;ownershipBase?:BlendBaseline;source:HTMLCanvasElement;signature:string;ready:boolean;inFlight:boolean;queued?:{stroke:Stroke;final:boolean};geometry?:unknown;resolve?:(surface:HTMLCanvasElement|undefined)=>void;timer?:ReturnType<typeof setTimeout>};
 
 /** Keep the existing browser Canvas pigment calculations off the input thread.
@@ -40,9 +40,9 @@ export class LiveBlendWorker{
    const basePixels=nativeDelta?source.getContext('2d')!.getImageData(0,0,source.width,source.height).data:undefined,deltaPixels=ownershipBase?.pixels.slice();
    if(nativeDelta){const seed=ownershipBase?.seed;this.delta={mask:canvas(source.width,source.height),patch:canvas(source.width,source.height),tiles:new Map(seed?.tiles),revision:0,group:ownershipBase,box:seed?.box};if(seed){this.delta.mask.getContext('2d')!.drawImage(seed.mask,seed.box.x,seed.box.y);this.delta.patch.getContext('2d')!.drawImage(seed.paint,seed.box.x,seed.box.y);}}
    this.surface.width=source.width;this.surface.height=source.height;this.surface.getContext('2d',{willReadFrequently:nativeDelta})!.drawImage(source,0,0);
-   // Pixel ownership uses an exact CPU snapshot inside the worker. GPU copies
-   // can introduce rounding changes that incorrectly replace sharp ink.
-   createImageBitmap(source).then(bitmap=>{if(this.job!==j){bitmap.close();return;}this.worker!.postMessage({kind:'begin',token,width:source.width,height:source.height,base:bitmap,readFrequently:!s.nativeMixVersion,nativeDelta,basePixels,deltaPixels,deltaRegion:ownershipBase?.region,seeded:!!ownershipBase?.seed},[bitmap,...(basePixels?[basePixels.buffer as ArrayBuffer]:[]),...(deltaPixels?[deltaPixels.buffer as ArrayBuffer]:[])]);j.ready=true;this.flush(j);}).catch(()=>this.fail());
+   // Native ownership already has exact pixels; pass them directly. Other
+   // blend modes retain their existing bitmap setup and readback behavior.
+   const begin=(bitmap?:ImageBitmap)=>{if(this.job!==j){bitmap?.close();return;}this.worker!.postMessage({kind:'begin',token,width:source.width,height:source.height,base:bitmap,readFrequently:!s.nativeMixVersion,nativeDelta,basePixels,deltaPixels,deltaRegion:ownershipBase?.region,seeded:!!ownershipBase?.seed,compactReplies:nativeDelta},[...(bitmap?[bitmap]:[]),...(basePixels?[basePixels.buffer as ArrayBuffer]:[]),...(deltaPixels?[deltaPixels.buffer as ArrayBuffer]:[])]);j.ready=true;this.flush(j);};if(nativeDelta)begin();else createImageBitmap(source).then(begin).catch(()=>this.fail());
   }
   const j=this.job!;if(j.geometry!==geometry){j.geometry=geometry;j.queued={stroke:s,final:false};this.flush(j);}return this.surface;
  }
@@ -56,8 +56,8 @@ export class LiveBlendWorker{
   if(j.timer)clearTimeout(j.timer);j.timer=undefined;j.inFlight=false;
   if(reply.error||!reply.bitmap||!reply.region){reply.bitmap?.close();reply.deltaMask?.close();reply.deltaPaint?.close();this.fail();return;}
   const r=reply.region;let displayRegion=r;
-  if(this.delta){const oldBox=this.delta.box;if(!reply.deltaMask||!reply.deltaPaint||!reply.tiles){reply.bitmap.close();reply.deltaMask?.close();reply.deltaPaint?.close();this.fail();return;}
-   for(const [surface,bitmap]of [[this.delta.mask,reply.deltaMask],[this.delta.patch,reply.deltaPaint]] as const){const c=surface.getContext('2d')!;c.clearRect(r.x,r.y,r.width,r.height);c.drawImage(bitmap,r.x,r.y);bitmap.close();}
+  if(this.delta){const oldBox=this.delta.box;if((!reply.deltaMask||!reply.deltaPaint)&&(!reply.maskData||!reply.paintData)||!reply.tiles){reply.bitmap?.close();reply.deltaMask?.close();reply.deltaPaint?.close();this.fail();return;}
+   for(const [surface,bitmap,data]of [[this.delta.mask,reply.deltaMask,reply.maskData],[this.delta.patch,reply.deltaPaint,reply.paintData]] as const){const c=surface.getContext('2d')!;if(data){const pixels=c.createImageData(r.width,r.height);pixels.data.set(data);c.putImageData(pixels,r.x,r.y);}else if(bitmap){c.clearRect(r.x,r.y,r.width,r.height);c.drawImage(bitmap,r.x,r.y);bitmap.close();}} 
    for(const tile of reply.tiles){const key=Math.floor(tile.x/64)*64+','+Math.floor(tile.y/64)*64;if(tile.w&&tile.h)this.delta.tiles.set(key,tile);else this.delta.tiles.delete(key);}this.delta.revision++;this.delta.final=!!reply.final;this.delta.support=reply.support;
    const dirty=this.delta.dirty;if(dirty){const x=Math.min(dirty.x,r.x),y=Math.min(dirty.y,r.y);this.delta.dirty={x,y,width:Math.max(dirty.x+dirty.width,r.x+r.width)-x,height:Math.max(dirty.y+dirty.height,r.y+r.height)-y};}else this.delta.dirty=r;
    let box:NativeMixSeed['box']|undefined;for(const value of this.delta.tiles.values()){if(!box)box={...value};else{const right=Math.max(box.x+box.w,value.x+value.w),bottom=Math.max(box.y+box.h,value.y+value.h);box.x=Math.min(box.x,value.x);box.y=Math.min(box.y,value.y);box.w=right-box.x;box.h=bottom-box.y;}}
