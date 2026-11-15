@@ -9,23 +9,25 @@ const canvas=(width:number,height:number)=>{const c=document.createElement('canv
 type Gesture={id:string;signature:string;base:HTMLCanvasElement;field:HTMLCanvasElement;reservoir:HTMLCanvasElement;sample:HTMLCanvasElement;contact:HTMLCanvasElement;count:number;last?:Point;until:number;loaded:boolean};
 const gestures=new WeakMap<HTMLCanvasElement,Gesture>();
 let effect:HTMLCanvasElement|undefined;
+const reusableTargets=new WeakSet<HTMLCanvasElement>();
 
 /** Per-stroke carried pigment, with optional artist-selected paint load and no pixel readbacks.
  * Contacts follow fixed document distance along the captured path. The full
  * native brush raster alone defines final pressure, texture, edge and taper.
  * Immutable-base worker calls append; canonical replay always starts afresh.
  */
-export function resetPigmentMix(target:HTMLCanvasElement){gestures.delete(target);}
+export function resetPigmentMix(target:HTMLCanvasElement,reuse=false){const g=gestures.get(target);if(reuse){reusableTargets.add(target);if(g){g.id='';g.signature='';g.count=0;g.last=undefined;}}else{reusableTargets.delete(target);if(g)for(const c of [g.field,g.reservoir,g.sample,g.contact])c.width=c.height=0;gestures.delete(target);}}
 export function applyPigmentMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElement,s:Stroke,sourceX:number,sourceY:number,dirty?:RasterRegion,base?:HTMLCanvasElement){
  const amount=clamp(s.nativeMixAmount??.58)*clamp(s.opacity);
  if(!amount||s.flow===0||!s.points.length)return;
- const width=ctx.canvas.width,height=ctx.canvas.height,source=base??ctx.canvas;
+ const width=ctx.canvas.width,height=ctx.canvas.height,source=base??ctx.canvas,reuse=reusableTargets.has(ctx.canvas);
  const signature=JSON.stringify({...s,points:undefined,mixStops:undefined});
  let g=base?gestures.get(ctx.canvas):undefined;
  const previous=g&&s.points[g.count-1];
  if(!g||g.id!==s.id||g.signature!==signature||g.base!==source||g.count>s.points.length||g.last&&(!previous||previous.x!==g.last.x||previous.y!==g.last.y||previous.p!==g.last.p)){
   const side=Math.max(8,Math.min(256,Math.ceil(s.size*1.5+8)));
-  g={id:s.id,signature,base:source,field:canvas(width,height),reservoir:canvas(side,side),sample:canvas(side,side),contact:canvas(side,side),count:0,until:0,loaded:false};
+  const recycle=(old:HTMLCanvasElement|undefined,w:number,h:number)=>{if(!reuse||!old)return canvas(w,h);if(old.width!==w)old.width=w;if(old.height!==h)old.height=h;old.getContext('2d')!.reset();return old;};
+  g={id:s.id,signature,base:source,field:recycle(g?.field,width,height),reservoir:recycle(g?.reservoir,side,side),sample:recycle(g?.sample,side,side),contact:recycle(g?.contact,side,side),count:0,until:0,loaded:false};
   if(base)gestures.set(ctx.canvas,g);
  }
  const field=g.field.getContext('2d')!,reservoir=g.reservoir.getContext('2d')!,sample=g.sample.getContext('2d')!,contact=g.contact.getContext('2d')!,side=g.reservoir.width;

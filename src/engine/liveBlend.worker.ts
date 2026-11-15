@@ -12,8 +12,9 @@ import {drawStroke} from './renderer';
 import {resetDryBristleV3MixModel} from './dryBristleV3';
 import type {RasterRegion} from './liveRaster';
 Object.defineProperty(globalThis,'document',{value:{createElement:(tag:string)=>{if(tag!=='canvas')throw Error('Unsupported worker element');return new OffscreenCanvas(1,1);}}});
-type Message={kind:'begin'|'update'|'cancel';token:number;serial:number;width:number;height:number;base?:ImageBitmap;readFrequently?:boolean;nativeDelta?:boolean;basePixels?:Uint8ClampedArray;deltaPixels?:Uint8ClampedArray;deltaRegion?:RasterRegion;seeded?:boolean;compactReplies?:boolean;stroke:Stroke;final:boolean};
+type Message={kind:'begin'|'update'|'cancel';token:number;serial:number;width:number;height:number;base?:ImageBitmap;readFrequently?:boolean;nativeDelta?:boolean;basePixels?:Uint8ClampedArray;deltaPixels?:Uint8ClampedArray;deltaRegion?:RasterRegion;seeded?:boolean;compactReplies?:boolean;reuseSurfaces?:boolean;stroke:Stroke;final:boolean};
 const worker=self as unknown as {onmessage:(e:MessageEvent<Message>)=>void;postMessage:(data:unknown,transfer?:Transferable[])=>void};
+let surfaceMode:boolean|undefined;
 let token=0,base:OffscreenCanvas|undefined,target:OffscreenCanvas|undefined,region:RasterRegion|undefined;
 let deltaSupport:RasterRegion|undefined,deltaRegion:RasterRegion|undefined;
 let deltaBase:Uint8ClampedArray|undefined,deltaRead:OffscreenCanvas|undefined,deltaMask:OffscreenCanvas|undefined,deltaPaint:OffscreenCanvas|undefined;
@@ -32,8 +33,24 @@ function finiteRegion(value:RasterRegion,width:number,height:number,fallback:()=
 worker.onmessage=async({data:j})=>{
  let pendingBitmaps:ImageBitmap[]=[];
  try{
-  if(j.kind!=='update'){compactReplies=!!j.compactReplies;lastPixels=j.basePixels?.slice();deltaSupport=j.seeded?j.deltaRegion:undefined;deltaRegion=j.deltaRegion;deltaBase=undefined;for(const c of [deltaRead,deltaMask,deltaPaint])if(c)c.width=c.height=0;deltaRead=deltaMask=deltaPaint=undefined;resetWetSmudgeCaches();resetGentleBlend();nativeStrokeRaster?.reset();nativeStrokeRaster=undefined;nativeMask=undefined;if(base)base.width=base.height=0;if(target)target.width=target.height=0;token=j.token;region=undefined;base=target=undefined;
-   if(j.kind==='begin'){base=new OffscreenCanvas(j.width,j.height);target=new OffscreenCanvas(j.width,j.height);const baseContext=base.getContext('2d',{willReadFrequently:j.nativeDelta||j.readFrequently!==false})!,targetContext=target.getContext('2d',{willReadFrequently:j.nativeDelta||j.readFrequently!==false})!;if(j.nativeDelta&&j.basePixels){const pixels=baseContext.createImageData(j.width,j.height);pixels.data.set(j.basePixels);baseContext.putImageData(pixels,0,0);targetContext.putImageData(pixels,0,0);}else{baseContext.drawImage(j.base!,0,0);targetContext.drawImage(j.base!,0,0);}j.base?.close();if(j.nativeDelta){deltaRead=new OffscreenCanvas(j.basePixels?1:j.width,j.basePixels?1:j.height);const read=deltaRead.getContext('2d',{willReadFrequently:true})!;if(j.deltaPixels||j.basePixels)deltaBase=j.deltaPixels??j.basePixels;else{read.drawImage(base,0,0);deltaBase=read.getImageData(0,0,j.width,j.height).data;deltaRead.width=deltaRead.height=1;}deltaMask=new OffscreenCanvas(1,1);deltaPaint=new OffscreenCanvas(1,1);}}return;
+  if(j.kind!=='update'){
+   compactReplies=!!j.compactReplies;
+   if(j.basePixels){if(lastPixels?.length===j.basePixels.length)lastPixels.set(j.basePixels);else lastPixels=j.basePixels.slice();}else if(j.kind!=='cancel'||!j.reuseSurfaces)lastPixels=undefined;
+   deltaSupport=j.seeded?j.deltaRegion:undefined;deltaRegion=j.deltaRegion;deltaBase=undefined;
+   for(const c of [deltaRead,deltaMask,deltaPaint])if(c)c.width=c.height=0;deltaRead=deltaMask=deltaPaint=undefined;
+   resetWetSmudgeCaches();resetGentleBlend();if(target)resetPigmentMix(target as unknown as HTMLCanvasElement,true);nativeStrokeRaster?.reset();token=j.token;region=undefined;
+   if(nativeMask)nativeMask.getContext('2d')!.reset();
+   if(j.kind==='cancel'){if(!j.reuseSurfaces){if(target)resetPigmentMix(target as unknown as HTMLCanvasElement);for(const c of [base,target,nativeMask])if(c)c.width=c.height=0;base=target=nativeMask=undefined;nativeStrokeRaster=undefined;lastPixels=undefined;surfaceMode=undefined;}return;}
+   const readFrequently=j.nativeDelta||j.readFrequently!==false;
+   if(!base||!target||base.width!==j.width||base.height!==j.height||surfaceMode!==readFrequently){
+    if(target)resetPigmentMix(target as unknown as HTMLCanvasElement);if(base)base.width=base.height=0;if(target)target.width=target.height=0;
+    base=new OffscreenCanvas(j.width,j.height);target=new OffscreenCanvas(j.width,j.height);surfaceMode=readFrequently;
+   }
+   const baseContext=base.getContext('2d',{willReadFrequently:readFrequently})!,targetContext=target.getContext('2d',{willReadFrequently:readFrequently})!;
+   if(j.nativeDelta&&j.basePixels){const pixels=baseContext.createImageData(j.width,j.height);pixels.data.set(j.basePixels);baseContext.putImageData(pixels,0,0);targetContext.putImageData(pixels,0,0);}
+   else{baseContext.clearRect(0,0,j.width,j.height);targetContext.clearRect(0,0,j.width,j.height);baseContext.drawImage(j.base!,0,0);targetContext.drawImage(j.base!,0,0);}j.base?.close();
+   if(j.nativeDelta){deltaRead=new OffscreenCanvas(j.basePixels?1:j.width,j.basePixels?1:j.height);const read=deltaRead.getContext('2d',{willReadFrequently:true})!;if(j.deltaPixels||j.basePixels)deltaBase=j.deltaPixels??j.basePixels;else{read.drawImage(base,0,0);deltaBase=read.getImageData(0,0,j.width,j.height).data;deltaRead.width=deltaRead.height=1;}deltaMask=new OffscreenCanvas(1,1);deltaPaint=new OffscreenCanvas(1,1);}
+   return;
   }
   if(j.token!==token||!base||!target)return;
   const s=j.stroke,tc=target.getContext('2d')! as unknown as CanvasRenderingContext2D,bc=base as unknown as HTMLCanvasElement;
@@ -48,11 +65,11 @@ worker.onmessage=async({data:j})=>{
   const fullBounds=()=>bounds??=strokeRasterBounds(s,target!.width,target!.height,currentGeometry());
   const ownershipBounds=()=>deltaRegion&&deltaRegion.width>0&&deltaRegion.height>0?union(deltaRegion,fullBounds()):fullBounds();
   if(!!s.nativeMixVersion){
-   if(!nativeMask||nativeMask.width!==target.width||nativeMask.height!==target.height){nativeMask=new OffscreenCanvas(target.width,target.height);nativeStrokeRaster=new LiveStrokeRaster();}
-   // On pen up generate the canonical final brush mask from scratch (off-thread),
-   // then replay once against the immutable original layer. The union region
-   // also removes provisional pixels that the final fitted geometry no longer covers.
-   if(j.final){nativeStrokeRaster!.reset();resetPigmentMix(tc.canvas);nativeMask.width=target.width;nativeMask.height=target.height;tc.clearRect(0,0,target.width,target.height);tc.drawImage(bc,0,0);}
+   if(!nativeMask||nativeMask.width!==target.width||nativeMask.height!==target.height){nativeMask=new OffscreenCanvas(target.width,target.height);nativeStrokeRaster??=new LiveStrokeRaster();}
+   // Rebuild the canonical final mask, but retain carried pigment: contacts
+   // depend only on the unchanged raw path, not the provisional brush geometry.
+   // Restore only the old/final footprint before applying that final mask.
+   if(j.final){nativeStrokeRaster!.reset();nativeMask.getContext('2d')!.reset();const restore=finiteRegion(union(region,fullBounds()),target.width,target.height,fullBounds);tc.clearRect(restore.x,restore.y,restore.width,restore.height);tc.drawImage(bc,restore.x,restore.y,restore.width,restore.height,restore.x,restore.y,restore.width,restore.height);}
    const maskContext=nativeMask.getContext('2d')! as unknown as CanvasRenderingContext2D;
    if(j.final&&s.nativeMixVersion===3){resetDryBristleV3MixModel(s);drawStroke(maskContext,s,'final',currentGeometry());}
    else nativeStrokeRaster!.paint(maskContext,s,currentGeometry());
@@ -73,7 +90,9 @@ worker.onmessage=async({data:j})=>{
   r=finiteRegion(r,target.width,target.height,fullBounds);
   if(deltaBase){
    const support=ownershipBounds(),old=deltaSupport;
-   if(!old)r=union(r,support);else{
+   // A retained compact mask already owns unchanged historical support.
+   // Expanding its bounding box does not change pixels outside the dab.
+   if(!old)r=union(r,support);else if(!compactReplies){
     const x=Math.min(old.x,support.x),y=Math.min(old.y,support.y),right=Math.max(old.x+old.width,support.x+support.width),bottom=Math.max(old.y+old.height,support.y+support.height);
     if(old.x!==support.x)r=union(r,{x,y,width:Math.abs(old.x-support.x),height:bottom-y});
     if(old.x+old.width!==support.x+support.width)r=union(r,{x:Math.min(old.x+old.width,support.x+support.width),y,width:Math.abs(old.x+old.width-support.x-support.width),height:bottom-y});
@@ -88,10 +107,11 @@ worker.onmessage=async({data:j})=>{
   // changed since the last reply. Keep the original native bitmap conversion
   // for identical pigment values; ownership masks use direct pixel buffers.
   if(compactReplies&&deltaBase&&lastPixels){
-   const sampled=tc.getImageData(r.x,r.y,r.width,r.height),a=sampled.data,a32=new Uint32Array(a.buffer),last32=new Uint32Array(lastPixels.buffer);let left=r.width,top=r.height,right=0,bottom=0;
+   const sampledX=r.x,sampledY=r.y,sampledWidth=r.width;const sampled=tc.getImageData(r.x,r.y,r.width,r.height),a=sampled.data,a32=new Uint32Array(a.buffer),last32=new Uint32Array(lastPixels.buffer);let left=r.width,top=r.height,right=0,bottom=0;
    for(let y=0;y<r.height;y++)for(let x=0;x<r.width;x++){const at=(y*r.width+x)*4,from=((r.y+y)*target.width+r.x+x)*4;if(last32[from/4]!==a32[at/4]&&nativePixelsDiffer(lastPixels,a,from,at)){left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x+1);bottom=Math.max(bottom,y+1);}}
-   if(right>left&&bottom>top){const x=Math.floor((r.x+left)/64)*64,y=Math.floor((r.y+top)/64)*64,ex=Math.min(target.width,Math.ceil((r.x+right)/64)*64),ey=Math.min(target.height,Math.ceil((r.y+bottom)/64)*64);r={x,y,width:ex-x,height:ey-y};}else r={x:0,y:0,width:Math.min(64,target.width),height:Math.min(64,target.height)};
-   const pixels=tc.getImageData(r.x,r.y,r.width,r.height),data=pixels.data,ownership=new Uint8ClampedArray(data.length),paint=new Uint8ClampedArray(data.length),tiles:{x:number;y:number;w:number;h:number}[]=[],support=ownershipBounds(),data32=new Uint32Array(data.buffer),base32=new Uint32Array(deltaBase.buffer),paint32=new Uint32Array(paint.buffer);
+   if(right>left&&bottom>top){const x=Math.floor((r.x+left)/64)*64,y=Math.floor((r.y+top)/64)*64,ex=Math.min(target.width,Math.ceil((r.x+right)/64)*64),ey=Math.min(target.height,Math.ceil((r.y+bottom)/64)*64);r={x,y,width:ex-x,height:ey-y};}else r={x:r.x,y:r.y,width:Math.min(64,r.width),height:Math.min(64,r.height)};
+   // Reuse the first readback when packing the smaller changed rectangle.
+   const data=new Uint8ClampedArray(r.width*r.height*4); for(let y=0;y<r.height;y++){const from=((r.y+y-sampledY)*sampledWidth+r.x-sampledX)*4;data.set(a.subarray(from,from+r.width*4),y*r.width*4);}const ownership=new Uint8ClampedArray(data.length),paint=new Uint8ClampedArray(data.length),tiles:{x:number;y:number;w:number;h:number}[]=[],support=ownershipBounds(),data32=new Uint32Array(data.buffer),base32=new Uint32Array(deltaBase.buffer),paint32=new Uint32Array(paint.buffer);
    for(let y=0;y<r.height;y++)lastPixels.set(data.subarray(y*r.width*4,(y+1)*r.width*4),((r.y+y)*target.width+r.x)*4);
    for(let ty=0;ty<r.height;ty+=64)for(let tx=0;tx<r.width;tx+=64){let left=64,top=64,right=0,bottom=0;for(let y=ty;y<Math.min(ty+64,r.height);y++)for(let x=tx;x<Math.min(tx+64,r.width);x++){const at=(y*r.width+x)*4,from=((r.y+y)*target.width+r.x+x)*4;if(r.x+x<support.x||r.y+y<support.y||r.x+x>=support.x+support.width||r.y+y>=support.y+support.height||base32[from/4]===data32[at/4]||!nativePixelsDiffer(deltaBase,data,from,at))continue;ownership[at+3]=255;paint32[at/4]=data32[at/4];left=Math.min(left,x-tx);top=Math.min(top,y-ty);right=Math.max(right,x-tx+1);bottom=Math.max(bottom,y-ty+1);}tiles.push(right>left&&bottom>top?{x:r.x+tx+left,y:r.y+ty+top,w:right-left,h:bottom-top}:{x:r.x+tx,y:r.y+ty,w:0,h:0});}
    const bitmap=await createImageBitmap(target,r.x,r.y,r.width,r.height);pendingBitmaps.push(bitmap);if(j.token!==token)return;worker.postMessage({token:j.token,serial:j.serial,region:r,final:j.final,bitmap,maskData:ownership,paintData:paint,tiles,support},[bitmap,ownership.buffer as ArrayBuffer,paint.buffer as ArrayBuffer]);pendingBitmaps=[];return;

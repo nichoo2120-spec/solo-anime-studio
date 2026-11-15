@@ -27,7 +27,7 @@ export class LiveBlendWorker{
   * repeatedly spawning a broken worker during the same editing session. */
  retryForNewGesture(){if(!this.failed||this.failures>=2)return;this.failed=false;this.warm();}
  deltaFor(s:Stroke){return this.job?.id===s.id?this.delta:undefined;}
- cancel(){if(this.delta){this.delta.mask.width=this.delta.mask.height=this.delta.patch.width=this.delta.patch.height=0;this.delta=undefined;}const j=this.job;if(j){if(j.timer)clearTimeout(j.timer);j.resolve?.(undefined);}this.job=undefined;this.dirty=undefined;this.token++;this.worker?.postMessage({kind:'cancel',token:this.token});this.surface.width=this.surface.height=0;}
+ cancel(reuseSurfaces=false){if(this.delta){this.delta.mask.width=this.delta.mask.height=this.delta.patch.width=this.delta.patch.height=0;this.delta=undefined;}const j=this.job;if(j){if(j.timer)clearTimeout(j.timer);j.resolve?.(undefined);}this.job=undefined;this.dirty=undefined;this.token++;this.worker?.postMessage({kind:'cancel',token:this.token,reuseSurfaces});this.surface.width=this.surface.height=0;}
  dispose(){this.cancel();this.worker?.terminate();this.worker=undefined;}
  matches(s:Stroke,source:HTMLCanvasElement){return !!this.job&&this.job.id===s.id&&this.job.source===source&&!this.failed;}
  takeRegion(s:Stroke){if(this.job?.id!==s.id)return undefined;const r=this.dirty??{x:0,y:0,width:0,height:0};this.dirty=undefined;return r;}
@@ -35,7 +35,7 @@ export class LiveBlendWorker{
   this.warm();if(!this.worker||this.failed||!workerBlendEligible(s))return undefined;
   const signature=JSON.stringify({...s,points:undefined,mixStops:undefined});
   if(!this.job||this.job.id!==s.id||this.job.source!==source||this.job.signature!==signature||this.job.ownershipBase!==ownershipBase){
-   this.cancel();const token=++this.token,j:Job={token,id:s.id,ownershipBase,source,signature,ready:false,inFlight:false};this.job=j;
+   this.cancel(true);const token=++this.token,j:Job={token,id:s.id,ownershipBase,source,signature,ready:false,inFlight:false};this.job=j;
    if(this.surfaceReadback!==nativeDelta){this.surface=canvas(1,1);this.surfaceReadback=nativeDelta;}
    const basePixels=nativeDelta?source.getContext('2d')!.getImageData(0,0,source.width,source.height).data:undefined,deltaPixels=ownershipBase?.pixels.slice();
    if(nativeDelta){const seed=ownershipBase?.seed;this.delta={mask:canvas(source.width,source.height),patch:canvas(source.width,source.height),tiles:new Map(seed?.tiles),revision:0,group:ownershipBase,box:seed?.box};if(seed){this.delta.mask.getContext('2d')!.drawImage(seed.mask,seed.box.x,seed.box.y);this.delta.patch.getContext('2d')!.drawImage(seed.paint,seed.box.x,seed.box.y);}}
