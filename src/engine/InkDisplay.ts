@@ -42,7 +42,7 @@ export class InkDisplay{
  private prefixes=new Map<string,{operations:Layer['operations'];canvas:HTMLCanvasElement;renderer:LayerRenderer;revision:number}>();
  private mixGroups=new Map<string,MixGroup>();private mixGroupBytes=0;private readonly mixGroupBudget=64*1024*1024;
  private nativeFallback?:{base:Key;stroke:string;rect?:Box};
- private nativePreview?:{base:Key;stroke:string;result:HTMLCanvasElement;delta:BlendDelta;group?:MixGroup;box?:Box;cutMask:HTMLCanvasElement;cutPatch:HTMLCanvasElement;rect?:Box;revision:number};
+ private nativePreview?:{base:Key;stroke:string;result:HTMLCanvasElement;delta:BlendDelta;group?:MixGroup;target?:{layer:Layer;project:string;frame?:string};box?:Box;cutMask:HTMLCanvasElement;cutPatch:HTMLCanvasElement;rect?:Box;revision:number};
  private lastLive?:{id:string;base:Key;picture:HTMLCanvasElement};private worker?:Worker;private pending?:Pending;private serial=0;
  constructor(private request:()=>void=()=>{}){}
  private prepared=new Map<Stroke,Prepared>();private preparedWeight=0;private pathBatches=0;
@@ -250,6 +250,8 @@ export class InkDisplay{
   }
   return true;
  }
+ setPendingNativeLayer(layer:Layer,p:Project){const n=this.nativePreview;if(n&&layer.operations.at(-1)?.id===n.stroke)n.target={layer,project:p.id,frame:p.animation?.activeFrameId};}
+ paintPendingNative(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer){const target=this.nativePreview?.target;if(target&&target.layer.id===layer.id&&target.project===p.id&&target.frame===p.animation?.activeFrameId&&this.presentCommittedMix(ctx,target.layer,p,renderer))return true;const entry=this.layers.get(layer.id),key=entry?.key,m=ctx.getTransform();if(!entry||!key||key.renderer!==renderer||key.width!==ctx.canvas.width||key.height!==ctx.canvas.height||key.frameWidth!==p.width||key.frameHeight!==p.height||![m.a,m.b,m.c,m.d,m.e,m.f].every((v,i)=>v===key.matrix[i])||key.operations.length>layer.operations.length||!key.operations.every((op,i)=>op===layer.operations[i]))return false;ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.drawImage(entry.surface,0,0);ctx.restore();return true;}
  finishNativePreview(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer){this.presentCommittedMix(ctx,layer,p,renderer,false);}
  paint(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,live?:Stroke,geometry?:Geometry,renderer?:LayerRenderer):boolean{
   if(!live&&renderer&&this.presentCommittedMix(ctx,layer,p,renderer))return true;

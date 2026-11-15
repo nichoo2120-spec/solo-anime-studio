@@ -11,13 +11,13 @@ import {resetPigmentMix} from './pigmentMix';
 import {drawStroke} from './renderer';
 import {resetDryBristleV3MixModel} from './dryBristleV3';
 import type {RasterRegion} from './liveRaster';
-Object.defineProperty(globalThis,'document',{value:{createElement:(tag:string)=>{if(tag!=='canvas')throw Error('Unsupported worker element');const canvas=new OffscreenCanvas(1,1);if(pixelReplies)canvas.getContext('2d',{willReadFrequently:true});return canvas;}}});
-type Message={kind:'begin'|'update'|'cancel';token:number;serial:number;width:number;height:number;base?:ImageBitmap;readFrequently?:boolean;nativeDelta?:boolean;basePixels?:Uint8ClampedArray;deltaPixels?:Uint8ClampedArray;deltaRegion?:RasterRegion;seeded?:boolean;pixelReplies?:boolean;stroke:Stroke;final:boolean};
+Object.defineProperty(globalThis,'document',{value:{createElement:(tag:string)=>{if(tag!=='canvas')throw Error('Unsupported worker element');return new OffscreenCanvas(1,1);}}});
+type Message={kind:'begin'|'update'|'cancel';token:number;serial:number;width:number;height:number;base?:ImageBitmap;readFrequently?:boolean;nativeDelta?:boolean;basePixels?:Uint8ClampedArray;deltaPixels?:Uint8ClampedArray;deltaRegion?:RasterRegion;seeded?:boolean;compactReplies?:boolean;stroke:Stroke;final:boolean};
 const worker=self as unknown as {onmessage:(e:MessageEvent<Message>)=>void;postMessage:(data:unknown,transfer?:Transferable[])=>void};
 let token=0,base:OffscreenCanvas|undefined,target:OffscreenCanvas|undefined,region:RasterRegion|undefined;
 let deltaSupport:RasterRegion|undefined,deltaRegion:RasterRegion|undefined;
 let deltaBase:Uint8ClampedArray|undefined,deltaRead:OffscreenCanvas|undefined,deltaMask:OffscreenCanvas|undefined,deltaPaint:OffscreenCanvas|undefined;
-let pixelReplies=false,lastPixels:Uint8ClampedArray|undefined;
+let compactReplies=false,lastPixels:Uint8ClampedArray|undefined;
 let nativeMask:OffscreenCanvas|undefined;let nativeStrokeRaster:LiveStrokeRaster|undefined;
 const union=(a:RasterRegion|undefined,b:RasterRegion)=>{if(!a)return b;const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);return{x,y,width:Math.max(a.x+a.width,b.x+b.width)-x,height:Math.max(a.y+a.height,b.y+b.height)-y};};
 // An unchanged native mask can report Infinity/-Infinity extrema. Never let
@@ -32,7 +32,7 @@ function finiteRegion(value:RasterRegion,width:number,height:number,fallback:()=
 worker.onmessage=async({data:j})=>{
  let pendingBitmaps:ImageBitmap[]=[];
  try{
-  if(j.kind!=='update'){pixelReplies=!!j.pixelReplies;lastPixels=j.basePixels?.slice();deltaSupport=j.seeded?j.deltaRegion:undefined;deltaRegion=j.deltaRegion;deltaBase=undefined;for(const c of [deltaRead,deltaMask,deltaPaint])if(c)c.width=c.height=0;deltaRead=deltaMask=deltaPaint=undefined;resetWetSmudgeCaches();resetGentleBlend();nativeStrokeRaster?.reset();nativeStrokeRaster=undefined;nativeMask=undefined;if(base)base.width=base.height=0;if(target)target.width=target.height=0;token=j.token;region=undefined;base=target=undefined;
+  if(j.kind!=='update'){compactReplies=!!j.compactReplies;lastPixels=j.basePixels?.slice();deltaSupport=j.seeded?j.deltaRegion:undefined;deltaRegion=j.deltaRegion;deltaBase=undefined;for(const c of [deltaRead,deltaMask,deltaPaint])if(c)c.width=c.height=0;deltaRead=deltaMask=deltaPaint=undefined;resetWetSmudgeCaches();resetGentleBlend();nativeStrokeRaster?.reset();nativeStrokeRaster=undefined;nativeMask=undefined;if(base)base.width=base.height=0;if(target)target.width=target.height=0;token=j.token;region=undefined;base=target=undefined;
    if(j.kind==='begin'){base=new OffscreenCanvas(j.width,j.height);target=new OffscreenCanvas(j.width,j.height);const baseContext=base.getContext('2d',{willReadFrequently:j.nativeDelta||j.readFrequently!==false})!,targetContext=target.getContext('2d',{willReadFrequently:j.nativeDelta||j.readFrequently!==false})!;if(j.nativeDelta&&j.basePixels){const pixels=baseContext.createImageData(j.width,j.height);pixels.data.set(j.basePixels);baseContext.putImageData(pixels,0,0);targetContext.putImageData(pixels,0,0);}else{baseContext.drawImage(j.base!,0,0);targetContext.drawImage(j.base!,0,0);}j.base?.close();if(j.nativeDelta){deltaRead=new OffscreenCanvas(j.basePixels?1:j.width,j.basePixels?1:j.height);const read=deltaRead.getContext('2d',{willReadFrequently:true})!;if(j.deltaPixels||j.basePixels)deltaBase=j.deltaPixels??j.basePixels;else{read.drawImage(base,0,0);deltaBase=read.getImageData(0,0,j.width,j.height).data;deltaRead.width=deltaRead.height=1;}deltaMask=new OffscreenCanvas(1,1);deltaPaint=new OffscreenCanvas(1,1);}}return;
   }
   if(j.token!==token||!base||!target)return;
@@ -53,11 +53,11 @@ worker.onmessage=async({data:j})=>{
    // then replay once against the immutable original layer. The union region
    // also removes provisional pixels that the final fitted geometry no longer covers.
    if(j.final){nativeStrokeRaster!.reset();resetPigmentMix(tc.canvas);nativeMask.width=target.width;nativeMask.height=target.height;tc.clearRect(0,0,target.width,target.height);tc.drawImage(bc,0,0);}
-   const maskContext=nativeMask.getContext('2d',{willReadFrequently:pixelReplies})! as unknown as CanvasRenderingContext2D;
+   const maskContext=nativeMask.getContext('2d')! as unknown as CanvasRenderingContext2D;
    if(j.final&&s.nativeMixVersion===3){resetDryBristleV3MixModel(s);drawStroke(maskContext,s,'final',currentGeometry());}
    else nativeStrokeRaster!.paint(maskContext,s,currentGeometry());
    let updated=finiteRegion(j.final?fullBounds():nativeStrokeRaster!.lastRegion??fullBounds(),target.width,target.height,fullBounds);
-   if(s.nativeMixVersion===3&&!j.final){const halo=Math.ceil(pixelReplies&&!s.transform&&!s.perspective?s.size*.75+12:s.size*1.5+12);updated=finiteRegion({x:updated.x-halo,y:updated.y-halo,width:updated.width+halo*2,height:updated.height+halo*2},target.width,target.height,fullBounds);}
+   if(s.nativeMixVersion===3&&!j.final){const halo=Math.ceil(compactReplies&&!s.transform&&!s.perspective?s.size*.75+12:s.size*1.5+12);updated=finiteRegion({x:updated.x-halo,y:updated.y-halo,width:updated.width+halo*2,height:updated.height+halo*2},target.width,target.height,fullBounds);}
    // Repaint/transfer only the changed tail while the pointer moves. The
    // accumulated union is bookkeeping for the FINAL correction only: the
    // final fitted stroke can shrink outside the last provisional footprint.
@@ -80,20 +80,21 @@ worker.onmessage=async({data:j})=>{
     if(old.y!==support.y)r=union(r,{x,y,width:right-x,height:Math.abs(old.y-support.y)});
     if(old.y+old.height!==support.y+support.height)r=union(r,{x,y:Math.min(old.y+old.height,support.y+support.height),width:right-x,height:Math.abs(old.y+old.height-support.y-support.height)});
    }
-   if(j.final)r=union(r,support);deltaSupport=support;
+   if(j.final&&!compactReplies)r=union(r,support);deltaSupport=support;
   }
   if(deltaBase){   const x=Math.floor(r.x/64)*64,y=Math.floor(r.y/64)*64,right=Math.min(target.width,Math.ceil((r.x+r.width)/64)*64),bottom=Math.min(target.height,Math.ceil((r.y+r.height)/64)*64);
    r={x,y,width:right-x,height:bottom-y};}
   // The pigment target stays exact. Transfer only tiles whose stored pixels
-  // changed since the last reply, without a CPU/GPU bitmap round trip.
-  if(pixelReplies&&deltaBase&&lastPixels){
+  // changed since the last reply. Keep the original native bitmap conversion
+  // for identical pigment values; ownership masks use direct pixel buffers.
+  if(compactReplies&&deltaBase&&lastPixels){
    const sampled=tc.getImageData(r.x,r.y,r.width,r.height),a=sampled.data,a32=new Uint32Array(a.buffer),last32=new Uint32Array(lastPixels.buffer);let left=r.width,top=r.height,right=0,bottom=0;
    for(let y=0;y<r.height;y++)for(let x=0;x<r.width;x++){const at=(y*r.width+x)*4,from=((r.y+y)*target.width+r.x+x)*4;if(last32[from/4]!==a32[at/4]&&nativePixelsDiffer(lastPixels,a,from,at)){left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x+1);bottom=Math.max(bottom,y+1);}}
    if(right>left&&bottom>top){const x=Math.floor((r.x+left)/64)*64,y=Math.floor((r.y+top)/64)*64,ex=Math.min(target.width,Math.ceil((r.x+right)/64)*64),ey=Math.min(target.height,Math.ceil((r.y+bottom)/64)*64);r={x,y,width:ex-x,height:ey-y};}else r={x:0,y:0,width:Math.min(64,target.width),height:Math.min(64,target.height)};
    const pixels=tc.getImageData(r.x,r.y,r.width,r.height),data=pixels.data,ownership=new Uint8ClampedArray(data.length),paint=new Uint8ClampedArray(data.length),tiles:{x:number;y:number;w:number;h:number}[]=[],support=ownershipBounds(),data32=new Uint32Array(data.buffer),base32=new Uint32Array(deltaBase.buffer),paint32=new Uint32Array(paint.buffer);
    for(let y=0;y<r.height;y++)lastPixels.set(data.subarray(y*r.width*4,(y+1)*r.width*4),((r.y+y)*target.width+r.x)*4);
    for(let ty=0;ty<r.height;ty+=64)for(let tx=0;tx<r.width;tx+=64){let left=64,top=64,right=0,bottom=0;for(let y=ty;y<Math.min(ty+64,r.height);y++)for(let x=tx;x<Math.min(tx+64,r.width);x++){const at=(y*r.width+x)*4,from=((r.y+y)*target.width+r.x+x)*4;if(r.x+x<support.x||r.y+y<support.y||r.x+x>=support.x+support.width||r.y+y>=support.y+support.height||base32[from/4]===data32[at/4]||!nativePixelsDiffer(deltaBase,data,from,at))continue;ownership[at+3]=255;paint32[at/4]=data32[at/4];left=Math.min(left,x-tx);top=Math.min(top,y-ty);right=Math.max(right,x-tx+1);bottom=Math.max(bottom,y-ty+1);}tiles.push(right>left&&bottom>top?{x:r.x+tx+left,y:r.y+ty+top,w:right-left,h:bottom-top}:{x:r.x+tx,y:r.y+ty,w:0,h:0});}
-   worker.postMessage({token:j.token,serial:j.serial,region:r,final:j.final,pixelData:data,maskData:ownership,paintData:paint,tiles,support},[data.buffer as ArrayBuffer,ownership.buffer as ArrayBuffer,paint.buffer as ArrayBuffer]);return;
+   const bitmap=await createImageBitmap(target,r.x,r.y,r.width,r.height);pendingBitmaps.push(bitmap);if(j.token!==token)return;worker.postMessage({token:j.token,serial:j.serial,region:r,final:j.final,bitmap,maskData:ownership,paintData:paint,tiles,support},[bitmap,ownership.buffer as ArrayBuffer,paint.buffer as ArrayBuffer]);pendingBitmaps=[];return;
   }
   const bitmap=await createImageBitmap(target,r.x,r.y,r.width,r.height);pendingBitmaps.push(bitmap);
   if(j.token!==token){bitmap.close();return;}
