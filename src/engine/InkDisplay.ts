@@ -1,3 +1,4 @@
+import {HistoryTiles} from './HistoryTiles';
 import type {ArtworkOrigin,Layer,Stroke,Project} from '../core/model';
 import {nativePixelsDiffer} from './nativePixelDelta';
 import {finalGeometry} from './geometryCache';
@@ -15,6 +16,8 @@ import type {BlendDelta,BlendBaseline,NativeMixSeed} from './LiveBlendWorker';
 import type {RasterRegion} from './liveRaster';
 
 type MixGroup={operations:Layer['operations'];renderer:LayerRenderer;revision:number;matrix:number[];width:number;height:number;frameWidth:number;frameHeight:number;sharp:HTMLCanvasElement;baseline:BlendBaseline;bytes:number};
+
+type MixViewDelta={project:string;layer:string;before:Layer['operations'];after:Layer['operations'];renderer:LayerRenderer;matrix:number[];width:number;height:number;frameWidth:number;frameHeight:number;patch:HistoryTiles;bytes:number};
 
 type Geometry=ReturnType<typeof strokeGeometry>;
 type Box={x:number;y:number;w:number;h:number};
@@ -40,6 +43,8 @@ export class InkDisplay{
  private key?:Key;private liveKey?:{base:Key;stroke:Stroke;geometry?:Geometry};
  private layers=new Map<string,{key:Key;surface:HTMLCanvasElement}>();
  private prefixes=new Map<string,{operations:Layer['operations'];canvas:HTMLCanvasElement;renderer:LayerRenderer;revision:number}>();
+ private mixViewHistory=new Map<Layer['operations'][number],MixViewDelta>();private mixViewBytes=0;private readonly mixViewBudget=64*1024*1024;
+ private mixRebase=new Map<string,{project:string;operations:Layer['operations']}>();
  private mixGroups=new Map<string,MixGroup>();private mixGroupBytes=0;private readonly mixGroupBudget=64*1024*1024;
  private nativeFallback?:{base:Key;stroke:string;rect?:Box};
  private nativePreview?:{base:Key;stroke:string;result:HTMLCanvasElement;delta:BlendDelta;group?:MixGroup;target?:{layer:Layer;project:string;frame?:string};box?:Box;cutMask:HTMLCanvasElement;cutPatch:HTMLCanvasElement;rect?:Box;revision:number};
@@ -76,6 +81,7 @@ export class InkDisplay{
   }catch{base?.close();}
  }
  clear(){
+  for(const entry of this.mixViewHistory.values())entry.patch.clear();this.mixViewHistory.clear();this.mixViewBytes=0;this.mixRebase.clear();
   for(const group of this.mixGroups.values()){group.sharp.width=group.sharp.height=0;const seed=group.baseline.seed;if(seed)seed.mask.width=seed.mask.height=seed.paint.width=seed.paint.height=0;}this.mixGroups.clear();this.mixGroupBytes=0;
   this.navigationGeneration++;this.navigationWorker?.terminate();this.navigationWorker=undefined;this.navigationStates.clear();for(const job of this.navigationJobs.values()){clearTimeout(job.timer);job.finish({error:"Navigation cancelled"});}this.navigationJobs.clear();
   this.viewSerial++;this.viewWorker?.terminate();this.viewWorker=undefined;if(this.viewPending)clearTimeout(this.viewPending.timer);this.viewPending=undefined;this.viewFailed=false;
@@ -204,6 +210,22 @@ export class InkDisplay{
    base.then(bitmap=>{if(this.viewPending!==job){bitmap?.close();return;}worker.postMessage({token,width:w,height:h,matrix,parts,base:bitmap},bitmap?[bitmap]:[]);}).catch(()=>{if(this.viewPending===job)fail();});return false;
   }catch{fail();return true;}
  }
+ private rememberMixView(previous:Layer,layer:Layer,p:Project,renderer:LayerRenderer,m:DOMMatrix,before:HTMLCanvasElement,after:HTMLCanvasElement){
+  const op=layer.operations.at(-1);if(!op||op.kind!=='stroke'||!op.nativeMixVersion||this.mixViewHistory.has(op))return;
+  const b=strokeRasterBounds(op,p.width,p.height),box=this.screenBounds({...op,transform:undefined,perspective:undefined},{x:b.x,y:b.y,w:b.width,h:b.height},m,before.width,before.height);if(!box)return;
+  const x=Math.max(0,box.x-4),y=Math.max(0,box.y-4),right=Math.min(before.width,box.x+box.w+4),bottom=Math.min(before.height,box.y+box.h+4),rect={x,y,width:right-x,height:bottom-y},bytes=rect.width*rect.height*8;if(bytes>this.mixViewBudget)return;
+  while(this.mixViewHistory.size&&(this.mixViewBytes+bytes>this.mixViewBudget||this.mixViewHistory.size>=160)){const oldest=this.mixViewHistory.keys().next().value!,entry=this.mixViewHistory.get(oldest)!;this.mixViewHistory.delete(oldest);this.mixViewBytes-=entry.bytes;entry.patch.clear();}
+  // Display history is optional; canonical undo remains available if a
+  // device cannot allocate another view patch.
+  let patch:HistoryTiles|undefined;try{patch=new HistoryTiles(before,rect);patch.finish(after);this.mixViewHistory.set(op,{project:p.id,layer:layer.id,before:previous.operations,after:layer.operations,renderer,matrix:[m.a,m.b,m.c,m.d,m.e,m.f],width:before.width,height:before.height,frameWidth:p.width,frameHeight:p.height,patch,bytes});this.mixViewBytes+=bytes;}catch{patch?.clear();}
+ }
+ private restoreMixView(out:CanvasRenderingContext2D,key:Key,layer:Layer,p:Project,renderer:LayerRenderer){
+  const old=key.operations,next=layer.operations,undo=next.length<old.length&&next.every((op,i)=>op===old[i]),redo=old.length<next.length&&old.every((op,i)=>op===next[i]);if(!undo&&!redo)return false;
+  const source=undo?old:next,start=undo?next.length:old.length,patches=source.slice(start).map((op,i)=>{const d=this.mixViewHistory.get(op);return d&&d.project===p.id&&d.layer===layer.id&&d.renderer===renderer&&d.width===out.canvas.width&&d.height===out.canvas.height&&d.frameWidth===p.width&&d.frameHeight===p.height&&d.matrix.every((v,j)=>v===key.matrix[j])&&d.before.length===start+i&&d.before.every((v,j)=>v===source[j])?d:undefined;});
+  if(!patches.every(d=>!!d))return false;for(const d of undo?patches.reverse():patches)d!.patch.restore(out,undo?'before':'after');
+  this.clearNativePreview();const group=this.mixGroups.get(layer.id);if(group){this.mixGroups.delete(layer.id);this.mixGroupBytes-=group.bytes;group.sharp.width=group.sharp.height=0;const seed=group.baseline.seed;if(seed)seed.mask.width=seed.mask.height=seed.paint.width=seed.paint.height=0;}
+  this.mixRebase.set(layer.id,{project:p.id,operations:layer.operations});this.lastLive=undefined;this.liveKey=undefined;return true;
+ }
  private rememberMixGroup(layer:Layer,p:Project,renderer:LayerRenderer,m:DOMMatrix,sharp:HTMLCanvasElement,native:HTMLCanvasElement,region:RasterRegion){
   const bytes=p.width*p.height*4+sharp.width*sharp.height*4;if(bytes>this.mixGroupBudget)return undefined;
   const old=this.mixGroups.get(layer.id);if(old){this.mixGroupBytes-=old.bytes;old.sharp.width=old.sharp.height=0;const seed=old.baseline.seed;if(seed)seed.mask.width=seed.mask.height=seed.paint.width=seed.paint.height=0;this.mixGroups.delete(layer.id);}
@@ -228,6 +250,7 @@ export class InkDisplay{
   let end=0;for(let i=layer.operations.length-1;i>=0;i--)if(layer.operations[i].kind!=='stroke'||!clean(layer.operations[i] as Stroke)){end=i+1;break;}
   this.paintRegion(ctx,layer,p,end,undefined,undefined,renderer,false);
   const m=ctx.getTransform(),matrix=[m.a,m.b,m.c,m.d,m.e,m.f],old=this.mixGroups.get(layer.id),same=old&&old.renderer===renderer&&old.revision===renderer.displayRevision&&old.width===ctx.canvas.width&&old.height===ctx.canvas.height&&old.frameWidth===p.width&&old.frameHeight===p.height&&old.operations.length===layer.operations.length&&old.operations.every((op,i)=>op===layer.operations[i])&&matrix.every((v,i)=>v===old.matrix[i]);
+  const rebase=this.mixRebase.get(layer.id);this.mixRebase.delete(layer.id);if(rebase?.project===p.id&&rebase.operations===layer.operations)return this.rememberMixGroup(layer,p,renderer,m,this.surface!,renderer.prefixSnapshot(layer,p),{x:0,y:0,width:0,height:0})?.baseline;
   if(same){this.mixGroups.delete(layer.id);this.mixGroups.set(layer.id,old);return old.baseline;}
   if(old){this.mixGroups.delete(layer.id);this.mixGroupBytes-=old.bytes;old.sharp.width=old.sharp.height=0;const seed=old.baseline.seed;if(seed)seed.mask.width=seed.mask.height=seed.paint.width=seed.paint.height=0;}
   if(!layer.operations.length||clean(layer.operations.at(-1) as Stroke))return this.rememberMixGroup(layer,p,renderer,m,this.surface!,renderer.prefixSnapshot(layer,p),{x:0,y:0,width:0,height:0})?.baseline;
@@ -244,14 +267,14 @@ export class InkDisplay{
   const previous={...layer,operations:key.operations};
   if(!this.paintNativePreview(ctx,previous,p,renderer,last,n.result,finalGeometry(last),n.delta,present))return false;
   if(n.delta.final){
-   const sharp=this.preview!,scratch=this.surface!;
+   const sharp=this.preview!,scratch=this.surface!;this.rememberMixView(previous,layer,p,renderer,m,scratch,sharp);
    this.key={...key,operations:layer.operations,firstClean:layer.operations.length,rendererRevision:renderer.displayRevision};this.surface=sharp;this.preview=scratch;
    this.layers.set(layer.id,{key:this.key,surface:sharp});n.group.operations=layer.operations;n.group.revision=renderer.displayRevision;if(n.delta.support)n.group.baseline.region=n.delta.support;const keep=n.box&&n.delta.tiles.size?this.retainMixCuts(n.group,{mask:n.cutMask,paint:n.cutPatch,box:n.box,tiles:new Map(n.delta.tiles)}):(this.retainMixCuts(n.group,undefined),false);this.clearNativePreview(!!keep);this.request();
   }
   return true;
  }
  setPendingNativeLayer(layer:Layer,p:Project){const n=this.nativePreview;if(n&&layer.operations.at(-1)?.id===n.stroke)n.target={layer,project:p.id,frame:p.animation?.activeFrameId};}
- paintPendingNative(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer){const target=this.nativePreview?.target;if(target&&target.layer.id===layer.id&&target.project===p.id&&target.frame===p.animation?.activeFrameId&&this.presentCommittedMix(ctx,target.layer,p,renderer))return true;const entry=this.layers.get(layer.id),key=entry?.key,m=ctx.getTransform();if(!entry||!key||key.renderer!==renderer||key.width!==ctx.canvas.width||key.height!==ctx.canvas.height||key.frameWidth!==p.width||key.frameHeight!==p.height||![m.a,m.b,m.c,m.d,m.e,m.f].every((v,i)=>v===key.matrix[i])||key.operations.length>layer.operations.length||!key.operations.every((op,i)=>op===layer.operations[i]))return false;ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.drawImage(entry.surface,0,0);ctx.restore();return true;}
+ paintPendingNative(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer){const target=this.nativePreview?.target;if(target&&target.layer.id===layer.id&&target.project===p.id&&target.frame===p.animation?.activeFrameId&&target.layer.operations.length<=layer.operations.length&&target.layer.operations.every((op,i)=>op===layer.operations[i])&&this.presentCommittedMix(ctx,target.layer,p,renderer))return true;const entry=this.layers.get(layer.id),key=entry?.key,m=ctx.getTransform();if(!entry||!key||key.renderer!==renderer||key.width!==ctx.canvas.width||key.height!==ctx.canvas.height||key.frameWidth!==p.width||key.frameHeight!==p.height||![m.a,m.b,m.c,m.d,m.e,m.f].every((v,i)=>v===key.matrix[i])||key.operations.length>layer.operations.length||!key.operations.every((op,i)=>op===layer.operations[i]))return false;ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.drawImage(entry.surface,0,0);ctx.restore();return true;}
  finishNativePreview(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer){this.presentCommittedMix(ctx,layer,p,renderer,false);}
  paint(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,live?:Stroke,geometry?:Geometry,renderer?:LayerRenderer):boolean{
   if(!live&&renderer&&this.presentCommittedMix(ctx,layer,p,renderer))return true;
@@ -385,10 +408,13 @@ export class InkDisplay{
    const surface=this.surface??=document.createElement('canvas');if(surface.width!==w)surface.width=w;if(surface.height!==h)surface.height=h;
    const out=surface.getContext('2d')!;out.resetTransform();out.globalAlpha=1;out.globalCompositeOperation='source-over';
    const append=sameView&&key!.firstClean===firstClean&&key!.operations.length<=layer.operations.length&&key!.operations.every((op,i)=>op===layer.operations[i]);
+   const restored=sameView&&!!renderer&&this.restoreMixView(out,key!,layer,p,renderer);
+   if(!restored){
    if(!append){out.clearRect(0,0,w,h);if(firstClean&&renderer)this.paintPrefix(out,layer,p,firstClean,renderer,m,w,h);out.resetTransform();}
    const added=append?layer.operations.slice(key!.operations.length):[],last=added[0];
    const deferred=added.length===1&&last.kind==='stroke'&&this.deferFinal(layer,last,key!,m,w,h);
    if(!deferred)this.paintStrokes(out,layer.operations.slice(append?key!.operations.length:firstClean) as Stroke[],m,w,h);
+   }
    this.key={operations:layer.operations,matrix,firstClean,width:w,height:h,frameWidth:p.width,frameHeight:p.height,renderer,rendererRevision:firstClean?renderer?.displayRevision:0};
   }
   const entry=cached&&cached.key===this.key&&cached.surface===this.surface?cached:{key:this.key!,surface:this.surface!};

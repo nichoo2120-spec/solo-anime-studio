@@ -35,7 +35,7 @@ export function applyPigmentMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElem
  feather.addColorStop(0,'white');feather.addColorStop(1,'rgba(255,255,255,0)');
  const map=(p:Point):Point=>s.perspective?{...p,...projectPoint(p,s.perspective)}:s.transform?{...p,x:s.transform[0]*p.x+s.transform[2]*p.y+s.transform[4],y:s.transform[1]*p.x+s.transform[3]*p.y+s.transform[5]}:p;
  const affineScale=s.transform?Math.max(Math.hypot(s.transform[0],s.transform[1]),Math.hypot(s.transform[2],s.transform[3])):1;
- const paintLoad=clamp(s.nativeMixPaintLoad??0);
+ const paintLoad=clamp(s.nativeMixPaintLoad??0),localPickup=s.nativeMixPickupVersion===1;
  const spacing=Math.max(.6,Math.min(12,s.size*.1));
  const deposit=(raw:Point,travel:number)=>{
   const p=map(raw),pressure=s.pressure?pressureResponse(clamp(raw.p)**s.response,s.pressureCurve):1;
@@ -49,7 +49,9 @@ export function applyPigmentMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElem
    if(paintLoad){reservoir.save();reservoir.globalCompositeOperation='destination-out';reservoir.globalAlpha=paintLoad;reservoir.fillRect(0,0,side,side);reservoir.globalCompositeOperation='lighter';reservoir.fillStyle=s.color;reservoir.fillRect(0,0,side,side);reservoir.restore();}
   }
   else{
-   const hold=Math.max(3,s.size*(.45+2.5*(s.nativeMixRadius??.5)));
+   // New contacts refresh from the canvas within a small part of the tip.
+   // Legacy strokes retain their long carried-pigment reach exactly.
+   const hold=localPickup?Math.max(1,s.size*(.12+.16*(s.nativeMixRadius??.5))):Math.max(3,s.size*(.45+2.5*(s.nativeMixRadius??.5)));
    const rate=1-Math.exp(-travel/hold*(.35+.65*pressure));
    // Premultiplied linear interpolation keeps opaque pigment opaque. Source-over
    // here would attenuate alpha twice and leave artificial translucent bands.
