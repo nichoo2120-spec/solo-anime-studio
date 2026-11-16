@@ -1,12 +1,13 @@
-import type {Stroke} from '../core/model';
+import type {Point,Stroke} from '../core/model';
 import type {RasterRegion} from './liveRaster';
 const canvas=(width:number,height:number)=>{const c=document.createElement('canvas');c.width=width;c.height=height;return c;};
+const samePoint=(a:Point|undefined,b:Point|undefined)=>!!a&&!!b&&a.x===b.x&&a.y===b.y&&a.p===b.p&&a.v===b.v;
 export const workerBlendEligible=(s:Pick<Stroke,'tool'|'coloringEngine'|'coloringAppearanceVersion'|'smudgeVersion'|'brushTip'|'nativeMixVersion'|'paintTipVersion'|'dryBristleVersion'>)=>s.tool!=='eraser'&&((s.paintTipVersion===2||s.dryBristleVersion===3)&&s.brushTip!=='color-blender'||!!s.nativeMixVersion||(s.coloringEngine===1&&s.brushTip==='color-blender'&&(s.coloringAppearanceVersion===3||s.smudgeVersion===2)));
 export type NativeMixSeed={mask:HTMLCanvasElement;paint:HTMLCanvasElement;box:{x:number;y:number;w:number;h:number};tiles:Map<string,{x:number;y:number;w:number;h:number}>};
 export type BlendBaseline={pixels:Uint8ClampedArray;region:RasterRegion;seed?:NativeMixSeed};
 export type BlendDelta={mask:HTMLCanvasElement;patch:HTMLCanvasElement;tiles:Map<string,{x:number;y:number;w:number;h:number}>;revision:number;final?:boolean;group?:BlendBaseline;support?:RasterRegion;dirty?:RasterRegion;box?:{x:number;y:number;w:number;h:number}};
 type Reply={maskData?:Uint8ClampedArray;paintData?:Uint8ClampedArray;token:number;serial:number;deltaMask?:ImageBitmap;deltaPaint?:ImageBitmap;tiles?:{x:number;y:number;w:number;h:number}[];support?:RasterRegion;bitmap?:ImageBitmap;region?:RasterRegion;final?:boolean;error?:string};
-type Job={token:number;id:string;ownershipBase?:BlendBaseline;source:HTMLCanvasElement;signature:string;ready:boolean;inFlight:boolean;queued?:{stroke:Stroke;final:boolean};geometry?:unknown;resolve?:(surface:HTMLCanvasElement|undefined)=>void;timer?:ReturnType<typeof setTimeout>};
+type Job={token:number;id:string;ownershipBase?:BlendBaseline;source:HTMLCanvasElement;signature:string;ready:boolean;inFlight:boolean;queued?:{stroke:Stroke;final:boolean};geometry?:unknown;pointsRef?:Point[];pointCount:number;lastPoint?:Point;resolve?:(surface:HTMLCanvasElement|undefined)=>void;timer?:ReturnType<typeof setTimeout>};
 
 /** Keep the existing browser Canvas pigment calculations off the input thread.
  * One update is in flight; newer input coalesces instead of building a backlog.
@@ -35,7 +36,7 @@ export class LiveBlendWorker{
   this.warm();if(!this.worker||this.failed||!workerBlendEligible(s))return undefined;
   const signature=JSON.stringify({...s,points:undefined,mixStops:undefined});
   if(!this.job||this.job.id!==s.id||this.job.source!==source||this.job.signature!==signature||this.job.ownershipBase!==ownershipBase){
-   this.cancel(true);const token=++this.token,j:Job={token,id:s.id,ownershipBase,source,signature,ready:false,inFlight:false};this.job=j;
+   this.cancel(true);const token=++this.token,j:Job={token,id:s.id,ownershipBase,source,signature,ready:false,inFlight:false,pointCount:0};this.job=j;
    if(this.surfaceReadback!==nativeDelta){this.surface=canvas(1,1);this.surfaceReadback=nativeDelta;}
    const basePixels=nativeDelta?source.getContext('2d')!.getImageData(0,0,source.width,source.height).data:undefined,deltaPixels=ownershipBase?.pixels.slice();
    if(nativeDelta){const seed=ownershipBase?.seed;this.delta={mask:canvas(source.width,source.height),patch:canvas(source.width,source.height),tiles:new Map(seed?.tiles),revision:0,group:ownershipBase,box:seed?.box};if(seed){this.delta.mask.getContext('2d')!.drawImage(seed.mask,seed.box.x,seed.box.y);this.delta.patch.getContext('2d')!.drawImage(seed.paint,seed.box.x,seed.box.y);}}
@@ -50,7 +51,20 @@ export class LiveBlendWorker{
   const j=this.job;if(!j||j.id!==s.id||this.failed)return undefined;
   const preview=this.surface,done=new Promise<HTMLCanvasElement|undefined>(resolve=>{j.resolve=resolve;});j.queued={stroke:s,final:true};this.flush(j);return{preview,done};
  }
- private flush(j:Job){if(this.job!==j||!j.ready||j.inFlight||!j.queued)return;const q=j.queued;j.queued=undefined;j.inFlight=true;const serial=++this.serial;this.worker!.postMessage({kind:'update',token:j.token,serial,stroke:q.stroke,final:q.final});j.timer=setTimeout(()=>this.fail(),5000);}
+ private flush(j:Job){
+  if(this.job!==j||!j.ready||j.inFlight||!j.queued)return;
+  const q=j.queued;j.queued=undefined;j.inFlight=true;const serial=++this.serial;
+  const points=q.stroke.points??[];
+  const canAppend=j.pointsRef===points&&points.length>=j.pointCount&&(!j.pointCount||samePoint(points[j.pointCount-1],j.lastPoint));
+  const resetPoints=!canAppend;
+  const pointDelta=points.slice(resetPoints?0:j.pointCount);
+  const {points:_points,...metadata}=q.stroke;
+  // Keep the growing point history on the worker. Only the newly captured
+  // samples cross the UI-thread boundary for ordinary pointer updates.
+  this.worker!.postMessage({kind:'update',token:j.token,serial,stroke:{...metadata,points:[]},pointDelta,resetPoints,final:q.final});
+  j.pointsRef=points;j.pointCount=points.length;j.lastPoint=points.length?{...points[points.length-1]}:undefined;
+  j.timer=setTimeout(()=>this.fail(),5000);
+}
  private receive(reply:Reply){
   const j=this.job;if(!j||reply.token!==j.token){reply.bitmap?.close();reply.deltaMask?.close();reply.deltaPaint?.close();return;}
   if(j.timer)clearTimeout(j.timer);j.timer=undefined;j.inFlight=false;

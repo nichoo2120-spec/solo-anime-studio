@@ -1,5 +1,5 @@
 import {nativePixelsDiffer} from './nativePixelDelta';
-import type {Stroke} from '../core/model';
+import type {Point,Stroke} from '../core/model';
 import {compositePaintStroke,strokeRasterBounds} from './paintCompositing';
 import {resetWetSmudgeCaches} from './wetSmudge';
 import {resetGentleBlend,applyGentleBlend} from './gentleBlend';
@@ -12,7 +12,7 @@ import {drawStroke} from './renderer';
 import {resetDryBristleV3MixModel} from './dryBristleV3';
 import type {RasterRegion} from './liveRaster';
 Object.defineProperty(globalThis,'document',{value:{createElement:(tag:string)=>{if(tag!=='canvas')throw Error('Unsupported worker element');return new OffscreenCanvas(1,1);}}});
-type Message={kind:'begin'|'update'|'cancel';token:number;serial:number;width:number;height:number;base?:ImageBitmap;readFrequently?:boolean;nativeDelta?:boolean;basePixels?:Uint8ClampedArray;deltaPixels?:Uint8ClampedArray;deltaRegion?:RasterRegion;seeded?:boolean;compactReplies?:boolean;reuseSurfaces?:boolean;stroke:Stroke;final:boolean};
+type Message={kind:'begin'|'update'|'cancel';token:number;serial:number;width:number;height:number;base?:ImageBitmap;readFrequently?:boolean;nativeDelta?:boolean;basePixels?:Uint8ClampedArray;deltaPixels?:Uint8ClampedArray;deltaRegion?:RasterRegion;seeded?:boolean;compactReplies?:boolean;reuseSurfaces?:boolean;stroke?:Stroke;pointDelta?:Point[];resetPoints?:boolean;final?:boolean};
 const worker=self as unknown as {onmessage:(e:MessageEvent<Message>)=>void;postMessage:(data:unknown,transfer?:Transferable[])=>void};
 let surfaceMode:boolean|undefined;
 let token=0,base:OffscreenCanvas|undefined,target:OffscreenCanvas|undefined,region:RasterRegion|undefined;
@@ -21,6 +21,7 @@ let deltaBase:Uint8ClampedArray|undefined,deltaRead:OffscreenCanvas|undefined,de
 let pigmentPoints=0;
 let compactReplies=false,lastPixels:Uint8ClampedArray|undefined;
 let nativeMask:OffscreenCanvas|undefined;let nativeStrokeRaster:LiveStrokeRaster|undefined;
+let activeStroke:Stroke|undefined,activeStrokeToken=0;
 const union=(a:RasterRegion|undefined,b:RasterRegion)=>{if(!a)return b;const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);return{x,y,width:Math.max(a.x+a.width,b.x+b.width)-x,height:Math.max(a.y+a.height,b.y+b.height)-y};};
 // An unchanged native mask can report Infinity/-Infinity extrema. Never let
 // those poison the accumulated region or become a zero-width bitmap crop.
@@ -35,6 +36,7 @@ worker.onmessage=async({data:j})=>{
  let pendingBitmaps:ImageBitmap[]=[];
  try{
   if(j.kind!=='update'){
+   activeStroke=undefined;activeStrokeToken=0;
    compactReplies=!!j.compactReplies;pigmentPoints=0;
    if(j.basePixels){if(lastPixels?.length===j.basePixels.length)lastPixels.set(j.basePixels);else lastPixels=j.basePixels.slice();}else if(j.kind!=='cancel'||!j.reuseSurfaces)lastPixels=undefined;
    deltaSupport=j.seeded?j.deltaRegion:undefined;deltaRegion=j.deltaRegion;deltaBase=undefined;
@@ -54,7 +56,20 @@ worker.onmessage=async({data:j})=>{
    return;
   }
   if(j.token!==token||!base||!target)return;
-  const s=j.stroke,tc=target.getContext('2d')! as unknown as CanvasRenderingContext2D,bc=base as unknown as HTMLCanvasElement;
+  let s:Stroke;
+  if(j.pointDelta){
+   if(!j.stroke)throw Error('Missing stroke metadata');
+   const {points:_points,...metadata}=j.stroke;
+   const reset=!!j.resetPoints||!activeStroke||activeStrokeToken!==j.token||activeStroke.id!==j.stroke.id;
+   let current:Stroke;
+   if(reset)current={...metadata,points:[]};
+   else{current=activeStroke!;Object.assign(current,metadata);}
+   current.points.push(...j.pointDelta);activeStroke=current;activeStrokeToken=j.token;s=current;
+  }else{
+   if(!j.stroke)return;
+   s=j.stroke;activeStroke=s;activeStrokeToken=j.token;
+  }
+  const tc=target.getContext('2d')! as unknown as CanvasRenderingContext2D,bc=base as unknown as HTMLCanvasElement;
   // v3 sends only the new dab rectangle. Previously the entire accumulated
   // stroke was read/transferred on EVERY pointer update, causing long stalls.
   let r:RasterRegion;
