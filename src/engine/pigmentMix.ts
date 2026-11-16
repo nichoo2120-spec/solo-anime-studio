@@ -1,3 +1,4 @@
+import {applyMaterialMix,resetMaterialMix} from './materialMix';
 import type {Point,Stroke} from '../core/model';
 import type {RasterRegion} from './liveRaster';
 import {pressureResponse} from './strokeGeometry';
@@ -16,8 +17,9 @@ const reusableTargets=new WeakSet<HTMLCanvasElement>();
  * native brush raster alone defines final pressure, texture, edge and taper.
  * Immutable-base worker calls append; canonical replay always starts afresh.
  */
-export function resetPigmentMix(target:HTMLCanvasElement,reuse=false){const g=gestures.get(target);if(reuse){reusableTargets.add(target);if(g){g.id='';g.signature='';g.count=0;g.last=undefined;}}else{reusableTargets.delete(target);if(g)for(const c of [g.field,g.reservoir,g.sample,g.contact,g.diffuse])if(c)c.width=c.height=0;gestures.delete(target);}}
+export function resetPigmentMix(target:HTMLCanvasElement,reuse=false){resetMaterialMix(target,reuse);const g=gestures.get(target);if(reuse){reusableTargets.add(target);if(g){g.id='';g.signature='';g.count=0;g.last=undefined;}}else{reusableTargets.delete(target);if(g)for(const c of [g.field,g.reservoir,g.sample,g.contact,g.diffuse])if(c)c.width=c.height=0;gestures.delete(target);}}
 export function applyPigmentMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElement,s:Stroke,sourceX:number,sourceY:number,dirty?:RasterRegion,base?:HTMLCanvasElement){
+ if(s.nativeMixPickupVersion===3){applyMaterialMix(ctx,mask,s,sourceX,sourceY,dirty,base);return;}
  const amount=clamp(s.nativeMixAmount??.58)*clamp(s.opacity);
  if(!amount||s.flow===0||!s.points.length)return;
  const width=ctx.canvas.width,height=ctx.canvas.height,source=base??ctx.canvas,reuse=reusableTargets.has(ctx.canvas);
