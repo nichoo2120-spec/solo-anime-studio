@@ -6,7 +6,7 @@ import {projectPoint} from './perspectiveWarp';
 
 const clamp=(v:number)=>Math.max(0,Math.min(1,v));
 const canvas=(width:number,height:number)=>{const c=document.createElement('canvas');c.width=width;c.height=height;return c;};
-type Gesture={id:string;signature:string;base:HTMLCanvasElement;field:HTMLCanvasElement;reservoir:HTMLCanvasElement;sample:HTMLCanvasElement;contact:HTMLCanvasElement;count:number;last?:Point;until:number;loaded:boolean};
+type Gesture={id:string;signature:string;base:HTMLCanvasElement;field:HTMLCanvasElement;reservoir:HTMLCanvasElement;sample:HTMLCanvasElement;contact:HTMLCanvasElement;diffuse?:HTMLCanvasElement;count:number;last?:Point;until:number;loaded:boolean};
 const gestures=new WeakMap<HTMLCanvasElement,Gesture>();
 let effect:HTMLCanvasElement|undefined;
 const reusableTargets=new WeakSet<HTMLCanvasElement>();
@@ -16,7 +16,7 @@ const reusableTargets=new WeakSet<HTMLCanvasElement>();
  * native brush raster alone defines final pressure, texture, edge and taper.
  * Immutable-base worker calls append; canonical replay always starts afresh.
  */
-export function resetPigmentMix(target:HTMLCanvasElement,reuse=false){const g=gestures.get(target);if(reuse){reusableTargets.add(target);if(g){g.id='';g.signature='';g.count=0;g.last=undefined;}}else{reusableTargets.delete(target);if(g)for(const c of [g.field,g.reservoir,g.sample,g.contact])c.width=c.height=0;gestures.delete(target);}}
+export function resetPigmentMix(target:HTMLCanvasElement,reuse=false){const g=gestures.get(target);if(reuse){reusableTargets.add(target);if(g){g.id='';g.signature='';g.count=0;g.last=undefined;}}else{reusableTargets.delete(target);if(g)for(const c of [g.field,g.reservoir,g.sample,g.contact,g.diffuse])if(c)c.width=c.height=0;gestures.delete(target);}}
 export function applyPigmentMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElement,s:Stroke,sourceX:number,sourceY:number,dirty?:RasterRegion,base?:HTMLCanvasElement){
  const amount=clamp(s.nativeMixAmount??.58)*clamp(s.opacity);
  if(!amount||s.flow===0||!s.points.length)return;
@@ -27,7 +27,7 @@ export function applyPigmentMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElem
  if(!g||g.id!==s.id||g.signature!==signature||g.base!==source||g.count>s.points.length||g.last&&(!previous||previous.x!==g.last.x||previous.y!==g.last.y||previous.p!==g.last.p)){
   const side=Math.max(8,Math.min(256,Math.ceil(s.size*1.5+8)));
   const recycle=(old:HTMLCanvasElement|undefined,w:number,h:number)=>{if(!reuse||!old)return canvas(w,h);if(old.width!==w)old.width=w;if(old.height!==h)old.height=h;old.getContext('2d')!.reset();return old;};
-  g={id:s.id,signature,base:source,field:recycle(g?.field,width,height),reservoir:recycle(g?.reservoir,side,side),sample:recycle(g?.sample,side,side),contact:recycle(g?.contact,side,side),count:0,until:0,loaded:false};
+  g={id:s.id,signature,base:source,field:recycle(g?.field,width,height),reservoir:recycle(g?.reservoir,side,side),sample:recycle(g?.sample,side,side),contact:recycle(g?.contact,side,side),diffuse:s.nativeMixPickupVersion===2?recycle(g?.diffuse,4,4):undefined,count:0,until:0,loaded:false};
   if(base||reuse)gestures.set(ctx.canvas,g);
  }
  const field=g.field.getContext('2d')!,reservoir=g.reservoir.getContext('2d')!,sample=g.sample.getContext('2d')!,contact=g.contact.getContext('2d')!,side=g.reservoir.width;
@@ -35,7 +35,7 @@ export function applyPigmentMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElem
  feather.addColorStop(0,'white');feather.addColorStop(1,'rgba(255,255,255,0)');
  const map=(p:Point):Point=>s.perspective?{...p,...projectPoint(p,s.perspective)}:s.transform?{...p,x:s.transform[0]*p.x+s.transform[2]*p.y+s.transform[4],y:s.transform[1]*p.x+s.transform[3]*p.y+s.transform[5]}:p;
  const affineScale=s.transform?Math.max(Math.hypot(s.transform[0],s.transform[1]),Math.hypot(s.transform[2],s.transform[3])):1;
- const paintLoad=clamp(s.nativeMixPaintLoad??0),localPickup=s.nativeMixPickupVersion===1;
+ const paintLoad=clamp(s.nativeMixPaintLoad??0),localPickup=s.nativeMixPickupVersion===1||s.nativeMixPickupVersion===2,wetMix=s.nativeMixPickupVersion===2;
  const spacing=Math.max(.6,Math.min(12,s.size*.1));
  const deposit=(raw:Point,travel:number)=>{
   const p=map(raw),pressure=s.pressure?pressureResponse(clamp(raw.p)**s.response,s.pressureCurve):1;
@@ -44,6 +44,12 @@ export function applyPigmentMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElem
   if(s.perspective){const q=projectPoint({...raw,x:raw.x+1},s.perspective),r=projectPoint({...raw,y:raw.y+1},s.perspective);scale=Math.max(Math.hypot(q.x-p.x,q.y-p.y),Math.hypot(r.x-p.x,r.y-p.y));}
   const span=Math.max(3,Math.min(Math.max(width,height)*2,s.size*scale*contactWidth*1.5+8)),x=p.x-span/2,y=p.y-span/2;
   sample.clearRect(0,0,side,side);sample.drawImage(source,x,y,span,span,0,0,side,side);
+  if(wetMix&&g!.diffuse){
+   // Diffuse locally across the nib, rather than dragging an unchanged stripe
+   // image. Tiny GPU resampling keeps wet mixing free of pixel readbacks.
+   const dc=g!.diffuse.getContext('2d')!;dc.clearRect(0,0,4,4);dc.drawImage(g!.sample,0,0,side,side,0,0,4,4);
+   sample.clearRect(0,0,side,side);sample.imageSmoothingEnabled=true;sample.imageSmoothingQuality='high';sample.drawImage(g!.diffuse,0,0,4,4,0,0,side,side);
+  }
   if(!g!.loaded){
    reservoir.drawImage(g!.sample,0,0);g!.loaded=true;
    if(paintLoad){reservoir.save();reservoir.globalCompositeOperation='destination-out';reservoir.globalAlpha=paintLoad;reservoir.fillRect(0,0,side,side);reservoir.globalCompositeOperation='lighter';reservoir.fillStyle=s.color;reservoir.fillRect(0,0,side,side);reservoir.restore();}
@@ -61,7 +67,13 @@ export function applyPigmentMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElem
   }
   contact.clearRect(0,0,side,side);contact.drawImage(g!.reservoir,0,0);
   contact.globalCompositeOperation='destination-in';contact.fillStyle=feather;contact.fillRect(0,0,side,side);contact.globalCompositeOperation='source-over';
-  field.drawImage(g!.contact,x,y,span,span);
+  if(wetMix){
+   // Interpolate coverage instead of accumulating the same translucent wash
+   // repeatedly at overlapping contacts.
+   sample.clearRect(0,0,side,side);sample.fillStyle=feather;sample.fillRect(0,0,side,side);
+   field.save();field.globalCompositeOperation='destination-out';field.drawImage(g!.sample,x,y,span,span);
+   field.globalCompositeOperation='lighter';field.drawImage(g!.contact,x,y,span,span);field.restore();
+  }else field.drawImage(g!.contact,x,y,span,span);
  };
  for(let i=g.count;i<s.points.length;i++){
   const b=s.points[i],a=i?s.points[i-1]:b;
@@ -84,5 +96,6 @@ export function applyPigmentMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElem
  if(base){ctx.clearRect(x,y,w,h);ctx.drawImage(base,x,y,w,h,x,y,w,h);}
  // Source-over retains opaque canvas coverage and can carry sampled pigment
  // onto empty paper. The previous source-atop path categorically prevented it.
+ if(wetMix){ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.globalCompositeOperation='destination-out';ctx.globalAlpha=amount;ctx.drawImage(mask,sourceX,sourceY);ctx.globalCompositeOperation='lighter';}
  ctx.globalAlpha=amount;ctx.drawImage(effect,x,y);ctx.restore();
 }
