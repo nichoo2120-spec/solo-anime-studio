@@ -65,7 +65,7 @@ worker.onmessage=async({data:j})=>{
   const currentGeometry=()=>geometry??=j.final?finalGeometry(s):strokeGeometry(s,'live');
   const fullBounds=()=>bounds??=strokeRasterBounds(s,target!.width,target!.height,currentGeometry());
   const ownershipBounds=()=>deltaRegion&&deltaRegion.width>0&&deltaRegion.height>0?union(deltaRegion,fullBounds()):fullBounds();
-  if(!!s.nativeMixVersion||s.paintTipVersion===2||s.dryBristleVersion===3){
+  if(!!s.nativeMixVersion||(s.paintTipVersion===2||s.dryBristleVersion===3)&&s.brushTip!=='color-blender'){
    if(!nativeMask||nativeMask.width!==target.width||nativeMask.height!==target.height){nativeMask=new OffscreenCanvas(target.width,target.height);nativeStrokeRaster??=new LiveStrokeRaster();}
    // Rebuild the canonical final mask, but retain carried pigment: contacts
    // depend only on the unchanged raw path, not the provisional brush geometry.
