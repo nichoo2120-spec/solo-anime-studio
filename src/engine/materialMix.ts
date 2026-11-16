@@ -53,7 +53,7 @@ export function applyMaterialMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasEle
    // Keep each hair's pickup local along the stroke path. Sampling the whole
    // nib length here averages several painted marks into a soft smear and
    // makes a dry bristle act wetter than its actual textured stamp.
-   pick.save();pick.translate(32,32);pick.rotate(-angle);pick.scale(64/span,64/(span*.12));pick.drawImage(source,-p.x,-p.y);pick.restore();incoming.imageSmoothingEnabled=true;incoming.drawImage(g!.pick,0,0,64,64,0,0,N,1);
+   pick.save();pick.translate(32,32);pick.rotate(-angle);pick.scale(64/span,64/(span*.03));pick.drawImage(source,-p.x,-p.y);pick.restore();incoming.imageSmoothingEnabled=true;incoming.drawImage(g!.pick,0,0,64,64,0,0,N,1);
   }else if(water){
    const spread=(.2+wet*clamp(s.wetDiffusion??.65)*1.35)*(1-dryness*.75),drift=wet*(1-dryness)*.3,dx=Math.sin(phase)*drift,dy=Math.cos(phase*.73)*drift,extra=span*2/N;
    pick.imageSmoothingQuality='high';pick.drawImage(source,p.x-span/2-extra,p.y-span/2-extra,span+extra*2,span+extra*2,0,0,N+4,H+4);
