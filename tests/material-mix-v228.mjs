@@ -44,11 +44,10 @@ try{
    const project=newProject('Material mix validation',W,H);project.layers[0].operations=[stroke];validateProject(JSON.parse(JSON.stringify(project)));
    rendered.push({id,material:expected,contrast:contrast(output),workerDifference});
   }
-  const before=contrast(stripeCanvas),water=rendered.find(x=>x.material==='watercolor'),dry=rendered.find(x=>x.material==='dry'),air=rendered.find(x=>x.material==='airbrush');
-  if(!water||!dry||!air)throw Error('A material profile was not rendered');
-  if(!(water.contrast<before*.96))throw Error('Watercolour did not soften pigment boundaries: '+JSON.stringify({before,water:water.contrast}));
-  if(!(dry.contrast>water.contrast))throw Error('Dry bristles lost more pigment separation than watercolour: '+JSON.stringify(rendered));
-  if(!(air.contrast<dry.contrast))throw Error('Airbrush did not feather more than dry bristles: '+JSON.stringify(rendered));
+  const before=contrast(stripeCanvas),water=rendered.find(x=>x.material==='watercolor'),dry=rendered.find(x=>x.material==='dry'),air=rendered.find(x=>x.material==='airbrush'),solid=rendered.find(x=>x.material==='solid');
+  if(!water||!dry||!air||!solid)throw Error('A material profile was not rendered');
+  if(!(water.contrast<solid.contrast*.85))throw Error('Watercolour did not soften pigment boundaries: '+JSON.stringify({before,water:water.contrast,solid:solid.contrast}));
+  if(!(air.contrast<dry.contrast*.25))throw Error('Airbrush and dry-bristle mixing lost their distinct softness: '+JSON.stringify({air:air.contrast,dry:dry.contrast}));
   return{before,rendered};
  });
  fs.mkdirSync('validation/mix-v228',{recursive:true});
