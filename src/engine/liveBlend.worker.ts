@@ -32,6 +32,26 @@ function finiteRegion(value:RasterRegion,width:number,height:number,fallback:()=
  const x=Math.max(0,Math.min(width-1,Math.floor(r.x))),y=Math.max(0,Math.min(height-1,Math.floor(r.y)));
  return{x,y,width:Math.max(1,Math.min(width,Math.ceil(r.x+r.width))-x),height:Math.max(1,Math.min(height,Math.ceil(r.y+r.height))-y)};
 }
+// Long Mix gestures often contain many subpixel tablet samples. They add
+// almost no visible shape detail, but rebuilding the full live brush path for
+// every worker reply makes cost grow throughout the gesture. Keep the exact
+// captured points for pigment pickup and the final render; simplify only the
+// provisional brush-mask geometry, retaining corners and pressure/velocity changes.
+function mixPreviewGeometryStroke(stroke:Stroke):Stroke{
+ const source=stroke.points;if(source.length<500)return stroke;
+ const spacing=Math.max(1.15,Math.min(2.5,(stroke.size||32)*.012));
+ const kept:Point[]=[source[0]];let last=source[0];
+ for(let i=1;i<source.length-1;i++){
+  const p=source[i],next=source[i+1],distance=Math.hypot(p.x-last.x,p.y-last.y);
+  const incoming=Math.hypot(p.x-source[i-1].x,p.y-source[i-1].y),outgoing=Math.hypot(next.x-p.x,next.y-p.y);
+  const dot=incoming>1e-4&&outgoing>1e-4?((p.x-source[i-1].x)*(next.x-p.x)+(p.y-source[i-1].y)*(next.y-p.y))/(incoming*outgoing):1;
+  const pressureChange=Math.abs(p.p-last.p)>.035,velocityChange=Math.abs((p.v??1)-(last.v??1))>.12;
+  if(distance>=spacing||pressureChange||velocityChange||dot<.82){kept.push(p);last=p;}
+ }
+ const end=source[source.length-1];if(last!==end)kept.push(end);
+ return kept.length===source.length?stroke:{...stroke,points:kept};
+}
+
 worker.onmessage=async({data:j})=>{
  let pendingBitmaps:ImageBitmap[]=[];
  try{
@@ -77,7 +97,7 @@ worker.onmessage=async({data:j})=>{
   // only if the incremental raster has no valid changed region.
   let bounds:RasterRegion|undefined;
   let geometry:ReturnType<typeof strokeGeometry>|undefined;
-  const currentGeometry=()=>geometry??=j.final?finalGeometry(s):strokeGeometry(s,'live');
+  const currentGeometry=()=>geometry??=j.final?finalGeometry(s):strokeGeometry(s.nativeMixVersion?mixPreviewGeometryStroke(s):s,'live');
   const fullBounds=()=>bounds??=strokeRasterBounds(s,target!.width,target!.height,currentGeometry());
   const ownershipBounds=()=>deltaRegion&&deltaRegion.width>0&&deltaRegion.height>0?union(deltaRegion,fullBounds()):fullBounds();
   if(!!s.nativeMixVersion||(s.paintTipVersion===2||s.dryBristleVersion===3)&&s.brushTip!=='color-blender'){
