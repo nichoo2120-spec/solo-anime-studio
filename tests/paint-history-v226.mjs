@@ -18,7 +18,7 @@ try{const page=await browser.newPage({viewport:{width:1600,height:1000},deviceSc
   e.renderer.prefixSnapshot(l,active,50);if(e.renderer.get(l,active)!==native||e.renderer.cacheStats().replayedOperations!==replays)throw Error('Preview prefix rewound native cache');
   InkDisplay.prototype.primeBase=function(...args){mixWarmups++;return originalPrime.apply(this,args);};const box=c.getBoundingClientRect(),counts=[],pictures=[e.inkDisplay.cachedSurface(e.store.getSnapshot().activeLayerId).getContext('2d').getImageData(0,0,c.width,c.height).data];
   for(let n=0;n<3;n++){
-   const preset=stockPresets.find(s=>s.id===['dry-ink-bristle','technical','water-wet'][n]);e.setInput('brush',{...preset.settings,size:70,opacity:1,nativeMixEnabled:false,mixAmount:.8},preset);const beforeCount=e.renderer.cacheStats().replayedOperations;
+   const preset=stockPresets.find(s=>s.id===['dry-ink-bristle','color-solid','water-wet'][n]);e.setInput('brush',{...preset.settings,size:70,opacity:1,nativeMixEnabled:false,mixAmount:.8},preset);const beforeCount=e.renderer.cacheStats().replayedOperations;
    for(let i=0;i<=24;i++){c.dispatchEvent(new PointerEvent(i===0?'pointerdown':i===24?'pointerup':'pointermove',{pointerId:51,isPrimary:true,pointerType:'pen',button:0,buttons:i===24?0:1,pressure:.8,clientX:box.left+260+i*12,clientY:box.top+280+n*20+Math.sin(i*.2)*25}));if(i%2===0)await new Promise(requestAnimationFrame);}
    await e.renderer.whenSettled();await new Promise(r=>setTimeout(r,100));counts.push(e.renderer.cacheStats().replayedOperations-beforeCount);pictures.push(e.inkDisplay.cachedSurface(e.store.getSnapshot().activeLayerId).getContext('2d').getImageData(0,0,c.width,c.height).data);
 
