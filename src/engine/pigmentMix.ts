@@ -6,7 +6,7 @@ import {projectPoint} from './perspectiveWarp';
 
 const clamp=(v:number)=>Math.max(0,Math.min(1,v));
 const canvas=(width:number,height:number)=>{const c=document.createElement('canvas');c.width=width;c.height=height;return c;};
-type Gesture={id:string;signature:string;base:HTMLCanvasElement;field:HTMLCanvasElement;reservoir:HTMLCanvasElement;sample:HTMLCanvasElement;contact:HTMLCanvasElement;diffuse?:HTMLCanvasElement;count:number;last?:Point;until:number;loaded:boolean};
+type Gesture={id:string;signature:string;base:HTMLCanvasElement;field:HTMLCanvasElement;reservoir:HTMLCanvasElement;sample:HTMLCanvasElement;contact:HTMLCanvasElement;diffuse?:HTMLCanvasElement;count:number;last?:Point;until:number;step?:number;loaded:boolean};
 const gestures=new WeakMap<HTMLCanvasElement,Gesture>();
 let effect:HTMLCanvasElement|undefined;
 const reusableTargets=new WeakSet<HTMLCanvasElement>();
@@ -37,6 +37,12 @@ export function applyPigmentMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElem
  const affineScale=s.transform?Math.max(Math.hypot(s.transform[0],s.transform[1]),Math.hypot(s.transform[2],s.transform[3])):1;
  const paintLoad=clamp(s.nativeMixPaintLoad??0),localPickup=s.nativeMixPickupVersion===1||s.nativeMixPickupVersion===2,wetMix=s.nativeMixPickupVersion===2;
  const spacing=Math.max(.6,Math.min(12,s.size*.1));
+ const contactStep=(p:Point)=>{
+  if(!wetMix)return spacing;
+  const pressure=s.pressure?pressureResponse(clamp(p.p)**s.response,s.pressureCurve):1;
+  const nib=s.pressure&&s.pressureWidth!==false?widthResponse(pressure,s):1;
+  return Math.max(.6,Math.min(48,s.size*nib*.25));
+ };
  const deposit=(raw:Point,travel:number)=>{
   const p=map(raw),pressure=s.pressure?pressureResponse(clamp(raw.p)**s.response,s.pressureCurve):1;
   const contactWidth=s.pressure&&s.pressureWidth!==false?widthResponse(pressure,s):1;
@@ -77,11 +83,11 @@ export function applyPigmentMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElem
  };
  for(let i=g.count;i<s.points.length;i++){
   const b=s.points[i],a=i?s.points[i-1]:b;
-  if(!i){deposit(b,0);g.until=spacing;}
+  if(!i){deposit(b,0);g.until=g.step=contactStep(b);}
   else{
    const length=Math.hypot(b.x-a.x,b.y-a.y);
    let distance=g.until;
-   while(length>0&&distance<=length+1e-8){const t=Math.min(1,distance/length);deposit({...b,x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,p:a.p+(b.p-a.p)*t},spacing);distance+=spacing;}
+   while(length>0&&distance<=length+1e-8){const t=Math.min(1,distance/length),p={...b,x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,p:a.p+(b.p-a.p)*t};deposit(p,g.step??spacing);g.step=contactStep(p);distance+=g.step;}
    g.until=distance-length;
   }
  }
