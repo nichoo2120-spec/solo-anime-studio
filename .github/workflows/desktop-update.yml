@@ -72,6 +72,7 @@ jobs:
       - run: node tests/paint-cache-v226.mjs
       - run: node tests/paint-history-v226.mjs
       - run: node tests/watercolor-mix-v227.mjs
+      - run: node tests/material-mix-v228.mjs
       - uses: actions/checkout@v4
         with:
           ref: v0.5.200
@@ -134,6 +135,7 @@ jobs:
             validation/mix-v225/**
             validation/mix-v226/**
             validation/mix-v227/**
+            validation/mix-v228/**
 
   publish:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
