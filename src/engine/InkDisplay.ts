@@ -211,7 +211,7 @@ export class InkDisplay{
   }catch{fail();return true;}
  }
  private rememberMixView(previous:Layer,layer:Layer,p:Project,renderer:LayerRenderer,m:DOMMatrix,before:HTMLCanvasElement,after:HTMLCanvasElement){
-  const op=layer.operations.at(-1);if(!op||op.kind!=='stroke'||!op.nativeMixVersion||this.mixViewHistory.has(op))return;
+  const op=layer.operations.at(-1);if(!op||op.kind!=='stroke'||!op.nativeMixVersion&&op.paintTipVersion!==2&&op.dryBristleVersion!==3||this.mixViewHistory.has(op))return;
   const b=strokeRasterBounds(op,p.width,p.height),box=this.screenBounds({...op,transform:undefined,perspective:undefined},{x:b.x,y:b.y,w:b.width,h:b.height},m,before.width,before.height);if(!box)return;
   const x=Math.max(0,box.x-4),y=Math.max(0,box.y-4),right=Math.min(before.width,box.x+box.w+4),bottom=Math.min(before.height,box.y+box.h+4),rect={x,y,width:right-x,height:bottom-y},bytes=rect.width*rect.height*8;if(bytes>this.mixViewBudget)return;
   while(this.mixViewHistory.size&&(this.mixViewBytes+bytes>this.mixViewBudget||this.mixViewHistory.size>=160)){const oldest=this.mixViewHistory.keys().next().value!,entry=this.mixViewHistory.get(oldest)!;this.mixViewHistory.delete(oldest);this.mixViewBytes-=entry.bytes;entry.patch.clear();}
@@ -288,8 +288,8 @@ export class InkDisplay{
  /** Apply a live native paint result only where it changes the sharp layer.
   * Restoring its dirty footprint avoids a whole-layer sharp/blur switch. */
  private clearNativePreview(keepCuts=false){const n=this.nativePreview;if(n&&!keepCuts)for(const c of [n.cutMask,n.cutPatch])c.width=c.height=0;this.nativePreview=undefined;this.nativeFallback=undefined;}
- paintNativePreview(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer,live:Stroke,result:HTMLCanvasElement,geometry?:Geometry,delta?:BlendDelta,present=true){
-  if(!delta)return this.paintNativeFallback(ctx,layer,p,renderer,live,result,geometry);
+ paintNativePreview(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer,live:Stroke,result:HTMLCanvasElement,geometry?:Geometry,delta?:BlendDelta,present=true,paintMask?:HTMLCanvasElement){
+  if(!delta)return this.paintNativeFallback(ctx,layer,p,renderer,live,result,geometry,paintMask);
   if(clean(live)||!layer.operations.some(op=>op.kind==='stroke'&&clean(op)))return false;
   let end=0;for(let i=layer.operations.length-1;i>=0;i--)if(layer.operations[i].kind!=='stroke'||!clean(layer.operations[i] as Stroke)){end=i+1;break;}
   const m=ctx.getTransform(),w=ctx.canvas.width,h=ctx.canvas.height;this.paintRegion(ctx,layer,p,end,undefined,undefined,renderer,false);
@@ -334,7 +334,7 @@ export class InkDisplay{
   }
   this.liveKey=undefined;if(present){ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.drawImage(preview,0,0);ctx.restore();}return true;
  }
- private paintNativeFallback(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer,live:Stroke,result:HTMLCanvasElement,geometry?:Geometry){
+ private paintNativeFallback(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer,live:Stroke,result:HTMLCanvasElement,geometry?:Geometry,paintMask?:HTMLCanvasElement){
   if(clean(live)||!layer.operations.some(op=>op.kind==='stroke'&&clean(op)))return false;
   let end=0;for(let i=layer.operations.length-1;i>=0;i--)if(layer.operations[i].kind!=='stroke'||!clean(layer.operations[i] as Stroke)){end=i+1;break;}
   const m=ctx.getTransform(),w=ctx.canvas.width,h=ctx.canvas.height;this.paintRegion(ctx,layer,p,end,undefined,undefined,renderer,false);
@@ -342,7 +342,9 @@ export class InkDisplay{
   let restore=old&&old.base===this.key&&old.stroke===live.id?rect:undefined;
   if(restore&&old?.rect){const x=Math.min(restore.x,old.rect.x),y=Math.min(restore.y,old.rect.y);restore={x,y,w:Math.max(restore.x+restore.w,old.rect.x+old.rect.w)-x,h:Math.max(restore.y+restore.h,old.rect.y+old.rect.h)-y};}
   if(restore){pc.clearRect(restore.x,restore.y,restore.w,restore.h);pc.drawImage(this.surface!,restore.x,restore.y,restore.w,restore.h,restore.x,restore.y,restore.w,restore.h);}else{pc.clearRect(0,0,w,h);pc.drawImage(this.surface!,0,0);}
-  if(b.width&&b.height){const baseline=renderer.getDisplay(layer,p);if(baseline!==result){const before=baseline.getContext('2d')!.getImageData(b.x,b.y,b.width,b.height).data,after=result.getContext('2d')!.getImageData(b.x,b.y,b.width,b.height).data;this.nativePatch(pc,before,after,b.x,b.y,b.width,b.height,m);}}
+  const direct=paintMask&&!live.nativeMixVersion&&live.brushTip!=='color-blender'&&(live.tool==='eraser'||live.watercolorEngine!==1||!live.watercolorMode||live.watercolorMode==='glaze');
+  if(direct){pc.save();pc.setTransform(m);pc.globalAlpha=live.opacity;pc.globalCompositeOperation=live.tool==='eraser'?'destination-out':'source-over';pc.drawImage(paintMask,0,0);pc.restore();}
+  else if(b.width&&b.height){const baseline=renderer.getDisplay(layer,p);if(baseline!==result){const before=baseline.getContext('2d')!.getImageData(b.x,b.y,b.width,b.height).data,after=result.getContext('2d')!.getImageData(b.x,b.y,b.width,b.height).data;this.nativePatch(pc,before,after,b.x,b.y,b.width,b.height,m);}}
   this.nativeFallback={base:this.key!,stroke:live.id,rect};this.liveKey=undefined;ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.drawImage(preview,0,0);ctx.restore();return true;
  }
  baseReady(layer:Layer,p:Project,matrix:number[],width:number,height:number,renderer:LayerRenderer){const key=this.layers.get(layer.id)?.key;return !!key&&key.operations===layer.operations&&key.frameWidth===p.width&&key.frameHeight===p.height&&key.width===width&&key.height===height&&key.renderer===renderer&&key.rendererRevision===(key.firstClean?renderer.displayRevision:0)&&matrix.every((v,i)=>v===key.matrix[i]);}

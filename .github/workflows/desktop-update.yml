@@ -69,6 +69,8 @@ jobs:
       - run: node tests/mix-buffers-v224.mjs
       - run: node tests/mix-local-pickup-v225.mjs
       - run: node tests/mix-history-v225.mjs
+      - run: node tests/paint-cache-v226.mjs
+      - run: node tests/paint-history-v226.mjs
       - uses: actions/checkout@v4
         with:
           ref: v0.5.200
@@ -129,6 +131,7 @@ jobs:
             validation/mix-v223/**
             validation/mix-v224/**
             validation/mix-v225/**
+            validation/mix-v226/**
 
   publish:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

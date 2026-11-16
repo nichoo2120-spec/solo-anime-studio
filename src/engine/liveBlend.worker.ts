@@ -18,6 +18,7 @@ let surfaceMode:boolean|undefined;
 let token=0,base:OffscreenCanvas|undefined,target:OffscreenCanvas|undefined,region:RasterRegion|undefined;
 let deltaSupport:RasterRegion|undefined,deltaRegion:RasterRegion|undefined;
 let deltaBase:Uint8ClampedArray|undefined,deltaRead:OffscreenCanvas|undefined,deltaMask:OffscreenCanvas|undefined,deltaPaint:OffscreenCanvas|undefined;
+let pigmentPoints=0;
 let compactReplies=false,lastPixels:Uint8ClampedArray|undefined;
 let nativeMask:OffscreenCanvas|undefined;let nativeStrokeRaster:LiveStrokeRaster|undefined;
 const union=(a:RasterRegion|undefined,b:RasterRegion)=>{if(!a)return b;const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);return{x,y,width:Math.max(a.x+a.width,b.x+b.width)-x,height:Math.max(a.y+a.height,b.y+b.height)-y};};
@@ -34,7 +35,7 @@ worker.onmessage=async({data:j})=>{
  let pendingBitmaps:ImageBitmap[]=[];
  try{
   if(j.kind!=='update'){
-   compactReplies=!!j.compactReplies;
+   compactReplies=!!j.compactReplies;pigmentPoints=0;
    if(j.basePixels){if(lastPixels?.length===j.basePixels.length)lastPixels.set(j.basePixels);else lastPixels=j.basePixels.slice();}else if(j.kind!=='cancel'||!j.reuseSurfaces)lastPixels=undefined;
    deltaSupport=j.seeded?j.deltaRegion:undefined;deltaRegion=j.deltaRegion;deltaBase=undefined;
    for(const c of [deltaRead,deltaMask,deltaPaint])if(c)c.width=c.height=0;deltaRead=deltaMask=deltaPaint=undefined;
@@ -64,24 +65,34 @@ worker.onmessage=async({data:j})=>{
   const currentGeometry=()=>geometry??=j.final?finalGeometry(s):strokeGeometry(s,'live');
   const fullBounds=()=>bounds??=strokeRasterBounds(s,target!.width,target!.height,currentGeometry());
   const ownershipBounds=()=>deltaRegion&&deltaRegion.width>0&&deltaRegion.height>0?union(deltaRegion,fullBounds()):fullBounds();
-  if(!!s.nativeMixVersion){
+  if(!!s.nativeMixVersion||(s.paintTipVersion===2||s.dryBristleVersion===3)&&s.brushTip!=='color-blender'){
    if(!nativeMask||nativeMask.width!==target.width||nativeMask.height!==target.height){nativeMask=new OffscreenCanvas(target.width,target.height);nativeStrokeRaster??=new LiveStrokeRaster();}
    // Rebuild the canonical final mask, but retain carried pigment: contacts
    // depend only on the unchanged raw path, not the provisional brush geometry.
    // Restore only the old/final footprint before applying that final mask.
    if(j.final){nativeStrokeRaster!.reset();nativeMask.getContext('2d')!.reset();const restore=finiteRegion(union(region,fullBounds()),target.width,target.height,fullBounds);tc.clearRect(restore.x,restore.y,restore.width,restore.height);tc.drawImage(bc,restore.x,restore.y,restore.width,restore.height,restore.x,restore.y,restore.width,restore.height);}
    const maskContext=nativeMask.getContext('2d')! as unknown as CanvasRenderingContext2D;
-   if(j.final&&s.nativeMixVersion===3){resetDryBristleV3MixModel(s);drawStroke(maskContext,s,'final',currentGeometry());}
+   if(j.final){resetDryBristleV3MixModel(s);drawStroke(maskContext,s,'final',currentGeometry());}
    else nativeStrokeRaster!.paint(maskContext,s,currentGeometry());
    let updated=finiteRegion(j.final?fullBounds():nativeStrokeRaster!.lastRegion??fullBounds(),target.width,target.height,fullBounds);
-   if(s.nativeMixVersion===3&&!j.final){const halo=Math.ceil(compactReplies&&!s.transform&&!s.perspective?s.size*.75+12:s.size*1.5+12);updated=finiteRegion({x:updated.x-halo,y:updated.y-halo,width:updated.width+halo*2,height:updated.height+halo*2},target.width,target.height,fullBounds);}
+   if(s.nativeMixVersion===3&&!j.final){
+    if(compactReplies&&!s.transform&&!s.perspective){
+     // Only new pigment contacts can change the carried-colour field. Include
+     // their footprint, rather than adding a full nib halo to the entire tail.
+     const halo=Math.ceil(s.size*1.5+12);let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
+     for(let i=Math.max(0,pigmentPoints-1);i<s.points.length;i++){const p=s.points[i];left=Math.min(left,p.x-halo);top=Math.min(top,p.y-halo);right=Math.max(right,p.x+halo);bottom=Math.max(bottom,p.y+halo);}
+     if(Number.isFinite(left))updated=finiteRegion(union(updated,{x:left,y:top,width:right-left,height:bottom-top}),target.width,target.height,fullBounds);
+    }else{const halo=Math.ceil(s.size*1.5+12);updated=finiteRegion({x:updated.x-halo,y:updated.y-halo,width:updated.width+halo*2,height:updated.height+halo*2},target.width,target.height,fullBounds);}
+    pigmentPoints=s.points.length;
+   }
    // Repaint/transfer only the changed tail while the pointer moves. The
    // accumulated union is bookkeeping for the FINAL correction only: the
    // final fitted stroke can shrink outside the last provisional footprint.
    region=union(region,updated);
    r=j.final?region:updated;
    if(r.width<1||r.height<1)r={x:0,y:0,width:1,height:1};
-   applyNativeBrushMix(tc,nativeMask as unknown as HTMLCanvasElement,s,0,0,j.final&&s.nativeMixVersion===3?fullBounds():r,bc);
+   if(s.nativeMixVersion)applyNativeBrushMix(tc,nativeMask as unknown as HTMLCanvasElement,s,0,0,j.final&&s.nativeMixVersion===3?fullBounds():r,bc);
+   else{tc.clearRect(r.x,r.y,r.width,r.height);tc.drawImage(bc,r.x,r.y,r.width,r.height,r.x,r.y,r.width,r.height);compositePaintStroke(tc,nativeMask as unknown as HTMLCanvasElement,s,0,0,r,bc);}
   }else if(s.smudgeVersion===3){r=applyGentleBlend(tc,bc,s,0,0,{x:0,y:0,width:target.width,height:target.height},bc)??{x:0,y:0,width:1,height:1};}
   else{
    r=region=union(region,s.points.length?strokeRasterBounds(s,target.width,target.height):{x:0,y:0,width:target.width,height:target.height});

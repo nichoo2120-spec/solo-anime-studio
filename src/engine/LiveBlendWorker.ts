@@ -1,7 +1,7 @@
 import type {Stroke} from '../core/model';
 import type {RasterRegion} from './liveRaster';
 const canvas=(width:number,height:number)=>{const c=document.createElement('canvas');c.width=width;c.height=height;return c;};
-export const workerBlendEligible=(s:Pick<Stroke,'tool'|'coloringEngine'|'coloringAppearanceVersion'|'smudgeVersion'|'brushTip'|'nativeMixVersion'>)=>s.tool!=='eraser'&&(!!s.nativeMixVersion||(s.coloringEngine===1&&s.brushTip==='color-blender'&&(s.coloringAppearanceVersion===3||s.smudgeVersion===2)));
+export const workerBlendEligible=(s:Pick<Stroke,'tool'|'coloringEngine'|'coloringAppearanceVersion'|'smudgeVersion'|'brushTip'|'nativeMixVersion'|'paintTipVersion'|'dryBristleVersion'>)=>s.tool!=='eraser'&&((s.paintTipVersion===2||s.dryBristleVersion===3)&&s.brushTip!=='color-blender'||!!s.nativeMixVersion||(s.coloringEngine===1&&s.brushTip==='color-blender'&&(s.coloringAppearanceVersion===3||s.smudgeVersion===2)));
 export type NativeMixSeed={mask:HTMLCanvasElement;paint:HTMLCanvasElement;box:{x:number;y:number;w:number;h:number};tiles:Map<string,{x:number;y:number;w:number;h:number}>};
 export type BlendBaseline={pixels:Uint8ClampedArray;region:RasterRegion;seed?:NativeMixSeed};
 export type BlendDelta={mask:HTMLCanvasElement;patch:HTMLCanvasElement;tiles:Map<string,{x:number;y:number;w:number;h:number}>;revision:number;final?:boolean;group?:BlendBaseline;support?:RasterRegion;dirty?:RasterRegion;box?:{x:number;y:number;w:number;h:number}};

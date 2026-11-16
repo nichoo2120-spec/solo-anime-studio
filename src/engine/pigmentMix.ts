@@ -22,13 +22,13 @@ export function applyPigmentMix(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElem
  if(!amount||s.flow===0||!s.points.length)return;
  const width=ctx.canvas.width,height=ctx.canvas.height,source=base??ctx.canvas,reuse=reusableTargets.has(ctx.canvas);
  const signature=JSON.stringify({...s,points:undefined,mixStops:undefined});
- let g=base?gestures.get(ctx.canvas):undefined;
+ let g=base||reuse?gestures.get(ctx.canvas):undefined;
  const previous=g&&s.points[g.count-1];
  if(!g||g.id!==s.id||g.signature!==signature||g.base!==source||g.count>s.points.length||g.last&&(!previous||previous.x!==g.last.x||previous.y!==g.last.y||previous.p!==g.last.p)){
   const side=Math.max(8,Math.min(256,Math.ceil(s.size*1.5+8)));
   const recycle=(old:HTMLCanvasElement|undefined,w:number,h:number)=>{if(!reuse||!old)return canvas(w,h);if(old.width!==w)old.width=w;if(old.height!==h)old.height=h;old.getContext('2d')!.reset();return old;};
   g={id:s.id,signature,base:source,field:recycle(g?.field,width,height),reservoir:recycle(g?.reservoir,side,side),sample:recycle(g?.sample,side,side),contact:recycle(g?.contact,side,side),count:0,until:0,loaded:false};
-  if(base)gestures.set(ctx.canvas,g);
+  if(base||reuse)gestures.set(ctx.canvas,g);
  }
  const field=g.field.getContext('2d')!,reservoir=g.reservoir.getContext('2d')!,sample=g.sample.getContext('2d')!,contact=g.contact.getContext('2d')!,side=g.reservoir.width;
  const feather=contact.createRadialGradient(side/2,side/2,side*.35,side/2,side/2,side*.5);
