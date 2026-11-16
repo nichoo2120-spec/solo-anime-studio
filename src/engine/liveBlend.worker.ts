@@ -32,14 +32,12 @@ function finiteRegion(value:RasterRegion,width:number,height:number,fallback:()=
  const x=Math.max(0,Math.min(width-1,Math.floor(r.x))),y=Math.max(0,Math.min(height-1,Math.floor(r.y)));
  return{x,y,width:Math.max(1,Math.min(width,Math.ceil(r.x+r.width))-x),height:Math.max(1,Math.min(height,Math.ceil(r.y+r.height))-y)};
 }
-// Long Mix gestures often contain many subpixel tablet samples. They add
-// almost no visible shape detail, but rebuilding the full live brush path for
-// every worker reply makes cost grow throughout the gesture. Keep the exact
-// captured points for pigment pickup and the final render; simplify only the
-// provisional brush-mask geometry, retaining corners and pressure/velocity changes.
+// Long Mix gestures can contain thousands of tiny tablet samples. The pigment
+// pickup and saved stroke keep every captured point; only the provisional brush
+// mask uses a size-aware spatial reduction so its geometry stays responsive.
 function mixPreviewGeometryStroke(stroke:Stroke):Stroke{
- const source=stroke.points;if(source.length<500)return stroke;
- const spacing=Math.max(1.15,Math.min(2.5,(stroke.size||32)*.012));
+ const source=stroke.points;if(source.length<96)return stroke;
+ const spacing=Math.max(2,Math.min(6,(stroke.size||32)*.035));
  const kept:Point[]=[source[0]];let last=source[0];
  for(let i=1;i<source.length-1;i++){
   const p=source[i],next=source[i+1],distance=Math.hypot(p.x-last.x,p.y-last.y);
