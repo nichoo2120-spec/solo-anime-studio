@@ -1,2 +1,2 @@
 declare const __STUDIO_SOURCE_DIGEST__:string;
-export const buildInfo={version:'0.5.232',correction:232,renderer:49,sourceDigest:typeof __STUDIO_SOURCE_DIGEST__==='string'?__STUDIO_SOURCE_DIGEST__:'test',mode:import.meta.env.DEV?'development':'production'};
+export const buildInfo={version:'0.5.233',correction:233,renderer:49,sourceDigest:typeof __STUDIO_SOURCE_DIGEST__==='string'?__STUDIO_SOURCE_DIGEST__:'test',mode:import.meta.env.DEV?'development':'production'};
