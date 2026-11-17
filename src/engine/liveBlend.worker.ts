@@ -37,7 +37,7 @@ function finiteRegion(value:RasterRegion,width:number,height:number,fallback:()=
 // mask uses a size-aware spatial reduction so its geometry stays responsive.
 function mixPreviewGeometryStroke(stroke:Stroke):Stroke{
  const source=stroke.points;if(source.length<96)return stroke;
- const spacing=Math.max(2,Math.min(6,(stroke.size||32)*.035));
+ const spacing=Math.max(3,Math.min(10,(stroke.size||32)*.06));
  const kept:Point[]=[source[0]];let last=source[0];
  for(let i=1;i<source.length-1;i++){
   const p=source[i],next=source[i+1],distance=Math.hypot(p.x-last.x,p.y-last.y);
