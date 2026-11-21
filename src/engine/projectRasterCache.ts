@@ -25,8 +25,14 @@ export async function cacheProjectRasters(p:Project,renderer:LayerRenderer){
  let db:IDBDatabase|undefined;const copies:{layer:Layer;canvas:HTMLCanvasElement}[]=[];
  try{
   if(p.width*p.height*4*visible(p).length>64*1024*1024)return;
-  // Copy synchronously before hashing/encoding: later strokes may mutate the renderer.
-  for(const layer of visible(p)){const source=renderer.cachedLayer(layer,p);if(!source)return;const canvas=document.createElement('canvas');canvas.width=p.width;canvas.height=p.height;canvas.getContext('2d')!.drawImage(source,0,0);copies.push({layer,canvas});}
+  // Let the project become interactive before copying full-resolution layers.
+  await new Promise<void>(resolve=>setTimeout(resolve,0));
+  for(const layer of visible(p)){
+   const source=renderer.cachedLayer(layer,p);if(!source)return;
+   const canvas=document.createElement('canvas');canvas.width=p.width;canvas.height=p.height;canvas.getContext('2d')!.drawImage(source,0,0);copies.push({layer,canvas});
+   // Yield between layers and abandon a stale snapshot if drawing changed the cache.
+   await new Promise<void>(resolve=>setTimeout(resolve,0));
+  }
   if(!copies.length)return;
   const fingerprint=await key(p),layers=await Promise.all(copies.map(async c=>({id:c.layer.id,blob:await png(c.canvas)}))),bytes=layers.reduce((n,l)=>n+l.blob.size,0);if(bytes>64*1024*1024)return;
   db=await database();const entries=await request(db.transaction('renders').objectStore('renders').getAll()) as RecordEntry[];
