@@ -8,6 +8,7 @@ on:
     paths:
       - 'package.json'
       - 'package-lock.json'
+      - 'src/**'
       - 'electron/**'
       - 'electron-builder.config.cjs'
       - 'release.config.json'
