@@ -127,7 +127,7 @@ export class WetSmudgeGesture{
 let live:{id:string;source:HTMLCanvasElement;gesture:WetSmudgeGesture}|undefined,canonical:WetSmudgeGesture|undefined;
 export function applyWetSmudge(ctx:CanvasRenderingContext2D,_mask:HTMLCanvasElement,s:Stroke,_sourceX:number,_sourceY:number,region:RasterRegion,base?:HTMLCanvasElement,liveMixPreview=false):RasterRegion|undefined{
  if(s.opacity<=0||s.flow===0||!s.points.length)return;const key=signature(s),dabs=contacts(s,liveMixPreview);let gesture:WetSmudgeGesture;
- if(base){if(!live||live.id!==s.id||live.source!==base||live.gesture.signature!==key||live.gesture.base.width!==base.width||live.gesture.base.height!==base.height){live?.gesture.dispose();live={id:s.id,source:base,gesture:new WetSmudgeGesture(base,s)};}gesture=live.gesture;}
+ if(base){if(!live||live.id!==s.id||live.source!==base||live.gesture.signature!==key||live.gesture.base.width!==base.width||live.gesture.base.height!==base.height){live?.gesture.dispose();const next={id:s.id,source:base,gesture:new WetSmudgeGesture(base,s)};live=next;gesture=next.gesture;}else gesture=live.gesture;}
  else if(live?.gesture.signature===key&&live.gesture.matchesSource(ctx,s,dabs))gesture=live.gesture;
  else{canonical?.dispose();canonical=new WetSmudgeGesture(ctx.canvas,s,false);gesture=canonical;}
  const dirty=gesture.update(s,dabs,liveMixPreview);gesture.present(ctx,s,liveMixPreview?dirty??{x:0,y:0,width:0,height:0}:region);return dirty;
