@@ -9,6 +9,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'src/**'
+      - 'tests/**'
       - 'electron/**'
       - 'electron-builder.config.cjs'
       - 'release.config.json'
