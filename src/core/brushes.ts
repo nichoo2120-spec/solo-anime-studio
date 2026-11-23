@@ -120,7 +120,7 @@ export function restoreBrushLibrary(value:unknown):BrushLibrary{
   fresh.brushId=fresh.brushId==='wet-mix'?'water-wet':fresh.brushId==='smudge-bristle'?'color-texture':'color-soft';
  }
  if(fresh.presets.some(p=>p.id===old.eraserId&&p.category==='Eraser'))fresh.eraserId=old.eraserId;
- for(const p of fresh.presets)if(!p.settings.brushTip?.startsWith('water-')){p.settings.mixColors=false;p.defaults.mixColors=false;}
+
  fresh.mode='paint';
  return fresh;
 }
@@ -130,7 +130,13 @@ export function updatePreset(library:BrushLibrary,id:string,settings:BrushSettin
 export function brushList(library:BrushLibrary,category:BrushCategory,family?:BrushFamily){
  return library.presets.filter(p=>p.category===category&&(!family||p.family===family)&&!isRetiredBlendPresetId(p.id));
 }
+export const brushSupportsMix=(preset:BrushPreset)=>preset.category!=='Eraser';
+export function mixifiedBrushSettings(settings:BrushSettings):BrushSettings{
+ return {...settings,nativeMixEnabled:true,mixColors:false};
+}
 export function activeInputPreset(library:BrushLibrary,eraser=false){
- return activePreset(library,eraser);
+ const preset=activePreset(library,eraser);
+ if(eraser||library.mode!=='mix'||!brushSupportsMix(preset))return preset;
+ return {...preset,name:preset.name+' · Mix',settings:mixifiedBrushSettings(preset.settings)};
 }
 
