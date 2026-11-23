@@ -84,6 +84,17 @@ export class DrawingFrameCache{
   return drawingScreenRegion(region,key.view,key.dpr,key.width,key.height);
  }
 
+ /** Worker-rendered Mix has an authoritative changed rectangle but intentionally
+  * does not build live geometry on the input thread. Reuse the same cached scene
+  * with that rectangle so each worker reply does not redraw every project layer. */
+ beginDirty(key:DrawingFrameKey,stroke:Stroke,region?:RasterRegion){
+  const compatible=this.prepare(key);
+  if(!compatible||this.lastStroke!==stroke.id||!region)return undefined;
+  if(region.width<=0||region.height<=0)return{x:0,y:0,width:0,height:0};
+  this.geometry=undefined;
+  return drawingScreenRegion(region,key.view,key.dpr,key.width,key.height);
+ }
+
  restore(ctx:CanvasRenderingContext2D,region?:RasterRegion){
   if(!this.prefixReady||!this.prefix)return undefined;
   ctx.save();ctx.resetTransform();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
@@ -121,6 +132,7 @@ export class DrawingFrameCache{
  }
 
  finish(stroke:Stroke,geometry:Geometry){this.lastStroke=stroke.id;this.geometry=geometry;}
+ finishWorker(stroke:Stroke){this.lastStroke=stroke.id;this.geometry=undefined;}
  status(){return{bytes:(this.prefix?.width??0)*(this.prefix?.height??0)*4+[...this.ink.values()].reduce((n,c)=>n+c.surface.width*c.surface.height*4,0),ready:this.prefixReady,captured:this.captured};}
 }
 

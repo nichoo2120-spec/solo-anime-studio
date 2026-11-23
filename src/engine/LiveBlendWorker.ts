@@ -1,13 +1,21 @@
 import type {Point,Stroke} from '../core/model';
 import type {RasterRegion} from './liveRaster';
+import {mixStrokeSignature} from './mixStrokeSignature';
 const canvas=(width:number,height:number)=>{const c=document.createElement('canvas');c.width=width;c.height=height;return c;};
 const samePoint=(a:Point|undefined,b:Point|undefined)=>!!a&&!!b&&a.x===b.x&&a.y===b.y&&a.p===b.p&&a.v===b.v;
-export const workerBlendEligible=(s:Pick<Stroke,'tool'|'coloringEngine'|'coloringAppearanceVersion'|'smudgeVersion'|'brushTip'|'nativeMixVersion'|'paintTipVersion'|'dryBristleVersion'>)=>s.tool!=='eraser'&&((s.paintTipVersion===2||s.dryBristleVersion===3)&&s.brushTip!=='color-blender'||!!s.nativeMixVersion||(s.coloringEngine===1&&s.brushTip==='color-blender'&&(s.coloringAppearanceVersion===3||s.smudgeVersion===2)));
+export const workerBlendEligible=(s:Pick<Stroke,'tool'|'coloringEngine'|'coloringAppearanceVersion'|'smudgeVersion'|'brushTip'|'nativeMixVersion'|'paintTipVersion'|'dryBristleVersion'>)=>{
+ const appearance=s.coloringAppearanceVersion as number|undefined;
+ return s.tool!=='eraser'&&(
+  (s.paintTipVersion===2||s.dryBristleVersion===3)&&s.brushTip!=='color-blender'||
+  !!s.nativeMixVersion||
+  s.coloringEngine===1&&s.brushTip==='color-blender'&&(appearance===1||appearance===2||appearance===3||s.smudgeVersion===2||s.smudgeVersion===3)
+ );
+};
 export type NativeMixSeed={mask:HTMLCanvasElement;paint:HTMLCanvasElement;box:{x:number;y:number;w:number;h:number};tiles:Map<string,{x:number;y:number;w:number;h:number}>};
 export type BlendBaseline={pixels:Uint8ClampedArray;region:RasterRegion;seed?:NativeMixSeed};
 export type BlendDelta={mask:HTMLCanvasElement;patch:HTMLCanvasElement;tiles:Map<string,{x:number;y:number;w:number;h:number}>;revision:number;final?:boolean;group?:BlendBaseline;support?:RasterRegion;dirty?:RasterRegion;box?:{x:number;y:number;w:number;h:number}};
 type Reply={maskData?:Uint8ClampedArray;paintData?:Uint8ClampedArray;token:number;serial:number;deltaMask?:ImageBitmap;deltaPaint?:ImageBitmap;tiles?:{x:number;y:number;w:number;h:number}[];support?:RasterRegion;bitmap?:ImageBitmap;region?:RasterRegion;final?:boolean;error?:string};
-type Job={token:number;id:string;ownershipBase?:BlendBaseline;source:HTMLCanvasElement;signature:string;ready:boolean;inFlight:boolean;queued?:{stroke:Stroke;final:boolean};geometry?:unknown;pointsRef?:Point[];pointCount:number;lastPoint?:Point;resolve?:(surface:HTMLCanvasElement|undefined)=>void;timer?:ReturnType<typeof setTimeout>};
+type Job={token:number;id:string;ownershipBase?:BlendBaseline;source:HTMLCanvasElement;signature:string;ready:boolean;inFlight:boolean;nativeDelta?:boolean;queued?:{stroke:Stroke;final:boolean};geometry?:unknown;pointsRef?:Point[];pointCount:number;lastPoint?:Point;resolve?:(surface:HTMLCanvasElement|undefined)=>void;timer?:ReturnType<typeof setTimeout>};
 
 /** Keep the existing browser Canvas pigment calculations off the input thread.
  * One update is in flight; newer input coalesces instead of building a backlog.
@@ -34,21 +42,26 @@ export class LiveBlendWorker{
  takeRegion(s:Stroke){if(this.job?.id!==s.id)return undefined;const r=this.dirty??{x:0,y:0,width:0,height:0};this.dirty=undefined;return r;}
  preview(s:Stroke,source:HTMLCanvasElement,geometry:unknown,nativeDelta=false,ownershipBase?:BlendBaseline){
   this.warm();if(!this.worker||this.failed||!workerBlendEligible(s))return undefined;
-  const signature=JSON.stringify({...s,points:undefined,mixStops:undefined});
+  const signature=mixStrokeSignature(s);
   if(!this.job||this.job.id!==s.id||this.job.source!==source||this.job.signature!==signature||this.job.ownershipBase!==ownershipBase){
-   this.cancel(true);const token=++this.token,j:Job={token,id:s.id,ownershipBase,source,signature,ready:false,inFlight:false,pointCount:0};this.job=j;
+   this.cancel(true);const token=++this.token,j:Job={token,id:s.id,ownershipBase,source,signature,ready:false,inFlight:false,nativeDelta,pointCount:0};this.job=j;
    if(this.surfaceReadback!==nativeDelta){this.surface=canvas(1,1);this.surfaceReadback=nativeDelta;}
    const deltaPixels=ownershipBase?.pixels.slice();
    if(nativeDelta){const seed=ownershipBase?.seed;this.delta={mask:canvas(source.width,source.height),patch:canvas(source.width,source.height),tiles:new Map(seed?.tiles),revision:0,group:ownershipBase,box:seed?.box};if(seed){this.delta.mask.getContext('2d')!.drawImage(seed.mask,seed.box.x,seed.box.y);this.delta.patch.getContext('2d')!.drawImage(seed.paint,seed.box.x,seed.box.y);}}
-   this.surface.width=source.width;this.surface.height=source.height;this.surface.getContext('2d',{willReadFrequently:nativeDelta})!.drawImage(source,0,0);
+   this.surface.width=source.width;this.surface.height=source.height;const surfaceContext=this.surface.getContext('2d',{willReadFrequently:nativeDelta})!;surfaceContext.clearRect(0,0,source.width,source.height);if(!nativeDelta)surfaceContext.drawImage(source,0,0);
    // Native ownership already has exact pixels; pass them directly. Other
    // blend modes retain their existing bitmap setup and readback behavior.
-   const begin=(bitmap?:ImageBitmap)=>{if(this.job!==j){bitmap?.close();return;}this.worker!.postMessage({kind:'begin',token,width:source.width,height:source.height,base:bitmap,readFrequently:!s.nativeMixVersion,nativeDelta,deltaPixels,deltaRegion:ownershipBase?.region,seeded:!!ownershipBase?.seed,compactReplies:nativeDelta},[...(bitmap?[bitmap]:[]),...(deltaPixels?[deltaPixels.buffer as ArrayBuffer]:[])]);j.ready=true;this.flush(j);};createImageBitmap(source).then(begin).catch(()=>this.fail());
+   const appearance=s.coloringAppearanceVersion as number|undefined,readFrequently=s.coloringEngine===1&&s.brushTip==='color-blender'&&(appearance===1||appearance===2);
+   const begin=(bitmap?:ImageBitmap)=>{if(this.job!==j){bitmap?.close();return;}this.worker!.postMessage({kind:'begin',token,width:source.width,height:source.height,base:bitmap,readFrequently,nativeDelta,deltaPixels,deltaRegion:ownershipBase?.region,seeded:!!ownershipBase?.seed,compactReplies:nativeDelta},[...(bitmap?[bitmap]:[]),...(deltaPixels?[deltaPixels.buffer as ArrayBuffer]:[])]);j.ready=true;this.flush(j);};createImageBitmap(source).then(begin).catch(()=>this.fail());
   }
   const j=this.job!;if(j.geometry!==geometry){j.geometry=geometry;j.queued={stroke:s,final:false};this.flush(j);}return this.surface;
  }
  finish(s:Stroke){
   const j=this.job;if(!j||j.id!==s.id||this.failed)return undefined;
+  // Native Mix displays only worker dirty patches while the pen is down.
+  // Materialize the unchanged layer beneath those patches once on release,
+  // instead of copying the full layer when the gesture begins.
+  if(j.nativeDelta){const c=this.surface.getContext('2d')!;c.save();c.globalCompositeOperation='destination-over';c.drawImage(j.source,0,0);c.restore();}
   const preview=this.surface,done=new Promise<HTMLCanvasElement|undefined>(resolve=>{j.resolve=resolve;});j.queued={stroke:s,final:true};this.flush(j);return{preview,done};
  }
  private flush(j:Job){

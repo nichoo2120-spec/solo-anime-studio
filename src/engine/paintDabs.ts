@@ -7,7 +7,7 @@ export type PaintDab={x:number;y:number;radius:number;angle:number;arc:number;le
 const clamp=(v:number)=>Math.max(0,Math.min(1,v));
 /** Contact follows distance, pressure and a gently turning physical brush.
  * Frame count and pointer-event frequency never select the pigment pattern. */
-export function paintDabs(s:Stroke,samples:PaintSamples){
+export function paintDabs(s:Stroke,samples:PaintSamples,liveMixPreview=false){
  const result:PaintDab[]=[];if(!samples.points.length)return result;let segment=1,distance=0,previousAngle=0,previousDistance=0;
  const evaluate=(d:number,tail=false)=>{
   while(segment<samples.points.length-1&&samples.arc[segment]<d)segment++;
@@ -17,7 +17,8 @@ export function paintDabs(s:Stroke,samples:PaintSamples){
   previousAngle=angle;previousDistance=d;const level=clamp((s.flow??1)*(s.pressure&&s.pressureFlow?pressure:1)*(s.pressure&&s.pressureOpacity?opacityResponse(pressure,s):1));
   const dab={x:p.x,y:p.y,radius,angle,arc:d,level,tail};result.push(dab);return dab;
  };
- while(distance<=samples.total+1e-7){const dab=evaluate(Math.min(distance,samples.total));distance+=s.brushTip==='color-blender'?Math.max(.3,Math.min(28,s.size*.09,dab.radius*.3)):Math.max(.3,Math.min(8,s.size*.045,dab.radius*.16));}
+ const previewFloor=liveMixPreview?Math.max(1,Math.min(8,s.size*.04)):0;
+ while(distance<=samples.total+1e-7){const dab=evaluate(Math.min(distance,samples.total));distance+=s.brushTip==='color-blender'?Math.max(previewFloor||.3,Math.min(28,s.size*.09,dab.radius*.3)):Math.max(previewFloor||.3,Math.min(8,s.size*.045,dab.radius*.16));}
  if(samples.total-(result.at(-1)?.arc??0)>1e-6)evaluate(samples.total,true);
  return result;
 }

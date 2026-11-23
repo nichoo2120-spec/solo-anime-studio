@@ -9,6 +9,7 @@ import {projectPoint} from './perspectiveWarp';
 import {watercolorSeedFor} from '../core/paintTips';
 import {smudgeDefaults} from '../core/smudge';
 import {colorNibFootprint,type NibPoint} from './colorNibs';
+import {mixStrokeSignature} from './mixStrokeSignature';
 
 const N=32,SIDE=96,clamp=(n:number)=>Math.max(0,Math.min(1,n));
 const smooth=(a:number,b:number,x:number)=>{const t=clamp((x-a)/(b-a));return t*t*(3-2*t);};
@@ -24,7 +25,7 @@ function insideDistance(x:number,y:number,shape:NibPoint[]){
 }
 type Contact=PaintDab&{pressure:number;speed:number};
 type Checkpoint={load:Float32Array;mass:Float32Array;previousArc:number;loaded:boolean;bounds?:RasterRegion};
-const signature=(s:Stroke)=>JSON.stringify({...s,points:undefined});
+const signature=mixStrokeSignature;
 const same=(a:Contact,b:Contact)=>a.x===b.x&&a.y===b.y&&a.radius===b.radius&&a.angle===b.angle&&a.arc===b.arc&&a.level===b.level&&a.pressure===b.pressure&&a.speed===b.speed;
 const union=(a:RasterRegion|undefined,b:RasterRegion):RasterRegion=>{if(!a)return{...b};const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);return{x,y,width:Math.max(a.x+a.width,b.x+b.width)-x,height:Math.max(a.y+a.height,b.y+b.height)-y};};
 /** Same affine/projective brush-contact convention as the classic smudge. */
@@ -37,8 +38,8 @@ function bounds(m:readonly number[],W:number,H:number):RasterRegion|undefined{
  const[a,b,c,d,e,f]=m,px=Math.abs(a)+Math.abs(c)+2,py=Math.abs(b)+Math.abs(d)+2,x=Math.max(0,Math.floor(e-px)),y=Math.max(0,Math.floor(f-py)),right=Math.min(W,Math.ceil(e+px)),bottom=Math.min(H,Math.ceil(f+py));
  return right>x&&bottom>y?{x,y,width:right-x,height:bottom-y}:undefined;
 }
-function contacts(s:Stroke){
- const samples=paintSamples(finalGeometry(s),.18),out=paintDabs(s,samples) as Contact[];let k=1;
+function contacts(s:Stroke,liveMixPreview=false){
+ const samples=paintSamples(finalGeometry(s),.18),out=paintDabs(s,samples,liveMixPreview) as Contact[];let k=1;
  for(const q of out){while(k<samples.points.length-1&&samples.arc[k]<q.arc)k++;const a=samples.points[Math.max(0,k-1)],b=samples.points[k]??a,t=clamp((q.arc-(samples.arc[k-1]??0))/((samples.arc[k]??0)-(samples.arc[k-1]??0)||1)),p=a.p+(b.p-a.p)*t,v=(a.v??.65)+((b.v??.65)-(a.v??.65))*t;q.pressure=s.pressure?pressureResponse(p**s.response,s.pressureCurve):1;q.speed=clamp((.85-v)/.65);}
  return out;
 }
@@ -47,13 +48,16 @@ function contacts(s:Stroke){
  * colour coverage; mass separately tracks how much wet paint remains. */
 export class WetSmudgeGesture{
  readonly base:HTMLCanvasElement;readonly work:HTMLCanvasElement;readonly signature:string;
- private sample=canvas(N,N);private pigment=canvas(N,N);private stamp=canvas(SIDE,SIDE);private nib=canvas(SIDE,SIDE);
+ private ownsBase=false;private readonly seeded=new Set<number>();private readonly tileColumns:number;
+ private sample=canvas(N,N);private pigment=canvas(N,N);private stamp=canvas(SIDE,SIDE);private nib=canvas(SIDE,SIDE);private opacityBase=canvas(1,1);private opacityWork=canvas(1,1);
  private load=new Float32Array(N*N*4);private mass=new Float32Array(N*N);private lane=new Float32Array(N);private uptake=new Float32Array(N);
  private old:Contact[]=[];private processed=0;private previousArc=0;private loaded=false;private affected?:RasterRegion;
  private rollback=new SmudgeRollback<Checkpoint>();private paint:ImageData;private seed:number;
  constructor(source:HTMLCanvasElement,s:Stroke,private readonly retainRollback=true){
-  this.signature=signature(s);this.seed=s.colorSeed??watercolorSeedFor(s.rasterSourceId??s.id);this.base=canvas(source.width,source.height);this.work=canvas(source.width,source.height);
-  this.base.getContext('2d',{willReadFrequently:true})!.drawImage(source,0,0);this.work.getContext('2d',{willReadFrequently:true})!.drawImage(source,0,0);
+  this.signature=signature(s);this.seed=s.colorSeed??watercolorSeedFor(s.rasterSourceId??s.id);this.tileColumns=Math.ceil(source.width/64);
+  if(retainRollback)this.base=source;else{this.base=canvas(source.width,source.height);this.base.getContext('2d')!.drawImage(source,0,0);this.ownsBase=true;}
+  this.work=canvas(source.width,source.height);
+  if(!retainRollback){this.work.getContext('2d')!.drawImage(this.base,0,0);for(let y=0;y<source.height;y+=64)for(let x=0;x<source.width;x+=64)this.seeded.add(Math.floor(y/64)*this.tileColumns+Math.floor(x/64));}
   this.paint=this.pigment.getContext('2d')!.createImageData(N,N);const nc=this.nib.getContext('2d')!,image=nc.createImageData(SIDE,SIDE),nib=s.colorNib??'bristle',soft=nib==='round',shape=nib==='round'||nib==='bristle'?undefined:colorNibFootprint(nib),streak=s.smearStreak??smudgeDefaults.smearStreak;
   for(let y=0;y<SIDE;y++)for(let x=0;x<SIDE;x++){
    const u=(x+.5)*2/SIDE-1,v=(y+.5)*2/SIDE-1,r=Math.sqrt(u*u+(v/(soft?1:.82))**2),edge=soft?Math.sqrt(smooth(0,.75,1-r)):smooth(0,.22,1-r),fibre=1-streak*(soft?.6:.4)*(1-noise(x*1.7,this.seed+71)),i=(y*SIDE+x)*4;
@@ -63,7 +67,9 @@ export class WetSmudgeGesture{
   // lanes therefore come from the travelling load, rather than holes in a mask.
   for(let x=0;x<N;x++)this.uptake[x]=soft?1:1+1.4*streak*(noise(x*2.37,this.seed+331)-.5);
  }
- dispose(){for(const c of [this.base,this.work,this.sample,this.pigment,this.stamp,this.nib])c.width=c.height=0;this.rollback.clear();}
+ dispose(){if(this.ownsBase)this.base.width=this.base.height=0;for(const c of [this.work,this.sample,this.pigment,this.stamp,this.nib,this.opacityBase,this.opacityWork])c.width=c.height=0;this.rollback.clear();}
+ private seedWork(r:RasterRegion){const x0=Math.max(0,Math.floor(r.x/64)*64),y0=Math.max(0,Math.floor(r.y/64)*64),x1=Math.min(this.work.width,Math.ceil((r.x+r.width)/64)*64),y1=Math.min(this.work.height,Math.ceil((r.y+r.height)/64)*64),wc=this.work.getContext('2d')!;for(let y=y0;y<y1;y+=64)for(let x=x0;x<x1;x+=64){const key=Math.floor(y/64)*this.tileColumns+Math.floor(x/64);if(this.seeded.has(key))continue;const w=Math.min(64,this.work.width-x),h=Math.min(64,this.work.height-y);wc.drawImage(this.base,x,y,w,h,x,y,w,h);this.seeded.add(key);}}
+ prepareRegion(r:RasterRegion){this.seedWork(r);}
  matchesSource(ctx:CanvasRenderingContext2D,s:Stroke,dabs:Contact[]){
   if(ctx.canvas.width!==this.base.width||ctx.canvas.height!==this.base.height)return false;let box=this.affected;for(const q of dabs){const b=bounds(contactMatrix(s,q),ctx.canvas.width,ctx.canvas.height);if(b)box=union(box,b);}if(!box)return true;
   const a=this.base.getContext('2d')!.getImageData(box.x,box.y,box.width,box.height).data,b=ctx.getImageData(box.x,box.y,box.width,box.height).data;for(let i=0;i<a.length;i++)if(a[i]!==b[i])return false;return true;
@@ -73,13 +79,14 @@ export class WetSmudgeGesture{
   if(restored){const cp=restored.state;this.load.set(cp.load);this.mass.set(cp.mass);this.previousArc=cp.previousArc;this.loaded=cp.loaded;this.processed=restored.count;this.affected=cp.bounds?{...cp.bounds}:undefined;}
   else{if(this.affected){const r=this.affected;wc.clearRect(r.x,r.y,r.width,r.height);wc.drawImage(this.base,r.x,r.y,r.width,r.height,r.x,r.y,r.width,r.height);}this.load.fill(0);this.mass.fill(0);this.previousArc=0;this.loaded=false;this.processed=0;this.affected=undefined;this.rollback.clear();}
  }
- update(s:Stroke,dabs=contacts(s)){
-  let prefix=0;while(prefix<Math.min(this.old.length,dabs.length)&&same(this.old[prefix],dabs[prefix]))prefix++;if(prefix<this.processed)this.reset(prefix);
-  const wc=this.work.getContext('2d',{willReadFrequently:true})!,sc=this.sample.getContext('2d',{willReadFrequently:true})!,pc=this.pigment.getContext('2d')!,tc=this.stamp.getContext('2d')!,mix=s.mixAmount??.75,hold=s.holdLen??3.5,pickup=s.pickupLen??.9,streak=s.smearStreak??.5,add=s.useSelectedColour??0,selected=s.color.slice(1).match(/../g)!.map(x=>parseInt(x,16));
+ update(s:Stroke,dabs=contacts(s),liveMixPreview=false):RasterRegion|undefined{
+  let prefix=0;while(prefix<Math.min(this.old.length,dabs.length)&&same(this.old[prefix],dabs[prefix]))prefix++;let changed:RasterRegion|undefined;if(prefix<this.processed){changed=this.affected?{...this.affected}:undefined;this.reset(prefix);}
+  const wc=this.work.getContext('2d')!,sc=this.sample.getContext('2d',{willReadFrequently:true})!,pc=this.pigment.getContext('2d')!,tc=this.stamp.getContext('2d')!,mix=s.mixAmount??.75,hold=s.holdLen??3.5,pickup=s.pickupLen??.9,streak=s.smearStreak??.5,add=s.useSelectedColour??0,selected=s.color.slice(1).match(/../g)!.map(x=>parseInt(x,16));
   const start=this.processed;for(let i=start;i<dabs.length;i++){
    if(this.retainRollback&&(i===start||i%4===0)){let region:RasterRegion|undefined;for(let j=i;j<Math.min(dabs.length,(Math.floor(i/4)+1)*4);j++){const r=bounds(contactMatrix(s,dabs[j]),this.work.width,this.work.height);if(r)region=union(region,r);}this.rollback.remember(this.work,i,{load:this.load.slice(),mass:this.mass.slice(),previousArc:this.previousArc,loaded:this.loaded,bounds:this.affected?{...this.affected}:undefined},region);}
    const q=dabs[i],m=contactMatrix(s,q),[a,b,c,d,e,f]=m,det=a*d-b*c,r=bounds(m,this.work.width,this.work.height);
    if(q.radius>.001&&Math.abs(det)>1e-8&&r){
+    this.seedWork(r);changed=union(changed,r);
     const half=N*.5;sc.resetTransform();sc.clearRect(0,0,N,N);sc.setTransform(half*d/det,-half*b/det,-half*c/det,half*a/det,half-half*(d*e-c*f)/det,half+half*(b*e-a*f)/det);sc.imageSmoothingEnabled=true;
     // Both sources are sampled before this dab. Premultiplied additive weights
     // keep transparent edges correct and avoid re-picking only fresh output.
@@ -105,21 +112,25 @@ export class WetSmudgeGesture{
    this.previousArc=q.arc;this.processed=i+1;
   }
   this.old=dabs;
+  return changed;
  }
  present(ctx:CanvasRenderingContext2D,s:Stroke,region:RasterRegion){
   const x=Math.max(0,region.x),y=Math.max(0,region.y),w=Math.min(ctx.canvas.width,region.x+region.width)-x,h=Math.min(ctx.canvas.height,region.y+region.height)-y;if(w<=0||h<=0)return;
+  this.seedWork({x,y,width:w,height:h});
   if(s.opacity===1){ctx.clearRect(x,y,w,h);ctx.drawImage(this.work,x,y,w,h,x,y,w,h);return;}
-  const original=this.base.getContext('2d')!.getImageData(x,y,w,h),after=this.work.getContext('2d')!.getImageData(x,y,w,h).data,data=original.data,t=s.opacity;
+  for(const c of [this.opacityBase,this.opacityWork]){if(c.width!==w)c.width=w;if(c.height!==h)c.height=h;}
+  const bc=this.opacityBase.getContext('2d',{willReadFrequently:true})!,wc=this.opacityWork.getContext('2d',{willReadFrequently:true})!;bc.clearRect(0,0,w,h);wc.clearRect(0,0,w,h);bc.drawImage(this.base,x,y,w,h,0,0,w,h);wc.drawImage(this.work,x,y,w,h,0,0,w,h);
+  const original=bc.getImageData(0,0,w,h),after=wc.getImageData(0,0,w,h).data,data=original.data,t=s.opacity;
   for(let i=0;i<data.length;i+=4){const a=data[i+3]/255,b=after[i+3]/255,alpha=a*(1-t)+b*t;for(let k=0;k<3;k++)data[i+k]=alpha?Math.round((data[i+k]*a*(1-t)+after[i+k]*b*t)/alpha):0;data[i+3]=Math.round(alpha*255);}ctx.putImageData(original,x,y);
  }
 }
 let live:{id:string;source:HTMLCanvasElement;gesture:WetSmudgeGesture}|undefined,canonical:WetSmudgeGesture|undefined;
-export function applyWetSmudge(ctx:CanvasRenderingContext2D,_mask:HTMLCanvasElement,s:Stroke,_sourceX:number,_sourceY:number,region:RasterRegion,base?:HTMLCanvasElement){
- if(s.opacity<=0||s.flow===0||!s.points.length)return;const key=signature(s),dabs=contacts(s);let gesture:WetSmudgeGesture;
+export function applyWetSmudge(ctx:CanvasRenderingContext2D,_mask:HTMLCanvasElement,s:Stroke,_sourceX:number,_sourceY:number,region:RasterRegion,base?:HTMLCanvasElement,liveMixPreview=false):RasterRegion|undefined{
+ if(s.opacity<=0||s.flow===0||!s.points.length)return;const key=signature(s),dabs=contacts(s,liveMixPreview);let gesture:WetSmudgeGesture;
  if(base){if(!live||live.id!==s.id||live.source!==base||live.gesture.signature!==key||live.gesture.base.width!==base.width||live.gesture.base.height!==base.height){live?.gesture.dispose();live={id:s.id,source:base,gesture:new WetSmudgeGesture(base,s)};}gesture=live.gesture;}
  else if(live?.gesture.signature===key&&live.gesture.matchesSource(ctx,s,dabs))gesture=live.gesture;
  else{canonical?.dispose();canonical=new WetSmudgeGesture(ctx.canvas,s,false);gesture=canonical;}
- gesture.update(s,dabs);gesture.present(ctx,s,region);
+ const dirty=gesture.update(s,dabs,liveMixPreview);gesture.present(ctx,s,liveMixPreview?dirty??{x:0,y:0,width:0,height:0}:region);return dirty;
 }
 
 /** Test/debug reset also releases retained gesture canvases. */

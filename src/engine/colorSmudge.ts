@@ -32,7 +32,7 @@ function transformedSamples(s:Stroke):{samples:PaintSamples;settings:Stroke}{
 /** A causal brush reservoir carries source pigment along the gesture. It is
  * evaluated once per arc-length contact and bristle lane, not per input event.
  * Final coverage mixes its RGB into original paint while keeping original alpha. */
-export function applyColorSmudge(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElement,s:Stroke,sourceX:number,sourceY:number,region:RasterRegion,base?:HTMLCanvasElement){
+export function applyColorSmudge(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElement,s:Stroke,sourceX:number,sourceY:number,region:RasterRegion,base?:HTMLCanvasElement,_liveMixPreview=false):RasterRegion|undefined{
  const x=Math.max(0,region.x,sourceX),y=Math.max(0,region.y,sourceY),right=Math.min(ctx.canvas.width,sourceX+mask.width,region.x+region.width),bottom=Math.min(ctx.canvas.height,sourceY+mask.height,region.y+region.height),w=right-x,h=bottom-y;if(w<=0||h<=0||s.opacity===0||s.flow===0||!s.points.length)return;
  let reader:ColorSource;if(base){if(!preview||preview.id!==s.id||preview.base!==base)preview={id:s.id,base,source:new ColorSource(base)};reader=preview.source;}else reader=new ColorSource(ctx.canvas);
  const {samples,settings}=transformedSamples(s),{rows}=colorContacts(settings,samples),lanes=24,colors=new Float32Array(rows.length*lanes*4),sample=new Float64Array(4),tap=new Float64Array(4);
@@ -61,5 +61,5 @@ export function applyColorSmudge(ctx:CanvasRenderingContext2D,mask:HTMLCanvasEle
   for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){const k=((iy+dy)*columns+ix+dx)*4,weight=(dx?u:1-u)*(dy?v:1-v)*nodes[k+3];valid+=weight;red+=nodes[k]*weight;green+=nodes[k+1]*weight;blue+=nodes[k+2]*weight;}
   if(valid<1e-6)continue;data[j]=Math.round(data[j]+(red/valid-data[j])*amount);data[j+1]=Math.round(data[j+1]+(green/valid-data[j+1])*amount);data[j+2]=Math.round(data[j+2]+(blue/valid-data[j+2])*amount);
  }
- ctx.putImageData(dest,x,y);
+ ctx.putImageData(dest,x,y);return {x,y,width:w,height:h};
 }

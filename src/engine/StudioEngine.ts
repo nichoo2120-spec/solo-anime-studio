@@ -127,7 +127,7 @@ export class StudioEngine {
  // Comparing only the immediately previous event replays overlapping batches
  // backwards and makes fitted curves double back into hooks and slivers.
  private vectorStartPressure=.5;private vectorFirstPressureTime=Infinity;
- private rawMove=(event:Event)=>{const e=event as PointerEvent;if(this.pointerId===e.pointerId&&this.vectors.drawing)this.acceptVectorMovement(e);};
+ private rawMove=(event:Event)=>{const e=event as PointerEvent;if(this.pointerId!==undefined&&this.pointerId!==e.pointerId)return;this.cursor=this.point(e);this.paintCursor();if(this.pointerId===e.pointerId&&this.vectors.drawing)this.acceptVectorMovement(e);};
  private windowMove=(e:PointerEvent)=>{if(this.pointerId===e.pointerId&&this.vectors.drawing&&e.target!==this.canvas)this.acceptVectorMovement(e);};
  private acceptVectorMovement(e:PointerEvent){
   if(!this.vectors.drawing||e.pointerId!==this.pointerId)return;
@@ -273,7 +273,9 @@ export class StudioEngine {
    ctx.restore();return;
   }
   if(!['brush','eraser'].includes(this.tool))return;
-  const position=toScreen(this.stroke&&this.liveTip?this.liveTip:this.cursor,this.view),b=this.stroke??this.brush,p=this.stroke?.points.at(-1);
+  // Keep the visible brush cursor locked to the raw tablet position. The
+  // stabilized live geometry intentionally trails the pen and is only for ink.
+  const position=toScreen(this.cursor,this.view),b=this.stroke??this.brush,p=this.stroke?.points.at(-1);
   const response=this.stroke?.pressure&&b.pressureWidth!==false?pressureResponse(Math.pow(p?.p??1,b.response),b.pressureCurve):1;
   const velocity=this.stroke?.velocityTaper?p?.v??1:1;
   const factor=this.stroke&&(this.stroke.pressure&&b.pressureWidth!==false||this.stroke.velocityTaper)?widthResponse(response*velocity,b):1;
@@ -547,7 +549,7 @@ export class StudioEngine {
   if(this.drag){this.updateDrag(this.point(e),e);this.canvas.style.cursor='none';this.paintCursor();return;}
   if(this.strokePending){const now=this.point(e),start=this.strokePending;if(Math.hypot(now.x-start.x,now.y-start.y)*this.view.zoom>3){if(this.strokeMode==='lasso'||this.strokeShape==='lasso'){if(!this.lasso)this.lasso=[{x:start.x,y:start.y,p:1}];appendPath(this.lasso,now);}else this.lasso=rectangle({x:start.x,y:start.y,p:1},now);this.request();}return;}
   if(this.vectors.drawing){this.acceptVectorMovement(e);return;}
-  if(!this.drawing){this.paintCursor();return;}this.consume(e);
+  if(!this.drawing){this.paintCursor();return;}this.paintCursor();this.consume(e);
   this.request();
  };
  private consume(e:PointerEvent,canceled=false){this.performance.input();const started=this.performance.enabled?performance.now():0;try{this.consumeInput(e,canceled);}finally{if(this.performance.enabled)this.performance.record('inputBatchMs',performance.now()-started);}}
@@ -626,12 +628,13 @@ export class StudioEngine {
   Object.assign(this.navigationPaper.style,{display:world?'none':'block',width:p.width+'px',height:p.height+'px',transform:`matrix(${paperCos},${paperSin},${-paperSin},${paperCos},${this.view.x},${this.view.y})`,boxShadow:this.viewMoving?'none':`0 0 ${25/this.view.zoom}px #0008`});
   // Rotated page-edge coverage changes during bitmap copies in Canvas 2D.
   // Retain the original rendering path there rather than changing its pixels.
-  const cachedDrawing=!!denseStroke&&!!this.liveGeometry&&!this.initialPressurePending&&!this.mirrorDrawing.enabled&&!this.strokeMirror&&!this.viewMoving&&!this.viewRefining&&Math.abs(this.view.rotation)<1e-9&&!this.selection.length&&!this.strokeIds.length&&!this.smoothing.previewLayer&&!this.vectors.drawing&&!this.drag&&!this.pan&&!this.navigation;
-  const workingBlend=!!denseStroke&&!this.strokeMirror&&workerBlendEligible(denseStroke)&&this.blendWorker.available()&&!!this.blendSource&&this.blendWorker.matches(denseStroke,this.blendSource);
+  const workerDrawing=!!denseStroke&&!this.strokeMirror&&workerBlendEligible(denseStroke)&&this.blendWorker.available();
+  const cachedDrawing=!!denseStroke&&(!!this.liveGeometry||workerDrawing)&&!this.initialPressurePending&&!this.mirrorDrawing.enabled&&!this.strokeMirror&&!this.viewMoving&&!this.viewRefining&&Math.abs(this.view.rotation)<1e-9&&!this.selection.length&&!this.strokeIds.length&&!this.smoothing.previewLayer&&!this.vectors.drawing&&!this.drag&&!this.pan&&!this.navigation;
+  const workingBlend=workerDrawing&&!!this.blendSource&&this.blendWorker.matches(denseStroke!,this.blendSource);
   // No bitmap arrived yet: the unchanged preview should not trigger a
   // full-project redraw. First-frame startup still renders normally.
   const blendDirty=workingBlend?this.blendWorker.takeRegion(denseStroke!)??{x:0,y:0,width:0,height:0}:undefined;
-  const changedFrame=cachedDrawing?this.drawingFrames.begin({project:p,renderer:this.renderer,revision:this.renderer.displayRevision,target:this.strokeTarget!.layer,width:W,height:H,dpr,view:this.view},denseStroke!,this.liveGeometry!,blendDirty??(livePainted?this.liveRaster.lastRegion:undefined)):undefined;
+  const changedFrame=cachedDrawing?(this.liveGeometry?this.drawingFrames.begin({project:p,renderer:this.renderer,revision:this.renderer.displayRevision,target:this.strokeTarget!.layer,width:W,height:H,dpr,view:this.view},denseStroke!,this.liveGeometry,blendDirty??(livePainted?this.liveRaster.lastRegion:undefined)):this.drawingFrames.beginDirty({project:p,renderer:this.renderer,revision:this.renderer.displayRevision,target:this.strokeTarget!.layer,width:W,height:H,dpr,view:this.view},denseStroke!,blendDirty)):undefined;
   // Canvas scan conversion can change by a few RGBA levels when the left
   // clip origin moves, including integer zoom on 4K surfaces. Keep its origin
   // fixed and limit the vertical band instead; preserve exact native pixels.
@@ -785,7 +788,7 @@ export class StudioEngine {
   }else ctx.fillText(`ROTATED VIEW · ${Math.round(this.view.rotation*180/Math.PI)}°`,27,11);
   // Brush outline lives on its own pointer-transparent canvas; pen hover no longer
   // redraws all document layers.  The active-stroke tip is updated here per RAF.
-  ctx.restore();if(cachedDrawing)this.drawingFrames.finish(this.stroke!,this.liveGeometry!);
+  ctx.restore();if(cachedDrawing){if(this.liveGeometry)this.drawingFrames.finish(this.stroke!,this.liveGeometry);else this.drawingFrames.finishWorker(this.stroke!);}
   this.paintCursor();if(warmDrawing)this.warmDrawingInk(p,W,H,dpr);
   if(this.performance.enabled)this.performance.record('compositionAndOverlaysMs',performance.now()-compositeStarted);
   if(this.historyPending){const ms=performance.now()-this.historyPending.at;this.performance.record('historyVisibleMs',ms);this.recorder.event('history-visible',{action:this.historyPending.action,ms});this.historyPending=undefined;}

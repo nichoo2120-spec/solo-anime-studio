@@ -8,6 +8,7 @@ import type {RasterRegion} from './liveRaster';
 import {paintSamples} from './paintPass';
 import {paintDabs,type PaintDab} from './paintDabs';
 import {finalGeometry} from './geometryCache';
+import {mixStrokeSignature} from './mixStrokeSignature';
 
 const clamp=(v:number)=>Math.max(0,Math.min(1,v));
 const surface=(w:number,h:number)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
@@ -30,17 +31,17 @@ export class GentleBlendGesture{
  private affected?:RasterRegion;
  private signature:string;
  constructor(private readonly target:HTMLCanvasElement,private readonly base:HTMLCanvasElement|undefined,s:Stroke){
-  this.signature=JSON.stringify({...s,points:undefined});
+  this.signature=mixStrokeSignature(s);
  }
  matches(target:HTMLCanvasElement,base:HTMLCanvasElement|undefined,s:Stroke){
-  return this.target===target&&this.base===base&&this.signature===JSON.stringify({...s,points:undefined});
+  return this.target===target&&this.base===base&&this.signature===mixStrokeSignature(s);
  }
  private reset():RasterRegion|undefined{
   if(this.affected&&this.base){const r=this.affected,c=this.target.getContext('2d')!;c.clearRect(r.x,r.y,r.width,r.height);c.drawImage(this.base,r.x,r.y,r.width,r.height,r.x,r.y,r.width,r.height);}
   const restored=this.affected;this.processed=0;this.affected=undefined;return restored;
  }
- update(ctx:CanvasRenderingContext2D,s:Stroke):RasterRegion|undefined{
-  const next=paintDabs(s,paintSamples(finalGeometry(s),.18));let common=0;
+ update(ctx:CanvasRenderingContext2D,s:Stroke,liveMixPreview=false):RasterRegion|undefined{
+  const next=paintDabs(s,paintSamples(finalGeometry(s),.18),liveMixPreview);let common=0;
   while(common<Math.min(this.dabs.length,next.length)&&eq(this.dabs[common],next[common]))common++;
   // The fitted tail sometimes changes on pointer-up. Recompute from the
   // unchanged source rather than leaving overlapping old smears in the result.
@@ -82,11 +83,11 @@ export class GentleBlendGesture{
 
 let live:{target:HTMLCanvasElement;base:HTMLCanvasElement|undefined;stroke:string;gesture:GentleBlendGesture}|undefined;
 /** Dirty rectangle is the newly processed part, not the entire drag so far. */
-export function applyGentleBlend(ctx:CanvasRenderingContext2D,_mask:HTMLCanvasElement,s:Stroke,_x:number,_y:number,_r:RasterRegion,base?:HTMLCanvasElement):RasterRegion|undefined{
+export function applyGentleBlend(ctx:CanvasRenderingContext2D,_mask:HTMLCanvasElement,s:Stroke,_x:number,_y:number,_r:RasterRegion,base?:HTMLCanvasElement,liveMixPreview=false):RasterRegion|undefined{
  if(s.opacity<=0||s.flow===0||!s.points.length)return;
  if(!live||live.stroke!==s.id||!live.gesture.matches(ctx.canvas,base,s)){
   live={stroke:s.id,target:ctx.canvas,base,gesture:new GentleBlendGesture(ctx.canvas,base,s)};
  }
- return live.gesture.update(ctx,s);
+ return live.gesture.update(ctx,s,liveMixPreview);
 }
 export function resetGentleBlend(){live=undefined;}

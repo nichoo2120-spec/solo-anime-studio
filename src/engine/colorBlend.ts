@@ -25,7 +25,7 @@ type Tile={x:number;y:number;width:number;height:number;original:Uint8ClampedArr
 const preview={id:'',base:undefined as HTMLCanvasElement|undefined,radius:0,tiles:new Map<string,Tile|null>(),bytes:0};
 /** A gesture reads an immutable layer base. Cache its filtered global-grid tiles,
  * independently of the moving nib mask; each tile includes a filter halo. */
-export function applyColorBlend(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElement,s:Stroke,sourceX:number,sourceY:number,region:RasterRegion,base?:HTMLCanvasElement){
+export function applyColorBlend(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElement,s:Stroke,sourceX:number,sourceY:number,region:RasterRegion,base?:HTMLCanvasElement,_liveMixPreview=false):RasterRegion|undefined{
  const x=Math.max(0,region.x,sourceX),y=Math.max(0,region.y,sourceY),right=Math.min(ctx.canvas.width,sourceX+mask.width,region.x+region.width),bottom=Math.min(ctx.canvas.height,sourceY+mask.height,region.y+region.height);if(right<=x||bottom<=y||s.opacity===0)return;
  const scale=s.transform?Math.sqrt(Math.abs(s.transform[0]*s.transform[3]-s.transform[1]*s.transform[2])):1,radius=Math.max(1,Math.min(64,Math.round(s.size*.3*scale))),left=Math.max(0,x-radius),top=Math.max(0,y-radius),ex=Math.min(ctx.canvas.width,right+radius),ey=Math.min(ctx.canvas.height,bottom+radius);
  if(base&&(preview.id!==s.id||preview.base!==base||preview.radius!==radius)){preview.id=s.id;preview.base=base;preview.radius=radius;preview.tiles.clear();preview.bytes=0;}
@@ -40,4 +40,5 @@ export function applyColorBlend(ctx:CanvasRenderingContext2D,mask:HTMLCanvasElem
   }else{preview.tiles.delete(key);preview.tiles.set(key,tile);}
   const dest=ctx.getImageData(px,py,pw,ph);for(let row=0;row<ph;row++)for(let col=0;col<pw;col++){const i=(row*pw+col)*4,j=(py+row-ty)*tw+px+col-tx,a=coverage[i+3]/255*s.opacity;if(!a||!tile.original[j*4+3])continue;for(let c=0;c<3;c++)dest.data[i+c]=Math.round(tile.original[j*4+c]+(tile.colors[j*3+c]-tile.original[j*4+c])*a);dest.data[i+3]=tile.original[j*4+3];}ctx.putImageData(dest,px,py);
  }
+ return {x,y,width:right-x,height:bottom-y};
 }

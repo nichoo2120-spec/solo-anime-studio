@@ -61,7 +61,7 @@ import {replayTrace} from '../engine/diagnosticReplay';
 import {BrushStudio} from './BrushStudio';
 import {ExactRange} from './ExactRange';
 import {VectorStudio,type VectorDefaults} from './VectorStudio';
-import {activePreset,activeInputPreset,brushSupportsMix,restoreBrushLibrary,updatePreset,type BrushLibrary} from '../core/brushes';
+import {activePreset,activeInputPreset,restoreBrushLibrary,updatePreset,type BrushLibrary} from '../core/brushes';
 import {vectorSvg,type VectorLine} from '../engine/vector';
 import {toolRegistry,allTools} from './icons';
 import {StudioStrokeSelectIcon,StudioLassoIcon,StudioFreeformIcon,StudioMoveIcon,StudioScaleIcon,StudioRotateObjectIcon,StudioPerspectiveIcon,StudioPerspectiveMoveIcon} from './StudioToolIcons';
@@ -140,10 +140,9 @@ export function App(){
   mute:(value:boolean)=>audioActionDelegates.current.mute(value),
   seek:(seconds:number)=>audioActionDelegates.current.seek(seconds)
  });
- const wheelDelegates=useRef({action:(_action:'previous-cel'|'next-cel'|'onion-skin')=>{},mix:()=>{}});
+ const wheelDelegates=useRef({action:(_action:'previous-cel'|'next-cel'|'onion-skin')=>{}});
  const wheelCallbacks=useRef({
-  action:(action:'previous-cel'|'next-cel'|'onion-skin')=>wheelDelegates.current.action(action),
-  mix:()=>wheelDelegates.current.mix()
+  action:(action:'previous-cel'|'next-cel'|'onion-skin')=>wheelDelegates.current.action(action)
  });
  // Stable props let large drawing inspector and Tool Wheel skip unrelated
  // document commits. The delegates are refreshed before each render so button
@@ -217,7 +216,6 @@ export function App(){
  const autosaveRetry=useRef<ReturnType<typeof setTimeout>|null>(null);
  useEffect(()=>()=>{if(autosaveRetry.current)clearTimeout(autosaveRetry.current);autosaveRetry.current=null;},[]);
  const notify=(text:string)=>setMessage(text);
- const toggleMixMode=(explicit?:'paint'|'mix')=>{if(operationLock.current||engine.current?.drawing)return;setBrushLibrary(old=>{const preset=activePreset(old,false);if(!brushSupportsMix(preset)){notify('Mix mode is only available for drawing brushes.');return old;}const mode=explicit??(old.mode==='mix'?'paint':'mix');return {...old,mode};});};
  const chooseTool=(t:Tool)=>{if(operationLock.current)return;if(t==='transform'){setRightTab('inspector');setLayout(old=>({...old,rightClosed:false}));}setAdvancedStrokeTransform(false);setAddingMotionDot(false);toolIntent.current=t;syncInput(t,libraryIntent.current);setTool(t);if(t==='stroke-select')engine.current?.setStrokeMode('select');};
  useEffect(()=>{mounted.current=true;const e=new StudioEngine(canvas.current!,store,notify);engine.current=e;setEngineReady(e);syncInput(toolIntent.current,libraryIntent.current);e.confirmFill=message=>new Promise(resolve=>setFillQuestion({message,resolve}));e.onMirrorChange=()=>{writePreference('mirror-drawing',e.mirrorDrawing);setMirrorRevision(v=>v+1);};const mirrorSaved=readPreference<any>('mirror-drawing',null);if(mirrorSaved&&typeof mirrorSaved==='object'){if(['vertical','horizontal'].includes(mirrorSaved.axis))e.mirrorDrawing.axis=mirrorSaved.axis;for(const key of ['enabled','showLine','lockCenter'] as const)if(typeof mirrorSaved[key]==='boolean')e.mirrorDrawing[key]=mirrorSaved[key];if(Number.isFinite(mirrorSaved.pivot?.x)&&Number.isFinite(mirrorSaved.pivot?.y))e.mirrorDrawing.pivot={x:Math.max(0,Math.min(1,mirrorSaved.pivot.x)),y:Math.max(0,Math.min(1,mirrorSaved.pivot.y))};}e.onLoad=p=>{saved.current=p;};e.restoreView=p=>views.read(p);e.onView=v=>{camera.publish(v);if(cameraOverlayNeeded.current)setView(v);playback.current?.setView(v);views.remember(store.getSnapshot(),v);};e.onTransform=setTransform;e.onStrokeSelection=setStrokeCount;e.onStrokeMode=setStrokeMode;e.onColor=setDrawingColor;e.vectors.onSelect=setVectorId;e.smoothing.onChange=setSmoothingActive;e.onSelection=has=>{setHasSelection(has);if(!has)setTransform({dx:0,dy:0,scale:1,angle:0});};e.onBusy=b=>{operationLock.current=b;setBusy(b);};e.fit();const diagnostics={recorder:{start:()=>e.recorder.start(),pause:()=>e.recorder.pause(),resume:()=>e.recorder.resume(),stop:()=>e.recorder.stop(),status:()=>e.recorder.getSnapshot(),export:()=>e.recorder.export()},build:buildInfo,status:()=>e.diagnosticSnapshot(),replay:replayTrace,performance:{start:()=>e.performance.start(),stop:()=>e.performance.stop(),export:()=>e.performance.export()},start:()=>e.diagnostics.start(),stop:()=>e.diagnostics.stop(),clear:()=>e.diagnostics.clear(),export:()=>e.diagnostics.export(),download:()=>downloadBlob(new Blob([JSON.stringify(e.diagnostics.export(),null,2)],{type:'application/json'}),'solo-stroke-traces.json')};(window as unknown as {soloStrokeDiagnostics?:typeof diagnostics}).soloStrokeDiagnostics=diagnostics;return()=>{mounted.current=false;e.dispose();engine.current=null;delete (window as unknown as {soloStrokeDiagnostics?:unknown}).soloStrokeDiagnostics;};},[store]);
 
@@ -979,8 +977,7 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
   if(!cmd&&!e.altKey&&!e.shiftKey&&e.key.toLowerCase()==='b'&&!target.closest('input,textarea,select,[contenteditable=true]')){
    e.preventDefault();
    if(!e.repeat){
-    if(toolIntent.current==='brush')toggleMixMode();
-    else chooseTool('brush');
+     if(toolIntent.current!=='brush')chooseTool('brush');
    }
    return;
   }
@@ -991,10 +988,9 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
   };const blur=()=>{cancelHoldDrag();playback.current?.pause();engine.current?.flipbook.preview(null);setFlipPreview(null);if(engine.current){engine.current.space=false;engine.current.finishGesture();}};
   window.addEventListener('keydown',keydown);window.addEventListener('keyup',keyup);window.addEventListener('blur',blur);return()=>{window.removeEventListener('keydown',keydown);window.removeEventListener('keyup',keyup);window.removeEventListener('blur',blur);};
  },[doc,shortcuts,linkTargetFrameId,modal,hasSelection,tool,vectorId,fillQuestion,renameId,busy,flipPreview,strokeCount,multiCelAvailable,batchCanvasMode,closingTab]);
- wheelDelegates.current={
-  action:action=>{if(action==='onion-skin')setOnionSettings(settings=>({...settings,enabled:!settings.enabled}));else stepDrawingFrame(action==='previous-cel'?-1:1);},
-  mix:()=>toggleMixMode()
- };
+  wheelDelegates.current={
+   action:action=>{if(action==='onion-skin')setOnionSettings(settings=>({...settings,enabled:!settings.enabled}));else stepDrawingFrame(action==='previous-cel'?-1:1);}
+  };
  const layer=activeLayer(doc),activeTool=allTools.find(t=>t.id===tool)!;
  const selectedVector=layer.operations.find(o=>o.kind==='vector'&&o.id===vectorId) as VectorLine|undefined;
  const displayStatus=documentDirty(doc,saved.current)&&!['Saving…','Save failed'].includes(status)?'Unsaved changes':status;
@@ -1315,7 +1311,7 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
      {rightTab==='camera'&&<SceneCameraPanel project={doc} frame={cameraExposure} frameCount={cameraPlan.length} renderer={engineReady?.renderer} activeLayerId={doc.activeLayerId} onCommit={commitCamera} onGoToFrame={goToCameraExposure}/>}
      {rightTab==='history'&&<Section title="HISTORY" icon={<Clock size={14}/>}><p className="hint">Click an action to restore that document state. New edits replace the redo branch.</p><div className="history-list">{store.getHistory().map(entry=><button key={entry.id} className={(entry.current?'active ':'')+(entry.future?'future':'')} aria-current={entry.current?'step':undefined} disabled={busy} onClick={()=>{engine.current?.cancelGesture();engine.current?.clearSelection();store.goTo(entry.index);}}><span>{entry.index.toString().padStart(2,'0')}</span>{entry.label}</button>)}</div></Section>}
      {rightTab==='inspector'&&<>
-      {(tool==='brush'||tool==='eraser')&&!layer.reference&&<BrushStudio library={brushLibrary} eraser={tool==='eraser'} onChange={stablePanelHandlers.current.brushChange} notify={stablePanelHandlers.current.notice} onToggleMode={toggleMixMode}/>}
+      {(tool==='brush'||tool==='eraser')&&!layer.reference&&<BrushStudio library={brushLibrary} eraser={tool==='eraser'} onChange={stablePanelHandlers.current.brushChange} notify={stablePanelHandlers.current.notice}/>}
       {tool==='vector'&&<VectorStudio line={selectedVector} defaults={vectorDefaults} setDefaults={setVectorDefaults} style={p=>engine.current?.vectors.style(p)} transform={(x,y,scale,angle)=>engine.current?.vectors.transform(x,y,scale,angle)} smooth={amount=>engine.current?.vectors.smooth(amount)} remove={()=>engine.current?.vectors.delete()} exportLine={()=>{if(selectedVector)downloadBlob(new Blob([vectorSvg(selectedVector,doc.width,doc.height)],{type:'image/svg+xml'}),'vector-line.svg');}}/>}
       {layer.kind!=='vector'&&!layer.reference&&['brush','eraser','lasso','rectangle'].includes(tool)&&<Section title="POST-STROKE SMOOTHING"><Range label="Post smoothness" value={postAmount} onChange={setPostAmount}/><p className="hint">Refine whole strokes without changing their captured points. Preview, then apply as one undo step.</p><button className="full-width" onClick={()=>engine.current?.smoothing.preview(postAmount,'last')}>Preview last stroke</button><button className="full-width" disabled={!hasSelection} onClick={()=>engine.current?.smoothing.preview(postAmount,'selection',engine.current.selection)}>Preview selected strokes</button>{smoothingActive&&<div className="studio-preset-actions"><button className="accent-button" onClick={()=>engine.current?.smoothing.apply()}>Apply smoothing</button><button onClick={()=>engine.current?.smoothing.cancel()}>Cancel smoothing</button></div>}</Section>}
       {(tool==='stroke-select'||tool==='transform')&&<StrokeWidthEditor engine={engine.current} project={doc} selectedCount={strokeCount}/>}
@@ -1399,7 +1395,7 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
       </div>
      </div>}
    </section>
-   <div className="wheel-overlay"><RadialToolbar shortcuts={shortcuts} onAction={wheelCallbacks.current.action} active={tool} onTool={stablePanelHandlers.current.choose} workspace={workbench} homeOpen={!layout.leftClosed&&!focusMode} onNotice={stablePanelHandlers.current.notice} mixMode={brushLibrary.mode==='mix'} onToggleMix={wheelCallbacks.current.mix}/></div>
+   <div className="wheel-overlay"><RadialToolbar shortcuts={shortcuts} onAction={wheelCallbacks.current.action} active={tool} onTool={stablePanelHandlers.current.choose} workspace={workbench} homeOpen={!layout.leftClosed&&!focusMode} onNotice={stablePanelHandlers.current.notice}/></div>
   </div>
   <footer className="app-footer"><span><i/> LOCAL WORKSPACE<span className="footer-divider"/>All artwork stays on this device</span><span>{busy?'Processing fill':hasSelection?'Selection active':'Ready to draw'}<span className="footer-divider"/>{frameSize.width} × {frameSize.height} px<span className="footer-divider"/><CameraPercent camera={camera}/></span></footer>
   <input ref={fileInput} type="file" accept=".json,.solo.json" multiple hidden onChange={async e=>{const files=[...(e.target.files??[])];e.target.value='';for(const file of files)try{await openProject(await importProject(file));}catch(err){notify('Import failed: '+String(err));}}}/>

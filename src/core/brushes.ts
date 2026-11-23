@@ -114,12 +114,14 @@ export function restoreBrushLibrary(value:unknown):BrushLibrary{
  if(old.brushId==='airbrush'){fresh.brushId='color-air';const saved=old.presets?.find(p=>p.id==='airbrush'),target=fresh.presets.find(p=>p.id==='color-air')!;if(saved){const migrated=sanitizeBrush(saved.settings,legacyAirbrushPreset.defaults);target.settings={...target.settings,size:migrated.size,color:migrated.color};}}
  else if(fresh.presets.some(p=>p.id===old.brushId&&p.category!=='Eraser'))fresh.brushId=old.brushId;
  else if(typeof old.brushId==='string'&&/^watercolor(?:-|$)/.test(old.brushId)||Array.isArray(old.presets)&&old.presets.some(p=>p?.id===old.brushId&&retiredWatercolorPreset(p)))fresh.brushId='soft-paint';
- if(typeof (old as any).mode==='string'&&['paint','mix'].includes((old as any).mode))fresh.mode=(old as any).mode as BrushMode;
+ // Mix mode was removed from the brush UI. Always open saved brush libraries
+ // in Paint mode while retaining their preset data for compatibility.
  if(isRetiredBlendPresetId(fresh.brushId)){
-  fresh.mode='mix';
   fresh.brushId=fresh.brushId==='wet-mix'?'water-wet':fresh.brushId==='smudge-bristle'?'color-texture':'color-soft';
  }
  if(fresh.presets.some(p=>p.id===old.eraserId&&p.category==='Eraser'))fresh.eraserId=old.eraserId;
+ for(const p of fresh.presets)if(!p.settings.brushTip?.startsWith('water-')){p.settings.mixColors=false;p.defaults.mixColors=false;}
+ fresh.mode='paint';
  return fresh;
 }
 export function activePreset(library:BrushLibrary,eraser=false){return library.presets.find(p=>p.id===(eraser?library.eraserId:library.brushId))!;}
@@ -128,49 +130,7 @@ export function updatePreset(library:BrushLibrary,id:string,settings:BrushSettin
 export function brushList(library:BrushLibrary,category:BrushCategory,family?:BrushFamily){
  return library.presets.filter(p=>p.category===category&&(!family||p.family===family)&&!isRetiredBlendPresetId(p.id));
 }
-export const brushSupportsMix=(preset:BrushPreset)=>preset.category!=='Eraser';
-function inferredMixNib(settings:BrushSettings):ColorNib{
- if(isColoringTip(settings.brushTip))return settings.colorNib??defaultColorNib(settings.brushTip);
- if(settings.brushTip==='flat-bristle')return 'flat';
- if(settings.brushTip==='felt')return 'chisel';
- if(settings.brushTip==='soft-round')return 'round';
- if(settings.brushTip==='chalk')return 'fan';
- if(settings.brushTip==='water-flat'||settings.watercolorShape==='angular')return 'flat';
- if(settings.brushTip==='water-gradient'||settings.watercolorShape==='liner')return 'rake';
- if(settings.brushTip==='water-wet'||settings.watercolorShape==='mop')return 'filbert';
- if(settings.brushTip?.startsWith('water-'))return 'filbert';
- if(settings.brushKind?.startsWith('graphite-'))return 'fan';
- if(settings.brushKind==='dry-bristle'||settings.brushTip==='bristle')return 'bristle';
- return 'filbert';
-}
-function inferMixDefaults(settings:BrushSettings){
- const watercolor=!!settings.brushTip?.startsWith('water-');
- const dry=settings.dryBristleVersion===1||settings.dryBristleVersion===2||settings.dryBristleVersion===3||settings.brushTip==='chalk';
- const soft=settings.brushTip==='soft-round'||settings.brushTip==='color-soft'||settings.brushTip==='color-air'||settings.brushKind==='airbrush';
- const flat=settings.brushTip==='flat-bristle'||settings.brushTip==='felt'||settings.brushTip==='color-solid'||settings.brushTip==='water-flat';
- const smudgeVersion=soft?3:2;
- return {
-  smudgeVersion,
-  mixAmount:settings.mixAmount??(watercolor ? .72 : soft ? .48 : dry ? .68 : flat ? .62 : .58),
-  pickupLen:settings.mixPickupLen??(watercolor ? 1.4 : dry ? .85 : 1),
-  holdLen:settings.mixHoldLen??(watercolor ? 5.5 : dry ? 2.2 : flat ? 1.9 : soft ? 1.2 : 2.6),
-  smearStreak:settings.mixStreak??(watercolor ? .12 : dry ? .44 : flat ? .18 : soft ? .05 : .22),
-  useSelectedColour:settings.mixPaintLoad??0,
-  blendPreserveAlpha:soft,
-  colorNib:inferredMixNib(settings),
-  colorNibFollow:settings.colorNibFollow??!soft,
- };
-}
-/** Mix changes only the compositing operation. The normal brush's renderer,
- * nib, pressure, grain, dry gaps, watercolor edge and hashes stay identical.
- * v167 converted the entire brush to color-blender: that is intentionally gone.
- */
-export function mixifiedBrushSettings(settings:BrushSettings):BrushSettings{
- return {...settings,nativeMixEnabled:true,mixColors:false};
-}
 export function activeInputPreset(library:BrushLibrary,eraser=false){
- const preset=activePreset(library,eraser);
- if(eraser||library.mode!=='mix'||!brushSupportsMix(preset))return preset;
- return {...preset,name:preset.name+' · Mix',settings:mixifiedBrushSettings(preset.settings)};
+ return activePreset(library,eraser);
 }
 
