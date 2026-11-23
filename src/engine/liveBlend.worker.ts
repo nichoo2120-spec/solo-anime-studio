@@ -20,7 +20,6 @@ let deltaSupport:RasterRegion|undefined,deltaRegion:RasterRegion|undefined;
 let deltaBase:Uint8ClampedArray|undefined,deltaRead:OffscreenCanvas|undefined,deltaMask:OffscreenCanvas|undefined,deltaPaint:OffscreenCanvas|undefined;
 let pigmentPoints=0;
 let compactReplies=false,lastPixels:Uint8ClampedArray|undefined;
-let seededTiles=new Set<number>();
 let nativeMask:OffscreenCanvas|undefined;let nativeStrokeRaster:LiveStrokeRaster|undefined;
 let activeStroke:Stroke|undefined,activeStrokeToken=0;
 const union=(a:RasterRegion|undefined,b:RasterRegion)=>{if(!a)return b;const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);return{x,y,width:Math.max(a.x+a.width,b.x+b.width)-x,height:Math.max(a.y+a.height,b.y+b.height)-y};};
@@ -32,10 +31,6 @@ function finiteRegion(value:RasterRegion,width:number,height:number,fallback:()=
  const r=valid(value)?value:backup&&valid(backup)?backup:{x:0,y:0,width:1,height:1};
  const x=Math.max(0,Math.min(width-1,Math.floor(r.x))),y=Math.max(0,Math.min(height-1,Math.floor(r.y)));
  return{x,y,width:Math.max(1,Math.min(width,Math.ceil(r.x+r.width))-x),height:Math.max(1,Math.min(height,Math.ceil(r.y+r.height))-y)};
-}
-function seedTarget(value:RasterRegion){
- if(!base||!target)return;const columns=Math.ceil(target.width/64),x0=Math.max(0,Math.floor(value.x/64)*64),y0=Math.max(0,Math.floor(value.y/64)*64),x1=Math.min(target.width,Math.ceil((value.x+value.width)/64)*64),y1=Math.min(target.height,Math.ceil((value.y+value.height)/64)*64),bc=base.getContext('2d')!,tc=target.getContext('2d')!;
- for(let y=y0;y<y1;y+=64)for(let x=x0;x<x1;x+=64){const key=Math.floor(y/64)*columns+Math.floor(x/64);if(seededTiles.has(key))continue;const w=Math.min(64,target.width-x),h=Math.min(64,target.height-y);tc.drawImage(base,x,y,w,h,x,y,w,h);seededTiles.add(key);}
 }
 // Long Mix gestures can contain thousands of tiny tablet samples. The pigment
 // pickup and saved stroke keep every captured point; only the provisional brush
@@ -60,21 +55,21 @@ worker.onmessage=async({data:j})=>{
  try{
   if(j.kind!=='update'){
    activeStroke=undefined;activeStrokeToken=0;
-   compactReplies=!!j.compactReplies;pigmentPoints=0;seededTiles.clear();
+   compactReplies=!!j.compactReplies;pigmentPoints=0;
    if(j.basePixels){if(lastPixels?.length===j.basePixels.length)lastPixels.set(j.basePixels);else lastPixels=j.basePixels.slice();}else if(j.kind!=='cancel'||!j.reuseSurfaces)lastPixels=undefined;
    deltaSupport=j.seeded?j.deltaRegion:undefined;deltaRegion=j.deltaRegion;deltaBase=undefined;
    for(const c of [deltaRead,deltaMask,deltaPaint])if(c)c.width=c.height=0;deltaRead=deltaMask=deltaPaint=undefined;
-   resetWetSmudgeCaches();resetGentleBlend();if(target)resetPigmentMix(target as unknown as HTMLCanvasElement,true);nativeStrokeRaster?.reset();token=j.token;region=undefined;seededTiles.clear();
+   resetWetSmudgeCaches();resetGentleBlend();if(target)resetPigmentMix(target as unknown as HTMLCanvasElement,true);nativeStrokeRaster?.reset();token=j.token;region=undefined;
    if(nativeMask)nativeMask.getContext('2d')!.reset();
    if(j.kind==='cancel'){if(!j.reuseSurfaces){if(target)resetPigmentMix(target as unknown as HTMLCanvasElement);for(const c of [base,target,nativeMask])if(c)c.width=c.height=0;base=target=nativeMask=undefined;nativeStrokeRaster=undefined;lastPixels=undefined;surfaceMode=undefined;}return;}
-   const readFrequently=!!j.nativeDelta||!!j.readFrequently;
+   const readFrequently=j.nativeDelta||j.readFrequently!==false;
    if(!base||!target||base.width!==j.width||base.height!==j.height||surfaceMode!==readFrequently){
     if(target)resetPigmentMix(target as unknown as HTMLCanvasElement);if(base)base.width=base.height=0;if(target)target.width=target.height=0;
     base=new OffscreenCanvas(j.width,j.height);target=new OffscreenCanvas(j.width,j.height);surfaceMode=readFrequently;
    }
    const baseContext=base.getContext('2d',{willReadFrequently:readFrequently})!,targetContext=target.getContext('2d',{willReadFrequently:readFrequently})!;
    if(j.nativeDelta&&j.basePixels){const pixels=baseContext.createImageData(j.width,j.height);pixels.data.set(j.basePixels);baseContext.putImageData(pixels,0,0);targetContext.putImageData(pixels,0,0);}
-   else{baseContext.clearRect(0,0,j.width,j.height);targetContext.clearRect(0,0,j.width,j.height);baseContext.drawImage(j.base!,0,0);}j.base?.close();
+   else{baseContext.clearRect(0,0,j.width,j.height);targetContext.clearRect(0,0,j.width,j.height);baseContext.drawImage(j.base!,0,0);targetContext.drawImage(j.base!,0,0);}j.base?.close();
    if(j.nativeDelta){deltaRead=new OffscreenCanvas(j.basePixels?1:j.width,j.basePixels?1:j.height);const read=deltaRead.getContext('2d',{willReadFrequently:true})!;if(j.deltaPixels||j.basePixels)deltaBase=j.deltaPixels??j.basePixels;else{read.drawImage(base,0,0);deltaBase=read.getImageData(0,0,j.width,j.height).data;deltaRead.width=deltaRead.height=1;}deltaMask=new OffscreenCanvas(1,1);deltaPaint=new OffscreenCanvas(1,1);}
    return;
   }
@@ -129,16 +124,12 @@ worker.onmessage=async({data:j})=>{
    region=union(region,updated);
    r=j.final?region:updated;
    if(r.width<1||r.height<1)r={x:0,y:0,width:1,height:1};
-   seedTarget(r);
    if(s.nativeMixVersion)applyNativeBrushMix(tc,nativeMask as unknown as HTMLCanvasElement,s,0,0,j.final&&s.nativeMixVersion===3?fullBounds():r,bc);
    else{tc.clearRect(r.x,r.y,r.width,r.height);tc.drawImage(bc,r.x,r.y,r.width,r.height,r.x,r.y,r.width,r.height);compositePaintStroke(tc,nativeMask as unknown as HTMLCanvasElement,s,0,0,r,bc);}
-  }else{
-   const full=s.points.length?strokeRasterBounds(s,target.width,target.height):{x:0,y:0,width:target.width,height:target.height};
-   const tailBounds=()=>{if(s.points.length<2)return full;const tail={...s,points:s.points.slice(Math.max(0,s.points.length-8))};return strokeRasterBounds(tail,target!.width,target!.height,strokeGeometry(tail,'live'));};
-   const requested=j.final?(union(region,full)??full):tailBounds();seedTarget(requested);
-   const renderStroke=j.final?s:mixPreviewGeometryStroke(s);
-   const updated=compositePaintStroke(tc,bc,renderStroke,0,0,requested,bc,!j.final)??requested;seedTarget(updated);
-   region=union(region,full);r=j.final?(region??full):updated;
+  }else if(s.smudgeVersion===3){r=applyGentleBlend(tc,bc,s,0,0,{x:0,y:0,width:target.width,height:target.height},bc)??{x:0,y:0,width:1,height:1};}
+  else{
+   r=region=union(region,s.points.length?strokeRasterBounds(s,target.width,target.height):{x:0,y:0,width:target.width,height:target.height});
+   compositePaintStroke(tc,bc,s,0,0,r,bc);
   }
   r=finiteRegion(r,target.width,target.height,fullBounds);
   if(deltaBase){

@@ -25,14 +25,14 @@ export function strokeRasterBounds(s:Stroke,width:number,height:number,g=finalGe
 }
 /** The layer boundary owns opacity. New watercolor modes never alter coverage
  * inside a stroke. Historical strokes and ordinary brushes use Canvas unchanged. */
-export function compositePaintStroke(ctx:CanvasRenderingContext2D,source:HTMLCanvasElement,s:Stroke,sourceX=0,sourceY=0,region?:RasterRegion,blendBase?:HTMLCanvasElement,liveMixPreview=false):RasterRegion|undefined{
+export function compositePaintStroke(ctx:CanvasRenderingContext2D,source:HTMLCanvasElement,s:Stroke,sourceX=0,sourceY=0,region?:RasterRegion,blendBase?:HTMLCanvasElement){
  if(!!s.nativeMixVersion&&s.tool==='brush'){applyNativeBrushMix(ctx,source,s,sourceX,sourceY,region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height),blendBase);return;}
- if(s.smudgeVersion===3&&s.coloringEngine===1&&s.brushTip==='color-blender'&&s.tool!=='eraser')return applyGentleBlend(ctx,source,s,sourceX,sourceY,region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height),blendBase,liveMixPreview);
- if(s.smudgeVersion===2&&s.coloringEngine===1&&s.brushTip==='color-blender'&&s.tool!=='eraser')return applyWetSmudge(ctx,source,s,sourceX,sourceY,region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height),blendBase,liveMixPreview);
- if(s.coloringEngine===1&&s.brushTip==='color-blender'&&s.tool!=='eraser')return (s.coloringAppearanceVersion===3?applyBristleSmudge:s.coloringAppearanceVersion===2?applyColorSmudge:applyColorBlend)(ctx,source,s,sourceX,sourceY,region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height),blendBase,liveMixPreview);
+ if(s.smudgeVersion===3&&s.coloringEngine===1&&s.brushTip==='color-blender'&&s.tool!=='eraser'){applyGentleBlend(ctx,source,s,sourceX,sourceY,region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height),blendBase);return;}
+ if(s.smudgeVersion===2&&s.coloringEngine===1&&s.brushTip==='color-blender'&&s.tool!=='eraser'){applyWetSmudge(ctx,source,s,sourceX,sourceY,region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height),blendBase);return;}
+ if(s.coloringEngine===1&&s.brushTip==='color-blender'&&s.tool!=='eraser'){(s.coloringAppearanceVersion===3?applyBristleSmudge:s.coloringAppearanceVersion===2?applyColorSmudge:applyColorBlend)(ctx,source,s,sourceX,sourceY,region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height),blendBase);return;}
  if(s.tool==='eraser'||s.watercolorEngine!==1||!s.watercolorMode||s.watercolorMode==='glaze'){
   ctx.save();ctx.globalCompositeOperation=s.tool==='eraser'?'destination-out':'source-over';ctx.globalAlpha=s.opacity;
-  if(region){const r=region;if(r.width&&r.height)ctx.drawImage(source,r.x-sourceX,r.y-sourceY,r.width,r.height,r.x,r.y,r.width,r.height);}else ctx.drawImage(source,sourceX,sourceY);ctx.restore();return region;
+  if(region){const r=region;if(r.width&&r.height)ctx.drawImage(source,r.x-sourceX,r.y-sourceY,r.width,r.height,r.x,r.y,r.width,r.height);}else ctx.drawImage(source,sourceX,sourceY);ctx.restore();return;
  }
  const r=region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height),x=Math.max(r.x,sourceX),y=Math.max(r.y,sourceY),right=Math.min(r.x+r.width,sourceX+source.width,ctx.canvas.width),bottom=Math.min(r.y+r.height,sourceY+source.height,ctx.canvas.height),w=right-x,h=bottom-y;
  if(w<=0||h<=0||s.opacity<=0)return;
@@ -44,5 +44,5 @@ export function compositePaintStroke(ctx:CanvasRenderingContext2D,source:HTMLCan
   const coverage=s.watercolorMode==='even'?Math.max(d,a):Math.max(d,a)+(union-Math.max(d,a))*(.12+.35*(1-wet));
   const t=a/(a+d);for(let j=0;j<3;j++)data[i+j]=Math.round(data[i+j]+(src[i+j]-data[i+j])*t);data[i+3]=Math.round(coverage*255);
  }
- ctx.putImageData(dest,x,y);return {x,y,width:w,height:h};
+ ctx.putImageData(dest,x,y);
 }
