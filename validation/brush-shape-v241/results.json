@@ -1,0 +1,132 @@
+{
+  "rows": [
+    {
+      "label": "Round paint, no shape (old path)",
+      "stamp": 0,
+      "ink": 10585,
+      "liveDiff": 40552,
+      "incDiff": 420,
+      "incMax": 191
+    },
+    {
+      "label": "Roundness 25%, angle 45°",
+      "stamp": 1,
+      "ink": 9929,
+      "liveDiff": 0,
+      "incDiff": 30,
+      "incMax": 2
+    },
+    {
+      "label": "Scale X 250%, Scale Y 40%",
+      "stamp": 1,
+      "ink": 12589,
+      "liveDiff": 0,
+      "incDiff": 7,
+      "incMax": 2
+    },
+    {
+      "label": "Flat, angle follows direction",
+      "stamp": 1,
+      "ink": 13047,
+      "liveDiff": 0,
+      "incDiff": 256,
+      "incMax": 3
+    },
+    {
+      "label": "Flat, follows + Flip X/Y",
+      "stamp": 1,
+      "ink": 11654,
+      "liveDiff": 0,
+      "incDiff": 378,
+      "incMax": 31
+    },
+    {
+      "label": "HB pencil squeezed 30%",
+      "stamp": 1,
+      "ink": 7414,
+      "liveDiff": 0,
+      "incDiff": 99,
+      "incMax": 6
+    },
+    {
+      "label": "G-Pen, oval tip",
+      "stamp": 1,
+      "ink": 10490,
+      "liveDiff": 0,
+      "incDiff": 19,
+      "incMax": 6
+    },
+    {
+      "label": "Dual multiply + chalk",
+      "stamp": 1,
+      "ink": 10344,
+      "liveDiff": 0,
+      "incDiff": 10,
+      "incMax": 6
+    },
+    {
+      "label": "Dual subtract + bristle",
+      "stamp": 1,
+      "ink": 8007,
+      "liveDiff": 0,
+      "incDiff": 55,
+      "incMax": 85
+    },
+    {
+      "label": "Dual darken",
+      "stamp": 1,
+      "ink": 10764,
+      "liveDiff": 0,
+      "incDiff": 38,
+      "incMax": 6
+    },
+    {
+      "label": "Dual overlay",
+      "stamp": 1,
+      "ink": 10230,
+      "liveDiff": 0,
+      "incDiff": 6,
+      "incMax": 6
+    },
+    {
+      "label": "Dual lighten",
+      "stamp": 1,
+      "ink": 11085,
+      "liveDiff": 0,
+      "incDiff": 6,
+      "incMax": 1
+    },
+    {
+      "label": "Dual screen",
+      "stamp": 1,
+      "ink": 11079,
+      "liveDiff": 0,
+      "incDiff": 14,
+      "incMax": 4
+    },
+    {
+      "label": "Dual height",
+      "stamp": 1,
+      "ink": 9794,
+      "liveDiff": 0,
+      "incDiff": 8,
+      "incMax": 2
+    },
+    {
+      "label": "Shape + dual together",
+      "stamp": 1,
+      "ink": 10973,
+      "liveDiff": 0,
+      "incDiff": 47,
+      "incMax": 2
+    }
+  ],
+  "distinct": 15,
+  "blend": {
+    "stamp": 1,
+    "blend": 1,
+    "diff": 0,
+    "changed": 3054
+  },
+  "errors": []
+}

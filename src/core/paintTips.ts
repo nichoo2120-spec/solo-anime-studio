@@ -1,5 +1,6 @@
 import {silkStrokeMetadata,type SilkBlendControls} from './silkBlend';
 import {brushBlendMetadata,type BrushBlendSettings} from './brushBlend';
+import {brushShapeMetadata,type BrushShapeSettings} from './brushShape';
 import {supportsInkTip} from './inkTip';
 import {inkTipMetadata} from './inkTip';
 import {isFlowInk,type InkFlowControls} from './inkFlow';
@@ -46,8 +47,7 @@ export const selectablePaintTips=paintTips.filter(t=>!isWatercolorTip(t.id));
 export const isPaintTip=(value:unknown):value is PaintTip=>paintTips.some(t=>t.id===value);
 /** Stable seed stored at contact, independent of replay or display updates. */
 export function watercolorSeedFor(id:string){let h=2166136261;for(let i=0;i<id.length;i++)h=Math.imul(h^id.charCodeAt(i),16777619);return h>>>0;}
-/** One metadata source for captured strokes, brush previews and saved replay. */
-export function brushStrokeMetadata(s:InkFlowControls&WatercolorControls&ColoringControls&DryBristleControls&TipMixControls&SilkBlendControls&BrushBlendSettings&{brushKind?:string;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;pressureFlow?:boolean;mixColors?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number}){
+function paintStrokeMetadata(s:InkFlowControls&WatercolorControls&ColoringControls&DryBristleControls&TipMixControls&SilkBlendControls&BrushBlendSettings&BrushShapeSettings&{brushKind?:string;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;pressureFlow?:boolean;mixColors?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number}){
  const mix=tipMixMetadata(s),tip=mix.brushTip??s.brushTip,textured=!!tip&&tip!=='round',kind=s.brushKind??'';
  return {...smudgeMetadata(s),...dryStrokeMetadata(s),...silkStrokeMetadata(s),...brushBlendMetadata(s),blendPreserveAlpha:s.brushTip==='color-blender'?s.blendPreserveAlpha:undefined,coloringAppearanceVersion:s.brushTip==='color-texture'||s.brushTip==='color-blender'?3 as const:undefined,coloringEngine:isColoringTip(s.brushTip)?1 as const:undefined,colorNib:isColoringTip(s.brushTip)?s.colorNib??defaultColorNib(s.brushTip):undefined,colorNibFollow:isColoringTip(s.brushTip)?s.colorNibFollow:undefined,colorSeed:isColoringTip(s.brushTip)?s.colorSeed:undefined,watercolorAppearanceVersion:isNewWatercolorTip(s.brushTip)?s.watercolorAppearanceVersion:undefined,watercolorShape:isNewWatercolorTip(s.brushTip)?s.watercolorShape:undefined,watercolorMode:isNewWatercolorTip(s.brushTip)?s.watercolorMode:undefined,mixVersion:s.mixColors||s.watercolorMode==='wet'?2 as const:undefined,watercolorEngine:isNewWatercolorTip(s.brushTip)?1 as const:undefined,pigmentAmount:s.pigmentAmount,waterAmount:s.waterAmount,edgeSoftness:s.edgeSoftness,dryness:s.dryness,pigmentBuildup:s.pigmentBuildup,pigmentDepletion:s.pigmentDepletion,pigmentReload:s.pigmentReload,wetDiffusion:s.wetDiffusion,edgeBleeding:s.edgeBleeding,watercolorMaterialVersion:isWatercolorTip(s.brushTip)?2 as const:undefined,watercolorStyle:s.watercolorStyle,pigmentPooling:s.pigmentPooling,brushTip:s.brushTip,tipAngle:s.tipAngle,tipSpacing:s.tipSpacing,flow:s.flow,hardness:s.hardness,pressureFlow:s.pressureFlow,paintTipVersion:textured?2 as const:undefined,watercolorVersion:isWatercolorTip(s.brushTip)?3 as const:undefined,
   ...mix,...inkTipMetadata(s),...(supportsInkTip(kind)&&s.inkProfileVersion===1?{inkProfileVersion:1 as const,inkProfile:s.inkProfile?.map(p=>({...p})),inkProfileLength:s.inkProfileLength??180}:{}),...(isFlowInk(kind)&&s.inkFlowAmount!==undefined?{inkFlowVersion:1 as const,inkFlowAmount:s.inkFlowAmount,inkFlowLength:s.inkFlowLength??160}:{}),liveRefinementVersion:s.inkProfileVersion===1||s.inkTipVersion===1||textured||['studio-ink','contour-flow','g-pen','mapping','brush-pen','marker','paint','dry-round','dry-grain','watercolor','airbrush','flat','eraser-soft'].includes(kind)?3 as const:2 as const,
@@ -56,3 +56,12 @@ export function brushStrokeMetadata(s:InkFlowControls&WatercolorControls&Colorin
   engineVersion:kind==='dry-round'||kind.startsWith('graphite-')?9 as const:['dry-grain','watercolor','airbrush'].includes(kind)?8 as const:10 as const};
 }
 
+
+/** One metadata source for captured strokes, brush previews and saved replay. */
+export function brushStrokeMetadata(s:InkFlowControls&WatercolorControls&ColoringControls&DryBristleControls&TipMixControls&SilkBlendControls&BrushBlendSettings&BrushShapeSettings&{brushKind?:string;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;pressureFlow?:boolean;mixColors?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number}){
+ // v0.5.241 Tip shape / Dual Brush: the stamp engine draws this stroke, so it
+ // carries only the stamp fields (plus Blend), never another engine's routing.
+ const shape=brushShapeMetadata(s);
+ if(shape.stampVersion===1)return {...brushBlendMetadata(s),...shape,tipSpacing:s.tipSpacing,flow:s.flow,pressureFlow:s.pressureFlow} as unknown as ReturnType<typeof paintStrokeMetadata>;
+ return paintStrokeMetadata(s);
+}

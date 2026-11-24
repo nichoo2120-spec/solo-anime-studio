@@ -1,5 +1,6 @@
 import {isSilkMode,silkLimits,type SilkBlendControls} from './silkBlend';
 import {validBrushBlendStroke,type BrushBlendControls} from './brushBlend';
+import {validBrushShapeStroke,validTilt,type BrushShapeControls} from './brushShape';
 import {validCurve} from './brushCurves';
 import {validWidthPoints,canEditStrokeWidth,type WidthPointControls} from './widthPoints';
 import {validImportedGrain} from './importedGrain';
@@ -24,7 +25,7 @@ export type WatercolorControls={watercolorAppearanceVersion?:1;watercolorShape?:
 export type PressureSettings={minSize?:number;maxSize?:number;minOpacity?:number;maxOpacity?:number;velocityTaper?:boolean};
 export type Matrix = [number,number,number,number,number,number];
 export type PerspectiveMatrix = [number,number,number,number,number,number,number,number,number];
-export type Stroke = {id:string;kind:'stroke';worldStroke?:true;tool:'brush'|'eraser';points:Point[];size:number;opacity:number;color:string;pressure:boolean;response:number;watercolorEngine?:1;mixVersion?:2;nativeMixVersion?:1|2|3;nativeMixPickupVersion?:1|2|3;nativeMixAmount?:number;nativeMixRadius?:number;nativeMixPaintLoad?:number;rasterTransformVersion?:1;rasterSourceId?:string;engineVersion?:2|3|4|5|6|7|8|9|10;/** Continuous flat-nib sweep for new strokes only. */flatNibVersion?:1;/** Diameter-scaled soft-paint sampling for new strokes. */paintNibVersion?:1;paintTipVersion?:1|2;/** Reference-guided watercolor coverage and edge pooling, new strokes only. */watercolorVersion?:1|2|3;/** Reference-guided materials on the continuous version-3 front. */watercolorMaterialVersion?:1|2;watercolorSeed?:number;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number;mixStops?:{x:number;y:number;color:string}[];flow?:number;hardness?:number;pressureFlow?:boolean;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;liveRefinementVersion?:1|2|3;inkFlowVersion?:1;/** Canvas zoom captured on pen-down. New strokes only: makes spatial stroke cleanup consistent in screen pixels. */captureZoom?:number;stabilization?:number;smoothness?:number;pressureWidth?:boolean;pressureOpacity?:boolean;pressureCurve?:{x:number;y:number}[];taperStart?:number;taperEnd?:number;brushKind?:string;textureStrength?:number;/** Non-destructive affine transform of one line. */transform?:Matrix;/** Projective transform for independent corner sizing. */perspective?:PerspectiveMatrix}&PressureSettings&WatercolorControls&ColoringControls&DryBristleControls&TipMixControls&InkFlowControls&WidthPointControls&SilkBlendControls&BrushBlendControls;
+export type Stroke = {id:string;kind:'stroke';worldStroke?:true;tool:'brush'|'eraser';points:Point[];size:number;opacity:number;color:string;pressure:boolean;response:number;watercolorEngine?:1;mixVersion?:2;nativeMixVersion?:1|2|3;nativeMixPickupVersion?:1|2|3;nativeMixAmount?:number;nativeMixRadius?:number;nativeMixPaintLoad?:number;rasterTransformVersion?:1;rasterSourceId?:string;engineVersion?:2|3|4|5|6|7|8|9|10;/** Continuous flat-nib sweep for new strokes only. */flatNibVersion?:1;/** Diameter-scaled soft-paint sampling for new strokes. */paintNibVersion?:1;paintTipVersion?:1|2;/** Reference-guided watercolor coverage and edge pooling, new strokes only. */watercolorVersion?:1|2|3;/** Reference-guided materials on the continuous version-3 front. */watercolorMaterialVersion?:1|2;watercolorSeed?:number;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number;mixStops?:{x:number;y:number;color:string}[];flow?:number;hardness?:number;pressureFlow?:boolean;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;liveRefinementVersion?:1|2|3;inkFlowVersion?:1;/** Canvas zoom captured on pen-down. New strokes only: makes spatial stroke cleanup consistent in screen pixels. */captureZoom?:number;stabilization?:number;smoothness?:number;pressureWidth?:boolean;pressureOpacity?:boolean;pressureCurve?:{x:number;y:number}[];taperStart?:number;taperEnd?:number;brushKind?:string;textureStrength?:number;/** Non-destructive affine transform of one line. */transform?:Matrix;/** Projective transform for independent corner sizing. */perspective?:PerspectiveMatrix}&PressureSettings&WatercolorControls&ColoringControls&DryBristleControls&TipMixControls&InkFlowControls&WidthPointControls&SilkBlendControls&BrushBlendControls&BrushShapeControls;
 export type Fill = {id:string;kind:'fill';png:string;under?:boolean};
 export type ImageOperation={id:string;kind:'image';png:string;x:number;y:number;width:number;height:number};
 export type ClearOperation={id:string;kind:'clear';polygon:Point[]};
@@ -33,7 +34,7 @@ export type ArtworkOrigin={inShot?:true;inPreviousStage?:true};
 export type Operation = (Stroke | Fill | Transform | VectorLine | ImageOperation | ClearOperation)&ArtworkOrigin;
 export type BlendMode='normal'|'multiply'|'screen'|'overlay'|'add';
 export type Layer = {id:string;name:string;visible:boolean;locked:boolean;opacity:number;operations:Operation[];kind?:'raster'|'vector';blend?:BlendMode;reference?:boolean;exportReference?:boolean};
-export type Project = {format:'solo-anime-studio';version:1|2|3|4|5|6;id:string;name:string;width:number;height:number;shotFrame?:ShotFrame;previousStage?:ShotFrame;activeLayerId:string;layers:Layer[];settings:{guides:boolean};createdAt:string;animation?:DrawingTimeline;substitutionShelf?:SubstitutionShelfData;cycleShelf?:CycleShelf;audio?:SceneAudio;motionPlanning?:MotionPlanning;camera?:SceneCamera};
+export type Project = {format:'solo-anime-studio';version:1|2|3|4|5|6;id:string;name:string;width:number;height:number;shotFrame?:ShotFrame;previousStage?:ShotFrame;activeLayerId:string;layers:Layer[];settings:{guides:boolean};createdAt:string;animation?:DrawingTimeline;substitutionShelf?:SubstitutionShelfData;cycleShelf?:CycleShelf;audio?:SceneAudio;motionPlanning?:MotionPlanning;camera?:SceneCamera;/** v0.5.241 Custom brushes carried with saved projects and backups (only when the user has some). */customBrushes?:unknown[]};
 export const MAX_STAGE_SIDE=8192,MAX_STAGE_PIXELS=16_777_216;
 export const WORLD_STROKE_LIMIT=8_000_000;
 export const uid = () => crypto.randomUUID();
@@ -161,6 +162,7 @@ export function validateProject(value:unknown):Project {
     if(o.silkMode!==undefined&&(o.silkBlendVersion===undefined||!isSilkMode(o.silkMode)))throw Error('Invalid Silk Blend mode.');
     for(const [key,min,max] of silkLimits)if(o[key]!==undefined&&(o.silkBlendVersion===undefined||!bounded(o[key],min,max)))throw Error('Invalid Silk Blend control.');
     if(!validBrushBlendStroke(o as Record<string,unknown>))throw Error('Invalid brush blend stroke.');
+    if(!validBrushShapeStroke(o as Record<string,unknown>)||o.tsTilt&&!o.points.every((q:Record<string,unknown>)=>validTilt(q)))throw Error('Invalid brush shape stroke.');
     if(['pressureWidth','pressureOpacity','velocityTaper'].some(key=>o[key]!==undefined&&typeof o[key]!=='boolean'))throw Error('Invalid pressure control.');
    }else if(o.kind==='fill'){
     if(typeof o.png!=='string'||!o.png.startsWith('data:image/png;base64,')||o.png.length>50000000)throw Error('Invalid fill data.');
@@ -262,6 +264,7 @@ export function validateProject(value:unknown):Project {
  }
  if(p.audio!==undefined&&!validateSceneAudio(p.audio))throw Error('Invalid scene audio.');
  if(!validateMotionPlanning(p))throw Error('Invalid motion/timing notes.');
+ if(p.customBrushes!==undefined&&(!Array.isArray(p.customBrushes)||p.customBrushes.length>100||!p.customBrushes.every((b:any)=>b&&typeof b==='object'&&b.custom===true&&typeof b.id==='string'&&b.id.length<=80&&typeof b.name==='string'&&b.name.length<=60&&['Pencil','Ink','Paint','Eraser'].includes(b.category)&&b.settings&&typeof b.settings==='object'&&!Array.isArray(b.settings))))throw Error('Invalid custom brushes.');
  if(p.camera!==undefined){if(!validateSceneCamera(p.camera))throw Error('Invalid scene camera.');p.camera=pruneCameraDepth(p.camera,ids);}
  if(!ids.has(p.activeLayerId)||!p.settings||typeof p.settings.guides!=='boolean')throw Error('Invalid document settings.');
  return p as Project;

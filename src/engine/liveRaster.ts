@@ -1,3 +1,5 @@
+import {drawStampStroke,stampBounds,stampPlan,stampChange,type StampPlan} from './stampBrush';
+const clipRegion=(r:RasterRegion,w:number,h:number):RasterRegion=>{const x=Math.max(0,r.x),y=Math.max(0,r.y);return {x,y,width:Math.max(0,Math.min(w,r.x+r.width)-x),height:Math.max(0,Math.min(h,r.y+r.height)-y)};};
 import {LiveDryBristleV3} from './dryBristleV3';
 import {LiveDryBristleV2} from './dryBristleV2';
 import {strokeRasterBounds} from './paintCompositing';
@@ -29,7 +31,7 @@ export class LiveStrokeRaster{
  private footprint?:{id:string;region:RasterRegion};
  /** Area changed on the scratch surface by the last paint. Undefined means full canvas. */
  lastRegion?:RasterRegion;
- reset(){this.footprint=undefined;this.dryV2.reset();this.dryV3.reset();this.mixColors?.reset();this.mixColors=undefined;this.mixGeometry=undefined;this.mixId='';this.unmixed?.reset();this.unmixed=undefined;if(this.mixSurface)this.mixSurface.width=this.mixSurface.height=0;this.mixSurface=undefined;this.painting.reset();this.id='';this.previous=undefined;this.lastRegion=undefined;this.settledCurves=0;for(const c of [this.settled,this.paintMask])if(c)c.width=c.height=0;this.settled=this.paintMask=undefined;}
+ reset(){this.stampRegion=undefined;this.stampPlan=undefined;this.stampCanvas=undefined;this.footprint=undefined;this.dryV2.reset();this.dryV3.reset();this.mixColors?.reset();this.mixColors=undefined;this.mixGeometry=undefined;this.mixId='';this.unmixed?.reset();this.unmixed=undefined;if(this.mixSurface)this.mixSurface.width=this.mixSurface.height=0;this.mixSurface=undefined;this.painting.reset();this.id='';this.previous=undefined;this.lastRegion=undefined;this.settledCurves=0;for(const c of [this.settled,this.paintMask])if(c)c.width=c.height=0;this.settled=this.paintMask=undefined;}
  paint(ctx:CanvasRenderingContext2D,stroke:Stroke,geometry:ReturnType<typeof strokeGeometry>){
   const pixels=this.rasterize(ctx,stroke,geometry);
   // A reflow still redraws the scratch stroke for exact pixels. Only its old
@@ -43,7 +45,30 @@ export class LiveStrokeRaster{
   }else this.footprint=undefined;
   return pixels;
  }
+ private stampRegion?:RasterRegion;
+ private stampPlan?:StampPlan;
+ private stampCanvas?:HTMLCanvasElement|OffscreenCanvas;
  private rasterize(ctx:CanvasRenderingContext2D,stroke:Stroke,geometry:ReturnType<typeof strokeGeometry>){
+  // v0.5.241 Tip shape / Dual Brush: redraw the stamp stroke over the union of
+  // its old and new footprint (the stamp engine is a pure function of the path).
+  if(stroke.stampVersion===1){
+   const m=ctx.getTransform(),identity=m.a===1&&m.b===0&&m.c===0&&m.d===1&&m.e===0&&m.f===0;
+   const now=identity?stampBounds(stroke,ctx.canvas.width,ctx.canvas.height,geometry):undefined,prev=this.id===stroke.id?this.stampRegion:undefined;
+   const plan=stampPlan(stroke,geometry),old=this.id===stroke.id&&this.stampCanvas===ctx.canvas?this.stampPlan:undefined;this.stampCanvas=ctx.canvas;
+   // Same stroke, no pen tilt: redraw only where dabs changed (exactly the same pixels as a full redraw).
+   if(now&&old&&!stroke.tsTilt){
+    const a=stampChange(old.dabs,plan.dabs),b=stampChange(old.dual,plan.dual),change=a&&b?union(a,b):a??b;
+    const clip=change?clipRegion(change,ctx.canvas.width,ctx.canvas.height):undefined;
+    if(clip&&clip.width&&clip.height){ctx.clearRect(clip.x,clip.y,clip.width,clip.height);drawStampStroke(ctx,stroke,geometry,clip,plan);}
+    this.stampRegion=now;this.stampPlan=plan;this.id=stroke.id;this.previous=geometry;this.hadSingle=!geometry.cubics.length;this.lastRegion=clip&&clip.width&&clip.height?clip:{x:0,y:0,width:0,height:0};
+    return clip?clip.width*clip.height:0;
+   }
+   const region=now?(prev?union(prev,now):now):undefined;
+   if(region){ctx.clearRect(region.x,region.y,region.width,region.height);}else{ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);ctx.restore();}
+   drawStampStroke(ctx,stroke,geometry,undefined,plan);
+   this.stampPlan=plan;this.stampRegion=now;this.id=stroke.id;this.previous=geometry;this.hadSingle=!geometry.cubics.length;this.lastRegion=region;
+   return region?region.width*region.height:ctx.canvas.width*ctx.canvas.height;
+  }
   if(stroke.mixStops?.length&&stroke.mixVersion===2){
    const surface=this.mixSurface??=document.createElement('canvas');if(surface.width!==ctx.canvas.width)surface.width=ctx.canvas.width;if(surface.height!==ctx.canvas.height)surface.height=ctx.canvas.height;
    const raw=this.unmixed??=new LiveStrokeRaster();raw.paint(surface.getContext('2d')!,{...stroke,mixStops:undefined},geometry);

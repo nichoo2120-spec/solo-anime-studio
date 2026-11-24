@@ -1,3 +1,12 @@
+## v0.5.241 — Tip shape, Dual brush, My brushes
+
+- New `src/core/brushShape.ts` and `src/engine/stampBrush.ts`: a stamp engine used only when Tip shape (`tsEnabled`) or Dual brush (`dbEnabled`) is on. New stroke fields `stampVersion:1`, `stampTip/stampHardness/stampTexture`, `tsRoundness/tsAngle/tsScaleX/tsScaleY/tsFlipX/tsFlipY/tsFollow/tsTilt` and `dbTip/dbHardness/dbTexture/dbMode/dbScale/dbSpacing/dbScatter/dbCount/dbAmount`; points get `az/alt` only with pen tilt on. Validated on load; old strokes carry none of these and render byte-identically.
+- Dual brush pixel merge modes multiply/darken/overlay/subtract/lighten/screen/height; seeded scatter so live == reload. Works under Blend mode (brushBlendVersion) as the blend mask.
+- Custom brushes: create from current / from scratch, rename, duplicate, delete (custom only), short names (24), up to 200; saved in the brush library, written to `project.customBrushes` on save/export and merged on backup import.
+- Live preview of stamp strokes redraws only the dabs that changed (pen-up always renders the full stroke canonically).
+- UI: Brush Settings sections "Tip shape", "Dual brush", "My brushes" (`src/ui/BrushShapePanel.tsx`) with live previews.
+- Tests: `tests/brush-shape-v241.test.ts` (10), `tests/brush-shape-v241-browser.mjs` (15 cases, live == reload, incremental preview check, blend+shape worker parity), `tests/brush-shape-v241-ui.mjs`.
+
 ## v0.5.240 — Paint / Blend switch on every paint brush
 
 - New `src/core/brushBlend.ts` (settings, stroke metadata, validation) and `src/engine/brushBlend.ts` (renderer built on the exported Silk Blend tile surface). New stroke field `brushBlendVersion:1` plus `bbAmount/bbPickup/bbWetness/bbMix/bbFlow/bbStretch/bbPaintLoad/bbSample/bbClean/bbPressure/bbProtectAlpha`; stroke-only `bbCarry` (clean off) and `bbSamplePng/bbSampleRect` (All layers snapshot, opaque PNG crop, decoded in `renderer.prepare`). Only Blend-mode strokes carry these fields.

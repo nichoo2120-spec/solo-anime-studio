@@ -1,3 +1,4 @@
+import {drawStampStroke} from './stampBrush';
 import {decodeBlendSample,hasBlendSample} from './brushBlend';
 import {resetPigmentMix} from './pigmentMix';
 import {cameraAt,cameraMatrix,layerDepth} from '../animation/sceneCamera';
@@ -39,6 +40,9 @@ export function drawStroke(ctx:CanvasRenderingContext2D,s:Stroke,phase:'live'|'f
   if(drawProjectiveFlowInk(ctx,s,geometry??finalGeometry(s),Math.hypot(ctx.getTransform().a,ctx.getTransform().b)))return;
   const warped=projectiveInkGeometry(s,geometry??finalGeometry(s));
   drawStroke(ctx,{...s,id:s.rasterSourceId??s.id,perspective:undefined,transform:undefined,points:warped.points},phase,warped);return;
+ }
+ // v0.5.241 Tip shape / Dual Brush strokes use the stamp engine only.
+ if(s.stampVersion===1){drawStampStroke(ctx,s,geometry??finalGeometry(s));return;
  }
  if(s.transform){ctx.save();ctx.transform(...s.transform);drawStroke(ctx,{...s,transform:undefined},phase,geometry);ctx.restore();return;}
  if((s.dryBristleVersion===1||s.dryBristleVersion===2||s.dryBristleVersion===3)){drawModernStroke(ctx,s,phase,geometry);return;}
