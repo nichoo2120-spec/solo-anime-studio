@@ -62,9 +62,9 @@ describe('Silk Blend v0.5.239 watercolor Wet',()=>{
   expect(water.L).toBeLessThan(old.L);
   const i=(100*W+215)*4,d=water.c.data;expect(d[i]).toBeGreaterThan(40);expect(d[i+2]).toBeGreaterThan(80);// both colours present
  });
- it('pigment gathers at the wet edge: the stroke border is darker than its middle on flat colour',()=>{
+ it('pigment gathers at the wet edge: the stroke border is darker than its middle on flat colour (saved v0.5.239-242 strokes, no edgeDarkness)',()=>{
   const c=scene('edge'),before=c.data.slice();
-  const s=stroke('wet',line(30,180,100,60,()=>.8),{silkStrength:.8,silkWetness:.8});renderSilkStroke(c.ctx,s);
+  const s=stroke('wet',line(30,180,100,60,()=>.8),{silkStrength:.8,silkWetness:.8,edgeDarkness:undefined});renderSilkStroke(c.ctx,s);
   // walk down across the stroke at several x and compare edge band vs centre
   let edge=0,centre=0;for(const x of [70,100,130]){let best=1e9,mid=0;for(let y=60;y<140;y++){const i=(y*W+x)*4,dl=lum(c.data,i)-lum(before,i);if(Math.abs(y-100)<4)mid+=dl/7;else if(dl<best)best=dl;}edge+=best;centre+=mid;}
   expect(edge).toBeLessThan(centre-6);

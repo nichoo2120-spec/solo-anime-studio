@@ -21,7 +21,7 @@ export type Tool = 'brush' | 'eraser' | 'lasso' | 'rectangle' | 'transform' | 'f
 export type Point = {x:number;y:number;p:number;v?:number};
 export type WatercolorShape='round'|'filbert'|'angular'|'liner'|'mop';
 export type WatercolorMode='wet'|'glaze'|'even';
-export type WatercolorControls={watercolorAppearanceVersion?:1;watercolorShape?:WatercolorShape;watercolorMode?:WatercolorMode;pigmentAmount?:number;waterAmount?:number;edgeSoftness?:number;dryness?:number;pigmentBuildup?:number;pigmentDepletion?:number;pigmentReload?:boolean;wetDiffusion?:number;edgeBleeding?:number};
+export type WatercolorControls={watercolorAppearanceVersion?:1;watercolorShape?:WatercolorShape;watercolorMode?:WatercolorMode;pigmentAmount?:number;waterAmount?:number;edgeSoftness?:number;dryness?:number;pigmentBuildup?:number;pigmentDepletion?:number;pigmentReload?:boolean;wetDiffusion?:number;edgeBleeding?:number;edgeDarkness?:number};
 export type PressureSettings={minSize?:number;maxSize?:number;minOpacity?:number;maxOpacity?:number;velocityTaper?:boolean};
 export type Matrix = [number,number,number,number,number,number];
 export type PerspectiveMatrix = [number,number,number,number,number,number,number,number,number];
@@ -134,7 +134,7 @@ export function validateProject(value:unknown):Project {
     if(o.watercolorMaterialVersion!==undefined&&(![1,2].includes(o.watercolorMaterialVersion)||o.watercolorVersion!==3))throw Error('Invalid watercolor material.');
     if(o.watercolorEngine!==undefined&&(o.watercolorEngine!==1||o.paintTipVersion!==2||!isNewWatercolorTip(o.brushTip)||o.watercolorVersion!==undefined))throw Error('Invalid natural watercolor engine.');
     if(isNewWatercolorTip(o.brushTip)&&o.watercolorEngine!==1)throw Error('Natural watercolor tip requires its renderer.');
-    for(const key of ['pigmentAmount','waterAmount','edgeSoftness','dryness','pigmentBuildup','pigmentDepletion','wetDiffusion','edgeBleeding'])if(o[key]!==undefined&&!bounded(o[key],0,1))throw Error('Invalid natural watercolor control.');
+    for(const key of ['pigmentAmount','waterAmount','edgeSoftness','dryness','pigmentBuildup','pigmentDepletion','wetDiffusion','edgeBleeding','edgeDarkness'])if(o[key]!==undefined&&!bounded(o[key],0,1))throw Error('Invalid natural watercolor control.');
     if(o.pigmentReload!==undefined&&typeof o.pigmentReload!=='boolean')throw Error('Invalid pigment reload.');
     if(o.watercolorSeed!==undefined&&(!(o.watercolorEngine===1||[1,2].includes(o.watercolorMaterialVersion))||!Number.isInteger(o.watercolorSeed)||!bounded(o.watercolorSeed,0,4294967295)))throw Error('Invalid watercolor seed.');
     if(o.watercolorStyle!==undefined&&!['paper','dry','bloom'].includes(o.watercolorStyle))throw Error('Invalid wash style.');

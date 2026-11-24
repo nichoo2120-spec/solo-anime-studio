@@ -8,7 +8,7 @@ export const silkModes:{id:SilkMode;name:string;hint:string}[]=[
  {id:'dry',name:'Dry',hint:'Rough, broken blend with paper grain and bristle streaks.'},
 ];
 export const isSilkMode=(v:unknown):v is SilkMode=>v==='soft'||v==='wet'||v==='smudge'||v==='dry';
-export type SilkBlendControls={silkBlendVersion?:1|2;silkMode?:SilkMode;silkStrength?:number;silkPickup?:number;silkWetness?:number;silkTexture?:number};
+export type SilkBlendControls={silkBlendVersion?:1|2;silkMode?:SilkMode;silkStrength?:number;silkPickup?:number;silkWetness?:number;silkTexture?:number;edgeDarkness?:number};
 export const silkLimits=[['silkStrength',0,1],['silkPickup',0,1],['silkWetness',0,1],['silkTexture',0,1]] as const;
 export const SILK_BRUSH_ID='silk-blend';
 export const SILK_BRUSH_KIND='silk-blend';
@@ -26,7 +26,7 @@ const clamp01=(v:unknown,fallback:number)=>typeof v==='number'&&Number.isFinite(
  * other brush keeps byte-identical strokes and pixels. */
 export function silkStrokeMetadata(s:SilkBlendControls&{brushKind?:string}):SilkBlendControls{
  if(!isSilkBrush(s))return {};
- return {silkBlendVersion:2,silkMode:isSilkMode(s.silkMode)?s.silkMode:'soft',silkStrength:clamp01(s.silkStrength,.55),silkPickup:clamp01(s.silkPickup,.7),silkWetness:clamp01(s.silkWetness,.35),silkTexture:clamp01(s.silkTexture,0)};
+ return {silkBlendVersion:2,silkMode:isSilkMode(s.silkMode)?s.silkMode:'soft',silkStrength:clamp01(s.silkStrength,.55),silkPickup:clamp01(s.silkPickup,.7),silkWetness:clamp01(s.silkWetness,.35),silkTexture:clamp01(s.silkTexture,0),...(s.silkMode==='wet'?{edgeDarkness:0}:{})};
 }
 /** Keeps only valid saved Silk settings. Non-Silk brushes never receive them. */
 export function sanitizeSilk(p:Partial<SilkBlendControls>,result:SilkBlendControls&{brushKind?:string},fallback:SilkBlendControls&{brushKind?:string}){

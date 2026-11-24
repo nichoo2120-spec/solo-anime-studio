@@ -62,7 +62,7 @@ export class SilkSurface{
     // Watercolor finish (v2 Wet): pigment collects at the drying wet front and
     // settles unevenly. It only deepens the layer's own colour (optical density),
     // it never adds a new hue.
-    const w=t.wet[c],bank=ease(.04,.5,w)*(1-ease(.45,.97,w));
+    const w=t.wet[c],bank=water.pool!==0||water.edgeAlpha!==0?ease(.04,.5,w)*(1-ease(.45,.97,w)):0;// v0.5.243: skip the edge pass when off
     let kk=1+water.pool*bank+water.cloud*(t.cloud![c]-.5)*2*w+water.grain*(t.grain![c]-.5)*2*w;kk=kk<.8?.8:kk>1.7?1.7:kk;
     target[k]=Math.round(255*Math.pow(Math.min(1,f[o]*m/255),kk));target[k+1]=Math.round(255*Math.pow(Math.min(1,f[o+1]*m/255),kk));target[k+2]=Math.round(255*Math.pow(Math.min(1,f[o+2]*m/255),kk));
     target[k+3]=Math.round(Math.min(255,a*(1+water.edgeAlpha*bank)));continue;
@@ -119,7 +119,9 @@ export class SilkGesture{
    // v0.5.239 watercolor Wet. Saved v1 Wet strokes keep the v0.5.238 path above.
    const wet=clamp01(s.silkWetness??.35),str=clamp01(s.silkStrength??.55)*clamp01(s.opacity);
    this.tune={pick:.2-.12*wet,mean:.3,blur:true,gain:1.9,falloff:d=>{const q=1-d*d;return q*Math.sqrt(q);}};
-   this.water={pool:str*(.35+.65*wet)*.3,cloud:(.05+.1*wet)*(.4+.6*str),grain:clamp01(s.silkTexture??0)*.18,edgeAlpha:str*(.12+.18*wet)};
+   // v0.5.243: edgeDarkness (new strokes 0) scales the dark wet edge; old strokes keep it (1).
+   const ek=s.edgeDarkness??1;
+   this.water={pool:str*(.35+.65*wet)*.3*ek,cloud:(.05+.1*wet)*(.4+.6*str),grain:clamp01(s.silkTexture??0)*.18,edgeAlpha:str*(.12+.18*wet)*ek};
    this.cloudSize=Math.max(12,s.size*.35);this.blurPasses=1+Math.round(wet*2);
   }
  }

@@ -59,8 +59,8 @@ describe('Blend v2 family styles v0.5.242',()=>{
   expect(touched('dry-paint')).toBeLessThan(touched('paint'));
   expect(touched('water-wet')).toBeGreaterThan(touched('dry-paint'));
  });
- it('watercolor leaves a darker wet edge (tide line) and mixes red + blue as transparent pigment',()=>{
-  const s=stroke('water-wet',{},{points:Array.from({length:40},(_,i)=>({x:60+i*8,y:100,p:1}))}),b=scene(),m=mask(s.points,26),r=scene();renderBrushBlend(r.ctx,m.canvas,s);
+ it('Watercolor Edge (v0.5.243: the one brush with the edge) leaves a darker wet edge (tide line) and mixes red + blue as transparent pigment',()=>{
+  const s=stroke('water-edge',{},{points:Array.from({length:40},(_,i)=>({x:60+i*8,y:100,p:1}))}),b=scene(),m=mask(s.points,26),r=scene();renderBrushBlend(r.ctx,m.canvas,s);
   const lum=(x:number,y:number)=>{const k=(y*W+x)*4;return .3*r.data[k]+.59*r.data[k+1]+.11*r.data[k+2];};
   // inside the pure red half: the bank of the wash is darker than its middle
   let edge=0,mid=0;for(let x=70;x<180;x++){edge+=Math.min(lum(x,100-22),lum(x,100+22));mid+=lum(x,100);}

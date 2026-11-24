@@ -1,3 +1,10 @@
+## v0.5.243 — No dark wet edge except "Watercolor Edge" (owner pt88u)
+
+- New stroke/brush field `edgeDarkness` (0..1, validated). New strokes of watercolor tips (paint and Blend v2) and Silk Wet strokes save it (0 by default); strokes without it (all saved drawings) render exactly as before (`?? 1`, multiply by 1 is exact).
+- `edgeDarkness` scales the dark wet edge in `watercolorNatural` (pool bank, wet bank, settling), Silk Wet v2 (`pool`, `edgeAlpha`) and Blend v2 watercolor (`pool`, `edgeAlpha`). In paint mode `edgeDarkness > 0` also adds a visible tide line (only the Watercolor Edge brush has it).
+- New stock preset `water-edge` "Watercolor Edge" (Soft Wet base, Edge darkness 100%). Brush Settings: "Edge darkness" slider on watercolor brushes. Blend style hint no longer mentions a dark edge.
+- Tests: `tests/water-edge-v243.test.ts` (7), `tests/water-edge-v243-browser.mjs` (rim score old vs new, 23 brush/mode cases, before/after sheets), `tests/water-edge-v243-ui.mjs` (real app, before/after, slider). Stock-count tests exclude `water-edge` like `studio-ink`/`contour-flow`; the Silk Wet v239 edge test pins a saved stroke.
+
 ## v0.5.242 — Family-style Blend mode (owner pt86u)
 
 - `brushBlendVersion:2` + `bbStyle` (water|dry|pencil|ink|air|oil|marker|texture|soft, from `blendStyleFor`) for new Blend strokes; v1 strokes keep `BrushBlendGesture` byte-identically (78/78 render hashes vs v0.5.241). Validation: v1 forbids `bbStyle`, v2 requires a valid one.

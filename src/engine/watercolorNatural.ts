@@ -44,6 +44,8 @@ export function drawNaturalWatercolor(ctx:CanvasRenderingContext2D,s:Stroke,g:Re
  for(let y=0;y<ch;y++)for(let x=0;x<cw;x++){const i=y*cw+x;if(x)distance[i]=Math.min(distance[i],distance[i-1]+1);if(y){distance[i]=Math.min(distance[i],distance[i-cw]+1);if(x)distance[i]=Math.min(distance[i],distance[i-cw-1]+1.4142);if(x+1<cw)distance[i]=Math.min(distance[i],distance[i-cw+1]+1.4142);}}
  for(let y=ch-1;y>=0;y--)for(let x=cw-1;x>=0;x--){const i=y*cw+x;if(x+1<cw)distance[i]=Math.min(distance[i],distance[i+1]+1);if(y+1<ch){distance[i]=Math.min(distance[i],distance[i+cw]+1);if(x)distance[i]=Math.min(distance[i],distance[i+cw-1]+1.4142);if(x+1<cw)distance[i]=Math.min(distance[i],distance[i+cw+1]+1.4142);}}
  const field=depositionField(s,samples),deposit:Deposit={radius:0,density:0,water:0,grain:0,dx:0,dy:0,edge:0},rgb=s.color.slice(1).match(/../g)!.map(v=>parseInt(v,16));
+ // v0.5.243: edgeDarkness scales the dark wet edge (pool bank); old strokes (no field) keep it fully.
+ const edgeK=s.edgeDarkness??1;
  const appearance=s.watercolorAppearanceVersion===1?watercolorAppearance(s):undefined,material:WaterAppearance={pigment:1,grain:.5,edge:0,pool:0};
  const granulation=appearance?watercolorGranulation(s):undefined,meanPigment=kind==='rough'?1.38:kind==='wet'?1.29:kind==='flat'?1.35:1.37;
  field.prepare(sx,sy,ex-sx,ey-sy);
@@ -57,10 +59,12 @@ export function drawNaturalWatercolor(ctx:CanvasRenderingContext2D,s:Stroke,g:Re
   // deposited interior, rather than cutting a dry, serrated wet boundary.
   const erosion=roughDepth*(1-(appearance?(kind==='wet'?.5+material.edge*.2:material.grain):deposit.grain))*(appearance?(kind==='rough'?.65:kind==='wet'?.24:1):1)+(appearance?contactSize*material.edge*(kind==='wet'?.018:kind==='rough'?.024:.008):0);
   c=waterEase(0,Math.max(.65,contactSize*feather/scale),moved-erosion/scale);
-  const dryness=s.dryness??0,edge=1-c,gap=waterEase(.22,.58,1-deposit.grain),breakup=dryness*gap*(.15+edge*.85),settling=(s.pigmentBuildup??.45)*edge*deposit.edge*.10;
+  const dryness=s.dryness??0,edge=1-c,gap=waterEase(.22,.58,1-deposit.grain),breakup=dryness*gap*(.15+edge*.85),settling=(s.pigmentBuildup??.45)*edge*deposit.edge*.10*edgeK;
   let a=Math.max(0,c-breakup)*deposit.density+settling*c*deposit.density;
-  if(appearance){const dryGap=kind==='rough'?(s.dryness??.72)*waterEase(.30,.66,1-material.grain)*(.22+(1-c)*.78):0;a=Math.max(0,c-breakup-dryGap)*deposit.density*material.pigment+material.pool*c*(1-c)*deposit.density*(s.pigmentBuildup??.4)*2;}
-  if(kind==='wet'){const bleed=(s.edgeBleeding??.55)*deposit.water;a*=1-edge*bleed*.35;const bank=waterEase(.15,.6,c)*(1-waterEase(.65,1,c));a+=Math.max(0,deposit.edge-.5)*deposit.water*(s.pigmentBuildup??.4)*.6*bank*Math.min(1,deposit.density*2);}
+  if(appearance){const dryGap=kind==='rough'?(s.dryness??.72)*waterEase(.30,.66,1-material.grain)*(.22+(1-c)*.78):0;a=Math.max(0,c-breakup-dryGap)*deposit.density*material.pigment+material.pool*c*(1-c)*deposit.density*(s.pigmentBuildup??.4)*2*edgeK;}
+  if(kind==='wet'){const bleed=(s.edgeBleeding??.55)*deposit.water;a*=1-edge*bleed*.35;if(edgeK!==0){const bank=waterEase(.15,.6,c)*(1-waterEase(.65,1,c));a+=Math.max(0,deposit.edge-.5)*deposit.water*(s.pigmentBuildup??.4)*.6*bank*Math.min(1,deposit.density*2)*edgeK;}}
+  // v0.5.243 Watercolor Edge: a deliberate darker wet edge (tide line), only when Edge darkness > 0.
+  if(s.edgeDarkness){const tide=waterEase(.3,.68,c)*(1-waterEase(.78,.99,c));a+=s.edgeDarkness*.6*tide*Math.min(1,deposit.density*1.6);}
   data[j]=rgb[0];data[j+1]=rgb[1];data[j+2]=rgb[2];data[j+3]=Math.round(255*Math.min(1,a));
  }
  const out=output??=document.createElement('canvas');if(out.width!==cw)out.width=cw;if(out.height!==ch)out.height=ch;out.getContext('2d')!.putImageData(image,0,0);ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.drawImage(out,0,0,cw,ch,sx,sy,cw*scale,ch*scale);ctx.restore();finishNewWaterPaper(ctx,(s.textureStrength??.18)*(appearance?.65:1),x,y,w,h);

@@ -5,7 +5,7 @@ import {newProject,activeLayer,validateProject,type Stroke} from '../src/core/mo
 import {strokeGeometry} from '../src/engine/strokeGeometry';
 import {paintSamples} from '../src/engine/paintPass';
 import {transportPigment,depositionField} from '../src/engine/watercolorTransport';
-const presets=stockPresets.filter(p=>p.settings.brushKind==='watercolor-new');
+const presets=stockPresets.filter(p=>p.settings.brushKind==='watercolor-new'&&p.id!=='water-edge');// v0.5.243: the extra 'Watercolor Edge' brush is checked in water-edge-v243 tests
 const stroke=(id='s',preset=presets[0]):Stroke=>({...preset.settings,...brushStrokeMetadata(preset.settings),id,kind:'stroke',tool:'brush',size:100,pressure:false,watercolorSeed:watercolorSeedFor(id),points:[{x:100,y:100,p:1,v:.65},{x:1000,y:100,p:1,v:.65}]});
 const transport=(s:Stroke)=>transportPigment(s,paintSamples(strokeGeometry(s),.18));
 describe('five-brush watercolor rebuild',()=>{

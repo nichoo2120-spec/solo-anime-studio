@@ -20,7 +20,7 @@ describe('five-only watercolor library migration',()=>{
   const restored=restoreBrushLibrary({...lib,brushId:'custom-smooth',presets:[...lib.presets,...customs]});
   expect(activePreset(restored).name).toBe('My smooth brush');
   expect(restored.presets.filter(p=>p.custom).map(p=>p.id)).toEqual(['custom-smooth','custom-pencil']);
-  expect(restored.presets.filter(p=>!p.custom&&isNewWatercolorTip(p.settings.brushTip))).toHaveLength(5);
+  expect(restored.presets.filter(p=>!p.custom&&isNewWatercolorTip(p.settings.brushTip)&&p.id!=='water-edge')).toHaveLength(5);
   expect(selectablePaintTips.filter(t=>isNewWatercolorTip(t.id))).toHaveLength(5);
  });
 });

@@ -1,7 +1,7 @@
 import {memo} from 'react';
 import {ExactRange} from './ExactRange';
 import {blendDefaults,blendPresets,canBrushBlend,isBlendSample,blendStyleFor,blendStyleNames,type BrushBlendSettings,type BlendStyle} from '../core/brushBlend';
-const styleHints:Record<BlendStyle,string>={water:'soft wet bleed, transparent pigment mixing, a darker wet edge and a cloudy, grainy wash',dry:'rough, broken, scratchy drag with bristle gaps',pencil:'a gentle graphite smudge with paper grain',ink:'a crisp wet-ink smear that drags colour a long way',air:'a very soft, wide airbrush blur',oil:'thick, buttery drag with soft bristle streaks',marker:'an even, transparent marker bleed',texture:'blending through a canvas grain',soft:'smooth, soft blending'};
+const styleHints:Record<BlendStyle,string>={water:'soft wet bleed, transparent pigment mixing and a cloudy, grainy wash',dry:'rough, broken, scratchy drag with bristle gaps',pencil:'a gentle graphite smudge with paper grain',ink:'a crisp wet-ink smear that drags colour a long way',air:'a very soft, wide airbrush blur',oil:'thick, buttery drag with soft bristle streaks',marker:'an even, transparent marker bleed',texture:'blending through a canvas grain',soft:'smooth, soft blending'};
 import type {BrushSettings} from '../engine/StudioEngine';
 type Patch=(p:Partial<BrushSettings>)=>void;
 /** v0.5.240 Paint / Blend switch, shown for every paint brush. */

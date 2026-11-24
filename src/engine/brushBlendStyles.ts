@@ -81,7 +81,8 @@ export class BrushBlendGestureV2{
   this.mean=this.prof.mean+(1-this.prof.mean)*wet*(this.style==='dry'?.1:this.style==='ink'?.15:.35);
   this.cloudSize=Math.max(12,s.size*.35);this.wetFront=.45*wet;
   if(this.style==='water'){const str=clamp01(.35+.6*this.p.flow)*clamp01(s.opacity),rough=s.brushTip==='water-rough'||s.brushTip==='water-flat';
-   this.water={pool:str*(.35+.65*wet)*.3,cloud:(.05+.1*wet)*(.4+.6*str),grain:rough?.2:.11,edgeAlpha:str*(.12+.18*wet)};}
+   const ek=s.edgeDarkness??1;// v0.5.243: no dark wet edge unless the brush asks for it
+   this.water={pool:str*(.35+.65*wet)*.3*ek,cloud:(.05+.1*wet)*(.4+.6*str),grain:rough?.2:.11,edgeAlpha:str*(.12+.18*wet)*ek};}
   this.reservoir=carry;
  }
  setMask(mask:BlendMask){this.mask=mask;}
@@ -185,7 +186,7 @@ export class BrushBlendGestureV2{
   }
  }
  private bytes(t:Tile,target:Uint8ClampedArray){
-  const {w,h,f,orig,changed}=t,amount=this.p.amount,water=this.water;
+  const {w,h,f,orig,changed}=t,amount=this.p.amount,water=this.water;const edgeOn=!!water&&(water.pool!==0||water.edgeAlpha!==0);// v0.5.243: no edge pass when the edge is off
   for(let j=0;j<h;j++)for(let i=0;i<w;i++){
    const k=(j*w+i)*4,c=j*TILE+i;
    if(!changed[c]){target[k]=orig[k];target[k+1]=orig[k+1];target[k+2]=orig[k+2];target[k+3]=orig[k+3];continue;}
@@ -196,7 +197,7 @@ export class BrushBlendGestureV2{
    if(water&&t.wet){
     // Watercolor finish: pigment collects at the drying wet front (tide line),
     // settles in clouds and paper grain. It deepens the existing colour only.
-    const wv=t.wet[c],bank=ease(.04,.5,wv)*(1-ease(.45,.97,wv)),am=amount;
+    const wv=t.wet[c],bank=edgeOn?ease(.04,.5,wv)*(1-ease(.45,.97,wv)):0,am=amount;
     let kk=1+(water.pool*bank+water.cloud*(t.cloud![c]-.5)*2*wv+water.grain*(t.grain![c]-.5)*2*wv)*am;kk=kk<.8?.8:kk>1.7?1.7:kk;
     target[k]=Math.round(255*Math.pow(Math.min(1,r*m/255),kk));target[k+1]=Math.round(255*Math.pow(Math.min(1,g*m/255),kk));target[k+2]=Math.round(255*Math.pow(Math.min(1,b*m/255),kk));
     target[k+3]=Math.round(Math.min(255,a*(1+water.edgeAlpha*bank*am)));continue;
