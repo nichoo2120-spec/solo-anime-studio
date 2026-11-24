@@ -45,7 +45,7 @@ describe('Silk Blend v0.5.238',()=>{
  });
  it('adds Silk metadata only to Silk strokes, so every other brush stays byte-identical',()=>{
   for(const p of stockPresets.filter(p=>p.id!=='silk-blend')){const m=brushStrokeMetadata(p.settings) as Record<string,unknown>;for(const k of ['silkBlendVersion','silkMode','silkStrength','silkPickup','silkWetness','silkTexture'])expect(m[k],p.id+' '+k).toBeUndefined();}
-  expect(brushStrokeMetadata(silk.settings)).toMatchObject({silkBlendVersion:1,silkMode:'soft',silkStrength:.55,silkPickup:.7,silkWetness:.35,silkTexture:0});
+  expect(brushStrokeMetadata(silk.settings)).toMatchObject({silkBlendVersion:2,silkMode:'soft',silkStrength:.55,silkPickup:.7,silkWetness:.35,silkTexture:0});
   expect(silkStrokeMetadata({brushKind:'paint'})).toEqual({});
  });
  it('blends the existing paint in all four modes, differently, without adding the brush colour',()=>{
@@ -118,7 +118,7 @@ describe('Silk Blend v0.5.238',()=>{
  it('saves Silk strokes in projects and rejects broken Silk data',()=>{
   const p=newProject(),s=stroke('dry',line(10,90,40,10));activeLayer(p).operations=[s];
   expect(validateProject(JSON.parse(JSON.stringify(p)))).toEqual(p);
-  for(const patch of [{silkMode:'lava'},{silkStrength:2},{silkBlendVersion:2},{tool:'eraser'}] as Partial<Stroke>[]){activeLayer(p).operations=[{...s,...patch} as Stroke];expect(()=>validateProject(JSON.parse(JSON.stringify(p))),JSON.stringify(patch)).toThrow();}
+  for(const patch of [{silkMode:'lava'},{silkStrength:2},{silkBlendVersion:3},{tool:'eraser'}] as Partial<Stroke>[]){activeLayer(p).operations=[{...s,...patch} as Stroke];expect(()=>validateProject(JSON.parse(JSON.stringify(p))),JSON.stringify(patch)).toThrow();}
   const {silkBlendVersion:_v,...noVersion}=s;activeLayer(p).operations=[noVersion as Stroke];expect(()=>validateProject(JSON.parse(JSON.stringify(p)))).toThrow();
  });
  it('one Silk stroke is exactly one undo step',()=>{

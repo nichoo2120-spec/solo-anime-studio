@@ -15,9 +15,10 @@
 import type {Point,Stroke} from '../core/model';
 import type {RasterRegion} from './liveRaster';
 import type {SilkMode} from '../core/silkBlend';
+import {paintNoise} from './paintingTips';
 
 const TILE=64,PATCH=20,CELLS=PATCH*PATCH;
-type Tile={x:number;y:number;w:number;h:number;f:Float32Array;orig:Uint8ClampedArray;changed:Uint8Array;dirty:boolean;touched:boolean};
+type Tile={x:number;y:number;w:number;h:number;f:Float32Array;orig:Uint8ClampedArray;changed:Uint8Array;dirty:boolean;touched:boolean;wet?:Float32Array;cloud?:Float32Array;grain?:Float32Array};
 
 /** Lazily loaded premultiplied float copy of the source layer, 64 px tiles. */
 class SilkSurface{
@@ -49,20 +50,36 @@ class SilkSurface{
  }
  /** Unpremultiplied bytes for putImageData. Untouched pixels keep their exact
   * original bytes, so a Silk stroke never nudges pixels it did not paint. */
- bytes(t:Tile,target:Uint8ClampedArray){
+ bytes(t:Tile,target:Uint8ClampedArray,water?:WaterFinish){
   const {w,h,f,orig,changed}=t;
   for(let j=0;j<h;j++)for(let i=0;i<w;i++){
    const k=(j*w+i)*4,c=j*TILE+i;
    if(!changed[c]){target[k]=orig[k];target[k+1]=orig[k+1];target[k+2]=orig[k+2];target[k+3]=orig[k+3];continue;}
    const o=c*4,a=f[o+3];
    if(a<.5){target[k]=target[k+1]=target[k+2]=target[k+3]=0;continue;}
-   const m=255/a;target[k]=Math.round(f[o]*m);target[k+1]=Math.round(f[o+1]*m);target[k+2]=Math.round(f[o+2]*m);target[k+3]=Math.round(a);
+   const m=255/a;
+   if(water&&t.wet){
+    // Watercolor finish (v2 Wet): pigment collects at the drying wet front and
+    // settles unevenly. It only deepens the layer's own colour (optical density),
+    // it never adds a new hue.
+    const w=t.wet[c],bank=ease(.04,.5,w)*(1-ease(.45,.97,w));
+    let kk=1+water.pool*bank+water.cloud*(t.cloud![c]-.5)*2*w+water.grain*(t.grain![c]-.5)*2*w;kk=kk<.8?.8:kk>1.7?1.7:kk;
+    target[k]=Math.round(255*Math.pow(Math.min(1,f[o]*m/255),kk));target[k+1]=Math.round(255*Math.pow(Math.min(1,f[o+1]*m/255),kk));target[k+2]=Math.round(255*Math.pow(Math.min(1,f[o+2]*m/255),kk));
+    target[k+3]=Math.round(Math.min(255,a*(1+water.edgeAlpha*bank)));continue;
+   }
+   target[k]=Math.round(f[o]*m);target[k+1]=Math.round(f[o+1]*m);target[k+2]=Math.round(f[o+2]*m);target[k+3]=Math.round(a);
   }
  }
 }
 
 const hash=(x:number,y:number,seed:number)=>{let h=Math.imul(x|0,374761393)^Math.imul(y|0,668265263)^Math.imul(seed|0,2246822519);h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return (h>>>0)/4294967295;};
 const fade=(t:number)=>t*t*(3-2*t);
+const ease=(a:number,b:number,v:number)=>{const t=v<=a?0:v>=b?1:(v-a)/(b-a);return t*t*(3-2*t);};
+const NEG_LN=new Float32Array(1025);for(let i=0;i<=1024;i++)NEG_LN[i]=-Math.log(Math.max(1/255,i/1024));
+const EXP_STEP=1/512,EXP_N=Math.ceil(6/EXP_STEP)+2,EXP_NEG=new Float32Array(EXP_N);for(let i=0;i<EXP_N;i++)EXP_NEG[i]=Math.exp(-i*EXP_STEP);
+const negLn=(v:number)=>{const x=(v<0?0:v>1?1:v)*1024,i=Math.floor(x),f=x-i;return i>=1024?NEG_LN[1024]:NEG_LN[i]+(NEG_LN[i+1]-NEG_LN[i])*f;};
+const expNeg=(d:number)=>{const x=d/EXP_STEP,i=Math.floor(x);if(i>=EXP_N-1)return EXP_NEG[EXP_N-1];const f=x-i;return EXP_NEG[i]+(EXP_NEG[i+1]-EXP_NEG[i])*f;};
+type WaterFinish={pool:number;cloud:number;grain:number;edgeAlpha:number};
 /** Smooth value noise in [0,1], fixed to canvas coordinates (paper grain). */
 function valueNoise(x:number,y:number,seed:number){
  const ix=Math.floor(x),iy=Math.floor(y),fx=fade(x-ix),fy=fade(y-iy);
@@ -93,12 +110,39 @@ export class SilkGesture{
  private processed:number[]=[];
  private readonly path:Point[]=[];private fx=0;private fy=0;private gx=0;private gy=0;
  private next=0;private carry=0;private traveled=0;private dirX=1;private dirY=0;
- private readonly mode:SilkMode;private readonly tune:ModeTuning;private readonly seed:number;
+ private readonly mode:SilkMode;private tune:ModeTuning;private readonly seed:number;
  dabs=0;
  constructor(private readonly s:Stroke,width:number,height:number,read:CanvasRenderingContext2D){
   this.surface=new SilkSurface(width,height,read);
   this.mode=s.silkMode??'soft';this.tune=tuning(this.mode,clamp01(s.silkWetness??.35));this.seed=strokeSeed(s.id);
+  if(s.silkBlendVersion===2&&this.mode==='wet'){
+   // v0.5.239 watercolor Wet. Saved v1 Wet strokes keep the v0.5.238 path above.
+   const wet=clamp01(s.silkWetness??.35),str=clamp01(s.silkStrength??.55)*clamp01(s.opacity);
+   this.tune={pick:.2-.12*wet,mean:.3,blur:true,gain:1.9,falloff:d=>{const q=1-d*d;return q*Math.sqrt(q);}};
+   this.water={pool:str*(.35+.65*wet)*.3,cloud:(.05+.1*wet)*(.4+.6*str),grain:clamp01(s.silkTexture??0)*.18,edgeAlpha:str*(.12+.18*wet)};
+   this.cloudSize=Math.max(12,s.size*.35);this.blurPasses=1+Math.round(wet*2);
+  }
  }
+ private water?:WaterFinish;private cloudSize=12;private blurPasses=1;
+ /** Coherent watercolor fields for one tile (stroke seed, canvas coordinates): a
+  * domain-warped broad "cloud" like the watercolor brush's pigment variation,
+  * and fine granulation. Computed once per tile, so every dab reads the same. */
+ private waterFields(t:Tile){
+  if(t.wet)return;
+  t.wet=new Float32Array(TILE*TILE);t.cloud=new Float32Array(TILE*TILE);t.grain=new Float32Array(TILE*TILE);
+  const sx=(this.seed&65535)+17,sy=(this.seed>>>16)+29,cl=this.cloudSize,fine=Math.max(2.2,Math.min(4,this.s.size*.035));
+  // The cloud is low-frequency (>=12 px), so it is evaluated on a 4 px lattice
+  // and interpolated; granulation is per pixel and only when Texture is on.
+  const G=TILE/4+1,lattice=this.lattice;
+  for(let j=0;j<G;j++)for(let i=0;i<G;i++){const x=t.x+i*4,y=t.y+j*4,broad=paintNoise(sx+(x+y*.37)/cl,sy+(y-x*.21)/(cl*.85)),warp=(broad-.5)*1.4,patch=paintNoise(sx+91+x/(cl*.42)+warp,sy+57+y/(cl*.53)-warp*.7);lattice[j*G+i]=broad*.76+patch*.24;}
+  const grain=!!this.water&&this.water.grain>0;
+  for(let j=0;j<t.h;j++){const gj=j>>2,v=(j&3)/4;for(let i=0;i<t.w;i++){
+   const gi=i>>2,u=(i&3)/4,k=gj*G+gi,c=j*TILE+i;
+   t.cloud[c]=(lattice[k]*(1-u)+lattice[k+1]*u)*(1-v)+(lattice[k+G]*(1-u)+lattice[k+G+1]*u)*v;
+   if(grain){const x=t.x+i,y=t.y+j;t.grain[c]=paintNoise(sx+171+(x+y*.27)/fine,sy+331+(y-x*.19)/fine);}else t.grain[c]=.5;
+  }}
+ }
+ private readonly lattice=new Float32Array((TILE/4+1)*(TILE/4+1));
  /** True if the already-processed points are an exact prefix of `points`. */
  extends(points:Point[]){
   const n=this.processed.length/3;if(points.length<n)return false;
@@ -157,9 +201,11 @@ export class SilkGesture{
   for(let j=0;j<PATCH;j++)for(let i=0;i<PATCH;i++){const dx=(i+.5)/PATCH*2-1,dy=(j+.5)/PATCH*2-1,d2=dx*dx+dy*dy;if(d2>=1)continue;const w=1-d2,k=(j*PATCH+i)*4;mr+=R[k]*w;mg+=R[k+1]*w;mb+=R[k+2]*w;ma+=R[k+3]*w;mw+=w;}
   if(mw>0){mr/=mw;mg/=mw;mb/=mw;ma/=mw;}
   let src=R;
+  if(this.water){this.waterTarget(R);}else{
   if(tune.blur){const B=this.scratch;for(let j=0;j<PATCH;j++)for(let i=0;i<PATCH;i++){let r0=0,g0=0,b0=0,a0=0,n=0;for(let v=-1;v<=1;v++)for(let h=-1;h<=1;h++){const ii=i+h,jj=j+v;if(ii<0||jj<0||ii>=PATCH||jj>=PATCH)continue;const k=(jj*PATCH+ii)*4;r0+=R[k];g0+=R[k+1];b0+=R[k+2];a0+=R[k+3];n++;}const k=(j*PATCH+i)*4;B[k]=r0/n;B[k+1]=g0/n;B[k+2]=b0/n;B[k+3]=a0/n;}src=B;}
   const mean=tune.mean,keep=1-mean;
   for(let k=0;k<CELLS*4;k+=4){T[k]=src[k]*keep+mr*mean;T[k+1]=src[k+1]*keep+mg*mean;T[k+2]=src[k+2]*keep+mb*mean;T[k+3]=src[k+3]*keep+ma*mean;}
+  }
   // 4) deposit with a smooth falloff (Blend Strength, Opacity, pressure)
   let strength=clamp01(s.silkStrength??.55)*clamp01(s.opacity)*(s.pressure?.3+.7*pr:1)*tune.gain;
   if(this.mode==='smudge')strength*=Math.exp(-this.traveled/(2*r*(4+14*clamp01(s.silkWetness??.35))));
@@ -168,14 +214,22 @@ export class SilkGesture{
   const tex=clamp01(s.silkTexture??0),dry=this.mode==='dry',seed=this.seed,coverage=.22+.48*pr,dirX=this.dirX,dirY=this.dirY;
   const left=Math.max(0,Math.floor(x-r)),top=Math.max(0,Math.floor(y-r)),right=Math.min(this.surface.width,Math.ceil(x+r)),bottom=Math.min(this.surface.height,Math.ceil(y+r));
   if(right<=left||bottom<=top){this.dabs++;return;}
-  const inv=1/r,falloff=tune.falloff;
+  const inv=1/r,falloff=tune.falloff,water=this.water,wetFront=.45*clamp01(s.silkWetness??.35);
   for(let ty=Math.floor(top/TILE);ty*TILE<bottom;ty++)for(let tx=Math.floor(left/TILE);tx*TILE<right;tx++){
    const t=this.surface.tile(tx,ty);if(!t)continue;
+   if(water)this.waterFields(t);
    const x0=Math.max(left,t.x),x1=Math.min(right,t.x+t.w),y0=Math.max(top,t.y),y1=Math.min(bottom,t.y+t.h),f=t.f,changed=t.changed;let any=false;
    for(let py=y0;py<y1;py++){const dy=(py+.5-y)*inv,dy2=dy*dy;if(dy2>=1)continue;
     for(let px=x0;px<x1;px++){
      const dx=(px+.5-x)*inv,d2=dx*dx+dy2;if(d2>=1)continue;
-     let a=alpha*falloff(Math.sqrt(d2));
+     let a:number;
+     if(water){
+      // Irregular, soft wet front: the broad pigment cloud pulls the edge in
+      // unevenly, so the blend blooms like wet paint instead of a round stamp.
+      const c=(py-t.y)*TILE+px-t.x,edge=Math.sqrt(d2)*(1+wetFront*t.cloud![c]);if(edge>=1)continue;
+      const cov=ease(0,.75,1-edge);if(cov>t.wet![c])t.wet![c]=cov;
+      a=alpha*falloff(edge);changed[c]=1;any=true;
+     }else a=alpha*falloff(Math.sqrt(d2));
      if(tex>0){
       const grain=valueNoise(px*.55,py*.55,seed&255)*.6+valueNoise(px*.17,py*.17,(seed>>8)&255)*.4;
       if(dry){const across=dx*-dirY+dy*dirX,bristle=noise1(across*15+((seed>>16)&63),seed&1023),m=grain*.45+bristle*.55,th=1-coverage,c=clamp01((m-th+.09)/.18);a*=1-tex*(1-c*c*(3-2*c));}
@@ -193,12 +247,50 @@ export class SilkGesture{
   }
   this.dabs++;
  }
+ /** Watercolor Wet target: wider wet bleed (several soft passes), then colours
+  * mix as transparent pigment (averaged optical density), so red and blue melt
+  * into a deep violet the way watercolour glazes do, not a grey RGB average. */
+ private waterTarget(R:Float32Array){
+  const T=this.target,B=this.scratch;let src=R;
+  // separable 3x3 box (edge-normalised), one to three passes by Wetness
+  const H=this.hpass;
+  for(let pass=0;pass<this.blurPasses;pass++){
+   const out=src===B?T:B;
+   for(let j=0;j<PATCH;j++)for(let i=0;i<PATCH;i++){const k=(j*PATCH+i)*4,l=i>0?k-4:k,r=i<PATCH-1?k+4:k,n=i>0&&i<PATCH-1?1/3:.5;
+    if(i>0&&i<PATCH-1){H[k]=(src[l]+src[k]+src[r])*n;H[k+1]=(src[l+1]+src[k+1]+src[r+1])*n;H[k+2]=(src[l+2]+src[k+2]+src[r+2])*n;H[k+3]=(src[l+3]+src[k+3]+src[r+3])*n;}
+    else{const o=i>0?l:r;H[k]=(src[k]+src[o])*n;H[k+1]=(src[k+1]+src[o+1])*n;H[k+2]=(src[k+2]+src[o+2])*n;H[k+3]=(src[k+3]+src[o+3])*n;}}
+   const row=PATCH*4;
+   for(let j=0;j<PATCH;j++)for(let i=0;i<PATCH;i++){const k=(j*PATCH+i)*4;
+    if(j>0&&j<PATCH-1){for(let c=0;c<4;c++)out[k+c]=(H[k-row+c]+H[k+c]+H[k+row+c])/3;}
+    else{const o=j>0?k-row:k+row;for(let c=0;c<4;c++)out[k+c]=(H[k+c]+H[o+c])*.5;}}
+   src=out;
+  }
+  // optical density per cell, and its alpha-weighted mean over the round nib
+  const D=this.density;let dr=0,dg=0,db=0,ma=0,mw=0;
+  for(let j=0;j<PATCH;j++)for(let i=0;i<PATCH;i++){
+   const k=(j*PATCH+i)*4,a=src[k+3];
+   if(a>=1){const m=1/a;D[k]=negLn(src[k]*m);D[k+1]=negLn(src[k+1]*m);D[k+2]=negLn(src[k+2]*m);}else D[k]=D[k+1]=D[k+2]=-1;
+   const dx=(i+.5)/PATCH*2-1,dy=(j+.5)/PATCH*2-1,d2=dx*dx+dy*dy;if(d2>=1)continue;const w=1-d2;
+   ma+=a*w;mw+=w;if(a>=1){const aw=a*w;dr+=D[k]*aw;dg+=D[k+1]*aw;db+=D[k+2]*aw;}
+  }
+  const wsum=ma;ma=mw>0?ma/mw:0;if(wsum>0){dr/=wsum;dg/=wsum;db/=wsum;}
+  const mean=this.tune.mean,keep=1-mean;
+  for(let k=0;k<CELLS*4;k+=4){
+   const a=src[k+3]*keep+ma*mean;
+   if(a<1e-4){T[k]=T[k+1]=T[k+2]=T[k+3]=0;continue;}
+   const own=D[k]>=0,wo=own?src[k+3]*keep:0,wm=wsum>0?ma*mean:0,ws=wo+wm;
+   if(ws<=0){T[k]=src[k];T[k+1]=src[k+1];T[k+2]=src[k+2];T[k+3]=a;continue;}
+   const r=own?(D[k]*wo+dr*wm)/ws:dr,g=own?(D[k+1]*wo+dg*wm)/ws:dg,b=own?(D[k+2]*wo+db*wm)/ws:db;
+   T[k]=expNeg(r)*a;T[k+1]=expNeg(g)*a;T[k+2]=expNeg(b)*a;T[k+3]=a;
+  }
+ }
+ private readonly density=new Float32Array(CELLS*4);private readonly hpass=new Float32Array(CELLS*4);
  /** Write tiles to `ctx`. `all` rewrites every tile this stroke ever touched. */
  flush(ctx:CanvasRenderingContext2D,all=false):RasterRegion|undefined{
   let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const t of this.surface.tiles.values()){
    if(!(t.dirty||all&&t.touched))continue;
-   const img=ctx.createImageData(t.w,t.h);this.surface.bytes(t,img.data);ctx.putImageData(img,t.x,t.y);t.dirty=false;
+   const img=ctx.createImageData(t.w,t.h);this.surface.bytes(t,img.data,this.water);ctx.putImageData(img,t.x,t.y);t.dirty=false;
    left=Math.min(left,t.x);top=Math.min(top,t.y);right=Math.max(right,t.x+t.w);bottom=Math.max(bottom,t.y+t.h);
   }
   return Number.isFinite(left)?{x:left,y:top,width:right-left,height:bottom-top}:undefined;

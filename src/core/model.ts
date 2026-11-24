@@ -156,9 +156,9 @@ export function validateProject(value:unknown):Project {
     for(const [key,min,max] of [['stabilization',0,1],['smoothness',0,100],['taperStart',0,1],['taperEnd',0,1],['textureStrength',0,1],['minSize',0,1],['maxSize',0,1],['minOpacity',0,1],['maxOpacity',0,1]] as const)if(o[key]!==undefined&&!bounded(o[key],min,max))throw Error('Invalid stroke setting.');
     if((o.minSize??0)>(o.maxSize??1)||(o.minOpacity??0)>(o.maxOpacity??1))throw Error('Minimum pressure response exceeds maximum.');
     if(o.pressureCurve!==undefined&&(!Array.isArray(o.pressureCurve)||!validCurve(o.pressureCurve)))throw Error('Invalid pressure curve.');
-    if(o.silkBlendVersion!==undefined&&(o.silkBlendVersion!==1||o.tool!=='brush'||!isSilkMode(o.silkMode)))throw Error('Invalid Silk Blend stroke.');
-    if(o.silkMode!==undefined&&(o.silkBlendVersion!==1||!isSilkMode(o.silkMode)))throw Error('Invalid Silk Blend mode.');
-    for(const [key,min,max] of silkLimits)if(o[key]!==undefined&&(o.silkBlendVersion!==1||!bounded(o[key],min,max)))throw Error('Invalid Silk Blend control.');
+    if(o.silkBlendVersion!==undefined&&(o.silkBlendVersion!==1&&o.silkBlendVersion!==2||o.tool!=='brush'||!isSilkMode(o.silkMode)))throw Error('Invalid Silk Blend stroke.');
+    if(o.silkMode!==undefined&&(o.silkBlendVersion===undefined||!isSilkMode(o.silkMode)))throw Error('Invalid Silk Blend mode.');
+    for(const [key,min,max] of silkLimits)if(o[key]!==undefined&&(o.silkBlendVersion===undefined||!bounded(o[key],min,max)))throw Error('Invalid Silk Blend control.');
     if(['pressureWidth','pressureOpacity','velocityTaper'].some(key=>o[key]!==undefined&&typeof o[key]!=='boolean'))throw Error('Invalid pressure control.');
    }else if(o.kind==='fill'){
     if(typeof o.png!=='string'||!o.png.startsWith('data:image/png;base64,')||o.png.length>50000000)throw Error('Invalid fill data.');

@@ -1,3 +1,10 @@
+## v0.5.239 — Silk Wet blends like watercolour
+
+- New stroke version `silkBlendVersion:2`. Only Wet changes in v2: a wider wet bleed (1-3 soft passes by Wetness), pigment mixing by averaged optical density, an uneven soft wet front driven by the watercolor brush's domain-warped cloud noise, darker wet-edge pooling, cloudy wash variation and Texture granulation (finish applied from a per-pixel swept wet mask, so live == reload).
+- Saved v1 strokes (all modes) use the frozen v0.5.238 path: `tests/fixtures/silk-v238-engine.ts` compares them byte for byte.
+- Tests: `tests/silk-wet-water-v239.test.ts` (7), visual sheet `tests/silk-wet-v239-visual.mjs` -> `validation/silk-v239/`.
+- No other brush or mode changed.
+
 ## v0.5.238 — Silk Blend brush (new)
 
 - New blending brush **Silk Blend** (`src/engine/silkBlend.ts`, `src/core/silkBlend.ts`), written from scratch to replace the removed Mix brush. Brush-local "silk patch" pickup in premultiplied float RGBA (no halos), exact-distance dabs (no gaps), 64 px tile reads/writes only.

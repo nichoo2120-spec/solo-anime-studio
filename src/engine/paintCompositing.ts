@@ -28,7 +28,7 @@ export function strokeRasterBounds(s:Stroke,width:number,height:number,g=finalGe
  * inside a stroke. Historical strokes and ordinary brushes use Canvas unchanged. */
 export function compositePaintStroke(ctx:CanvasRenderingContext2D,source:HTMLCanvasElement,s:Stroke,sourceX=0,sourceY=0,region?:RasterRegion,blendBase?:HTMLCanvasElement){
  // v0.5.238 Silk Blend: new strokes only; every other stroke takes its old path.
- if(s.silkBlendVersion===1&&s.tool==='brush'){applySilkBlend(ctx,source,s,sourceX,sourceY,region,blendBase,true);return;}
+ if((s.silkBlendVersion===1||s.silkBlendVersion===2)&&s.tool==='brush'){applySilkBlend(ctx,source,s,sourceX,sourceY,region,blendBase,true);return;}
  if(!!s.nativeMixVersion&&s.tool==='brush'){applyNativeBrushMix(ctx,source,s,sourceX,sourceY,region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height),blendBase);return;}
  if(s.smudgeVersion===3&&s.coloringEngine===1&&s.brushTip==='color-blender'&&s.tool!=='eraser'){applyGentleBlend(ctx,source,s,sourceX,sourceY,region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height),blendBase);return;}
  if(s.smudgeVersion===2&&s.coloringEngine===1&&s.brushTip==='color-blender'&&s.tool!=='eraser'){applyWetSmudge(ctx,source,s,sourceX,sourceY,region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height),blendBase);return;}

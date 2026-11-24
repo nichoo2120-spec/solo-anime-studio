@@ -24,3 +24,15 @@
 - Bytes harness: compat 1240/1240, old 160/160, oldv 36/36 renders byte-identical to base; live==final 0 diff.
 - Perf medians of 3 (perf_medians.txt): Silk p95 50-67 ms, pen-up 191-224, undo 123-142; base controls pencil/solid p95 33-183, pen-up 126-301, undo 107-135. Targets missed app-wide on base too; Silk is in line with existing brushes.
 - Next: commit + push (CI publishes), zip, reports.
+
+## 13:16 IST — done
+- Pushed 5a6c04b to main. GitHub Actions desktop-update run 45348471116 passed and published v0.5.238 (non-draft, latest, with exe + blockmap + latest.yml, verified).
+- Zip: /workspace/sas_b24_out/solo-anime-studio-v0.5.238-src.zip; REPORT.md; MASTER_REPORT_v2.md Part 18 added.
+
+## v0.5.239 (t79u: Silk Wet like our watercolor brush) — 13:50 IST
+- Studied watercolorNatural.ts / watercolorAppearance.ts (water-wet preset): swept max-coverage mask, feathered wet front, domain-warped cloud pigment variation, granulation, pool/bank darkening at the wet front (c*(1-c)), transparent layering, paper grain.
+- Silk Wet v2 (silkBlendVersion:2, Wet only): wider bleed (1-3 passes), optical-density pigment mixing, uneven wet front from the same style cloud noise, darker wet edge from per-pixel swept wet mask, cloudy wash + Texture granulation. No brush colour.
+- v1 strokes: frozen engine fixture compare (all modes) byte-identical. vitest 452/452. Silk browser worker parity 0 (wet v2 included). Harness: 1240/160/36 identical, livefinal 0.
+- Visual: validation/silk-v239/silk-wet-watercolor.png.
+- Running ci.sh work239 + regression + build.
+- 14:35 IST: guards vs base all same (6 extra guards identical to base, incl. commit-band; regression 52/73 same names+reasons); CI-mirror list all pass. Optimised v2 (4px cloud lattice, grain only with Texture, LUT density, separable blur): worker CPU per stroke v2/v1 = 78/53 ms (size 30), 88/67 (size 150). Real-app perf medians unchanged within noise (perf239_medians.txt). Pushing v0.5.239.

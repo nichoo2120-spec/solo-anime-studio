@@ -5,35 +5,35 @@
       "changed": 26684,
       "green": 0,
       "grey": 0,
-      "ms": 35.2
+      "ms": 33.9
     },
     {
       "mode": "wet",
-      "changed": 30872,
+      "changed": 27368,
       "green": 0,
       "grey": 0,
-      "ms": 33.7
+      "ms": 44.6
     },
     {
       "mode": "smudge",
       "changed": 30864,
       "green": 0,
       "grey": 0,
-      "ms": 30.1
+      "ms": 31
     },
     {
       "mode": "dry",
       "changed": 28349,
       "green": 0,
       "grey": 0,
-      "ms": 46.5
+      "ms": 48.2
     },
     {
       "mode": "fast",
       "changed": 26420,
       "green": 0,
       "grey": 0,
-      "ms": 20.6
+      "ms": 21.8
     }
   ],
   "workerRows": [

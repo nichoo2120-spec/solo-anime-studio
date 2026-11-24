@@ -99,7 +99,7 @@ worker.onmessage=async({data:j})=>{
   const currentGeometry=()=>geometry??=j.final?finalGeometry(s):strokeGeometry(s.nativeMixVersion?mixPreviewGeometryStroke(s):s,'live');
   const fullBounds=()=>bounds??=strokeRasterBounds(s,target!.width,target!.height,currentGeometry());
   const ownershipBounds=()=>deltaRegion&&deltaRegion.width>0&&deltaRegion.height>0?union(deltaRegion,fullBounds()):fullBounds();
-  if(s.silkBlendVersion===1){
+  if(s.silkBlendVersion===1||s.silkBlendVersion===2){
    // v0.5.238 Silk Blend: incremental; only tiles touched by new dabs come back.
    r=applySilkBlend(tc,bc,s,0,0,undefined,bc)??{x:0,y:0,width:1,height:1};
   }else if(!!s.nativeMixVersion||(s.paintTipVersion===2||s.dryBristleVersion===3)&&s.brushTip!=='color-blender'){
