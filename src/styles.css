@@ -723,3 +723,11 @@
 .silk-presets{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:4px 0 10px}.silk-presets>button{padding:6px 4px;font-size:9px;border:1px solid #36535d;background:#12252d;border-radius:5px}.silk-presets>button.active{background:#1d3640;border-color:#8fd6f0;color:#e6f7fd}
 .silk-actions{display:flex;justify-content:flex-end;margin-top:8px}.silk-actions>button{font-size:9px;padding:5px 12px;border:1px solid #36535d;background:#12252d;border-radius:5px}
 .silk-tool-button.active{box-shadow:inset 0 0 0 1px #8fd6f0}
+/* v0.5.240 Paint / Blend switch and Blend settings */
+.brush-blend-toggle{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:8px 0 6px;border:1px solid #36535d;border-radius:7px;overflow:hidden;background:#101c22}
+.brush-blend-toggle>button{padding:6px 4px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;border:0;border-radius:0;background:transparent;color:#9fb4bc}
+.brush-blend-toggle>button+button{border-left:1px solid #36535d}
+.brush-blend-toggle>button.active{background:linear-gradient(160deg,#1d3a45,#163039);color:#e6f7fd;box-shadow:inset 0 -2px 0 #8fd6f0}
+.brush-blend-panel{padding:2px 0}
+.brush-blend-controls{border:0;margin:0;padding:0;min-width:0}
+.brush-blend-controls:disabled{opacity:.45}

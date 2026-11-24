@@ -1,0 +1,190 @@
+{
+  "rows": [
+    {
+      "id": "hb",
+      "brushKind": "graphite-hb",
+      "changed": 22865,
+      "green": 0,
+      "grey": 0,
+      "ms": 88.3,
+      "version": 1
+    },
+    {
+      "id": "g-pen",
+      "brushKind": "g-pen",
+      "changed": 20909,
+      "green": 0,
+      "grey": 0,
+      "ms": 37,
+      "version": 1
+    },
+    {
+      "id": "soft-paint",
+      "brushKind": "paint",
+      "changed": 19135,
+      "green": 0,
+      "grey": 0,
+      "ms": 54.9,
+      "version": 1
+    },
+    {
+      "id": "paint",
+      "brushKind": "paint",
+      "changed": 19133,
+      "green": 0,
+      "grey": 0,
+      "ms": 71.8,
+      "version": 1
+    },
+    {
+      "id": "marker",
+      "brushKind": "marker",
+      "changed": 16932,
+      "green": 0,
+      "grey": 0,
+      "ms": 35.3,
+      "version": 1
+    },
+    {
+      "id": "dry",
+      "brushKind": "dry-round",
+      "changed": 24250,
+      "green": 0,
+      "grey": 0,
+      "ms": 52.8,
+      "version": 1
+    },
+    {
+      "id": "water-wet",
+      "brushKind": "watercolor-new",
+      "changed": 23653,
+      "green": 0,
+      "grey": 0,
+      "ms": 116.2,
+      "version": 1
+    },
+    {
+      "id": "color-air",
+      "brushKind": "coloring-air",
+      "changed": 10206,
+      "green": 0,
+      "grey": 0,
+      "ms": 60.3,
+      "version": 1
+    },
+    {
+      "id": "color-texture",
+      "brushKind": "coloring-texture",
+      "changed": 21226,
+      "green": 0,
+      "grey": 0,
+      "ms": 72.3,
+      "version": 1
+    }
+  ],
+  "settingRows": [
+    {
+      "k": "bbAmount",
+      "v": 0.3,
+      "diff": 43766
+    },
+    {
+      "k": "bbPickup",
+      "v": 1,
+      "diff": 31705
+    },
+    {
+      "k": "bbWetness",
+      "v": 1,
+      "diff": 31815
+    },
+    {
+      "k": "bbMix",
+      "v": 0,
+      "diff": 45499
+    },
+    {
+      "k": "bbFlow",
+      "v": 0.2,
+      "diff": 44365
+    },
+    {
+      "k": "bbStretch",
+      "v": 0,
+      "diff": 43785
+    },
+    {
+      "k": "bbPaintLoad",
+      "v": 0.5,
+      "diff": 84984
+    },
+    {
+      "k": "bbPressure",
+      "v": false,
+      "diff": 17553
+    }
+  ],
+  "protectedGain": 0,
+  "allLayers": {
+    "picked": 20494,
+    "green": 0,
+    "layerPicked": 0,
+    "pngRoundTripDiff": 0
+  },
+  "carry": {
+    "diff": 2713,
+    "len": 344
+  },
+  "workerRows": [
+    {
+      "id": "hb",
+      "all": false,
+      "max": 0,
+      "diff": 0
+    },
+    {
+      "id": "soft-paint",
+      "all": false,
+      "max": 0,
+      "diff": 0
+    },
+    {
+      "id": "paint",
+      "all": false,
+      "max": 0,
+      "diff": 0
+    },
+    {
+      "id": "water-wet",
+      "all": false,
+      "max": 0,
+      "diff": 0
+    },
+    {
+      "id": "color-air",
+      "all": false,
+      "max": 0,
+      "diff": 0
+    },
+    {
+      "id": "dry",
+      "all": false,
+      "max": 0,
+      "diff": 0
+    },
+    {
+      "id": "soft-paint",
+      "all": true,
+      "max": 0,
+      "diff": 0
+    },
+    {
+      "id": "paint",
+      "all": false,
+      "max": 0,
+      "diff": 0
+    }
+  ],
+  "workerErrors": [],
+  "errors": []
+}

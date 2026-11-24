@@ -36,3 +36,15 @@
 - Visual: validation/silk-v239/silk-wet-watercolor.png.
 - Running ci.sh work239 + regression + build.
 - 14:35 IST: guards vs base all same (6 extra guards identical to base, incl. commit-band; regression 52/73 same names+reasons); CI-mirror list all pass. Optimised v2 (4px cloud lattice, grain only with Texture, LUT density, separable blur): worker CPU per stroke v2/v1 = 78/53 ms (size 30), 88/67 (size 150). Real-app perf medians unchanged within noise (perf239_medians.txt). Pushing v0.5.239.
+- 14:10 IST: v0.5.239 published (Actions run 45355413184), non-draft + latest, exe/blockmap/latest.yml verified. Zip + REPORT.md + MASTER Part 19 done.
+
+## Build A–E (owner pt81u): v0.5.240 = A+B (Brush Blend), v0.5.241 = C+D+E (Dual brush, My brushes, Tip shape)
+- Base bf04939 (v0.5.239). Rules: gate new fields (old files byte-identical), never remove tools, no npm deps, push token env SAS_GH_TOKEN never printed, cite pt81u. Don't push if a guard newly fails vs base.
+- v0.5.240 lives UNCOMMITTED in /workspace/sas_b24_work: src/core/brushBlend.ts, src/engine/brushBlend.ts, src/ui/BrushBlendPanel.tsx + edits (model, StudioEngine, paintTips, brushes, paintCompositing, liveBlend.worker, LiveBlendWorker, renderer, silkBlend exports, shortcuts 'j'=blendToggle, App, BrushStudio, styles). Version bumped 0.5.240, UPDATE_v0.5.240.md, CHANGES.md.
+- Tests v240: tests/brush-blend-v240.test.ts (12 pass), tests/brush-blend-v240-browser.mjs (worker parity 0), tests/brush-blend-v240-ui.mjs (pass). Screenshot validation/brush-blend-v240/blend-settings-panel.png.
+- 15:20 IST: all240.sh guards (sas_b24_out/ci/work240/results.txt) ALLDONE: only base-known fails (commit-band-v175, dry-v148-goldens, blender-v154-legacy, smudge-v156-visual, dry-blend-legacy-golden, check-offline-v176); regression 21 fails = same names as v239; vitest 464/464; tsc+build ok.
+- 15:35 IST: bytes harness work240 (h/run240.sh, h/cmp.mjs): compat 620/620, old 80/80, oldv 36/36 identical to base; livefinal same as v239.
+- Perf: perf script got a brush-blend case (BLEND_CASE=1, ONLY=). First v240 runs looked slower everywhere incl. untouched pencil/solid => box noise; building v0.5.239 control in worktree /workspace/sas_b24_v239 served on 6239 for interleaved runs (perfc239_*/perfc240_* logs).
+- v0.5.241 (C+D+E) lives in worktree /workspace/sas_b24_cde (copy of v240 + brushShape.ts, stampBrush.ts, BrushShapePanel.tsx, customBrushes in project, etc.; node_modules symlink — don't commit). Unit 10 pass, browser test pass, UI test PASS after renaming checkbox to "Use dual brush". Screenshots validation/brush-shape-v241/{tip-shape-panel,my-brushes-panel}.png.
+- NEXT: perf control -> commit+push v240 -> verify release -> port cde to work tree, bump 0.5.241, guards/harness/perf, push, reports (REPORT.md, zip, MASTER Part 20/21).
+- 16:10 IST: interleaved perf v239 vs v240 (perf240_medians.txt): v240 same or better on every row; brush-blend p95 50/67 ms, pen-up 124/180. Committing + pushing v0.5.240.

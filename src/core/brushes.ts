@@ -1,3 +1,4 @@
+import {sanitizeBrushBlend} from './brushBlend';
 import {validCurve} from './brushCurves';
 import {validImportedGrain} from './importedGrain';
 import {smudgeMetadata,smudgeLimits} from './smudge';
@@ -84,6 +85,7 @@ export function sanitizeBrush(value:unknown,fallback:BrushSettings):BrushSetting
  const c=p.pressureCurve;if(validCurve(c))result.pressureCurve=c.map(n=>({...n}));
  if((result.minSize??0)>(result.maxSize??1))result.minSize=result.maxSize;if((result.minOpacity??0)>(result.maxOpacity??1))result.minOpacity=result.maxOpacity;
  sanitizeSilk(p,result,fallback);
+ sanitizeBrushBlend(p,result,fallback);
  if(canMixTips(result.brushTip)&&!result.dryBristleVersion){for(const key of ['mixTipA','mixTipB']as const)if(isMixTip(p[key]))result[key]=p[key];if(typeof p.mixBlend==='number'&&Number.isFinite(p.mixBlend))result.mixBlend=Math.max(0,Math.min(1,p.mixBlend));}else{delete result.mixTipA;delete result.mixTipB;delete result.mixBlend;}
  return result;
 }

@@ -1,3 +1,4 @@
+import {decodeBlendSample,hasBlendSample} from './brushBlend';
 import {resetPigmentMix} from './pigmentMix';
 import {cameraAt,cameraMatrix,layerDepth} from '../animation/sceneCamera';
 import {artworkAtOrigin,shotFrame,type ShotFrame} from '../core/shotFrame';
@@ -135,6 +136,9 @@ export class LayerRenderer {
  private afterOperation(layer:Layer,canvas:HTMLCanvasElement,index:number){const d=this.deltaLookup.get(layer.operations[index]);if(d&&d.id===layer.id)d.patch.finish(canvas);}
  private historyPatch(layer:Layer,op:Layer['operations'][number],index:number,width:number,height:number){const d=this.deltaLookup.get(op);return d&&d.id===layer.id&&d.width===width&&d.height===height&&d.prefix.length===index&&d.prefix.every((o,i)=>o===layer.operations[i])?d:undefined;}
  async prepare(project:Project){
+  // v0.5.240 Blend mode "All layers": decode each stroke's saved page sample.
+  const blendSamples=project.layers.flatMap(l=>l.operations).filter((o):o is Stroke=>o.kind==='stroke'&&o.brushBlendVersion===1&&!!o.bbSamplePng&&!!o.bbSampleRect&&!hasBlendSample(o.bbSamplePng));
+  if(blendSamples.length)await Promise.all(blendSamples.map(o=>decodeBlendSample(o.bbSamplePng!,o.bbSampleRect!).catch(()=>undefined)));
   const images=project.layers.flatMap(l=>l.operations).filter(o=>o.kind==='fill'||o.kind==='image');
   await Promise.all(images.map(async o=>{
    let image=this.bitmaps.get(o.png);

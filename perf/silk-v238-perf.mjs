@@ -35,9 +35,11 @@ const res={tag,dpr:+dpr,thr:+thr,state,w:+vw,h:+vh,rows:[],ui:{}};
 const silkAvailable=await pg.getByLabel('Silk Blend (B B)',{exact:true}).count()>0;
 const brushes=[['pencil',async()=>{await pg.keyboard.press('Escape');await pg.getByLabel('Brush (B)',{exact:true}).first().click();await sel('Brush category','Pencil');}],['solid',async()=>{await pg.getByLabel('Brush (B)',{exact:true}).first().click();await sel('Brush category','Paint');await sel('Brush family','all');await sel('Brush preset','color-solid');}]];
 if(silkAvailable)for(const mode of ['soft','wet','smudge','dry'])brushes.push(['silk-'+mode,async()=>{await pg.getByLabel('Silk Blend (B B)',{exact:true}).first().click();await sel('Silk Blend mode',mode);}]);
+const blendAvailable=await pg.getByRole('group',{name:'Paint or Blend'}).count()>0||!!process.env.BLEND_CASE;
+if(blendAvailable)brushes.push(['brush-blend',async()=>{await pg.getByLabel('Brush (B)',{exact:true}).first().click();await sel('Brush category','Paint');await sel('Brush family','all');await sel('Brush preset','color-solid');await pg.mouse.move(box.x+20,box.y+20);await pg.keyboard.press('j');await pg.waitForTimeout(200);}]);
 if(+thr>1)await cdp.send('Emulation.setCPUThrottlingRate',{rate:+thr});
 for(const [name,choose] of (process.env.SKIP_MATRIX?[]:brushes)){
- await choose();
+ await choose();if(process.env.ONLY&&!process.env.ONLY.split(',').includes(name))continue;
  for(const size of [30,150]){
   await field('Size',size);await pg.mouse.move(5,5);await pg.waitForTimeout(500);
   const r=await penStroke();

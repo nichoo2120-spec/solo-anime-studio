@@ -17,11 +17,11 @@ import type {RasterRegion} from './liveRaster';
 import type {SilkMode} from '../core/silkBlend';
 import {paintNoise} from './paintingTips';
 
-const TILE=64,PATCH=20,CELLS=PATCH*PATCH;
-type Tile={x:number;y:number;w:number;h:number;f:Float32Array;orig:Uint8ClampedArray;changed:Uint8Array;dirty:boolean;touched:boolean;wet?:Float32Array;cloud?:Float32Array;grain?:Float32Array};
+export const TILE=64,PATCH=20,CELLS=PATCH*PATCH;
+export type Tile={x:number;y:number;w:number;h:number;f:Float32Array;orig:Uint8ClampedArray;changed:Uint8Array;dirty:boolean;touched:boolean;wet?:Float32Array;cloud?:Float32Array;grain?:Float32Array};
 
 /** Lazily loaded premultiplied float copy of the source layer, 64 px tiles. */
-class SilkSurface{
+export class SilkSurface{
  readonly tiles=new Map<number,Tile>();
  private readonly cols:number;private readonly rows:number;
  private last?:Tile;private lastKey=-1;

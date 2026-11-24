@@ -1,3 +1,11 @@
+## v0.5.240 — Paint / Blend switch on every paint brush
+
+- New `src/core/brushBlend.ts` (settings, stroke metadata, validation) and `src/engine/brushBlend.ts` (renderer built on the exported Silk Blend tile surface). New stroke field `brushBlendVersion:1` plus `bbAmount/bbPickup/bbWetness/bbMix/bbFlow/bbStretch/bbPaintLoad/bbSample/bbClean/bbPressure/bbProtectAlpha`; stroke-only `bbCarry` (clean off) and `bbSamplePng/bbSampleRect` (All layers snapshot, opaque PNG crop, decoded in `renderer.prepare`). Only Blend-mode strokes carry these fields.
+- The brush's own stroke raster (drawStroke) is used as a mask: dabs pick up / carry / lay down colour only where the brush has coverage, so tip, texture, grain, pressure and spacing shape the blend. Live preview runs in the existing blend worker; the final message restores and renders the canonical pass (live final == reload, tested).
+- UI: Paint | Blend switch in the brush panel, new Brush Settings section "Blend" (`src/ui/BrushBlendPanel.tsx`), remappable shortcut `blendToggle` = J.
+- Tests: `tests/brush-blend-v240.test.ts` (12), `tests/brush-blend-v240-browser.mjs` (real worker parity for 8 cases, render sheet), `tests/brush-blend-v240-ui.mjs` (J, settings panel, real stroke, persistence, screenshot).
+- Paint mode and every saved stroke render byte-identically to v0.5.239.
+
 ## v0.5.239 — Silk Wet blends like watercolour
 
 - New stroke version `silkBlendVersion:2`. Only Wet changes in v2: a wider wet bleed (1-3 soft passes by Wetness), pigment mixing by averaged optical density, an uneven soft wet front driven by the watercolor brush's domain-warped cloud noise, darker wet-edge pooling, cloudy wash variation and Texture granulation (finish applied from a per-pixel swept wet mask, so live == reload).

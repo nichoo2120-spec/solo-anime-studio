@@ -4,6 +4,7 @@ import {compositePaintStroke,strokeRasterBounds} from './paintCompositing';
 import {resetWetSmudgeCaches} from './wetSmudge';
 import {resetGentleBlend,applyGentleBlend} from './gentleBlend';
 import {resetSilkBlend,applySilkBlend} from './silkBlend';
+import {resetBrushBlend,applyBrushBlendLive,setLiveBlendSample,type BlendSampleSource} from './brushBlend';
 import {LiveStrokeRaster} from './liveRaster';
 import {strokeGeometry} from './strokeGeometry';
 import {finalGeometry} from './geometryCache';
@@ -13,7 +14,7 @@ import {drawStroke} from './renderer';
 import {resetDryBristleV3MixModel} from './dryBristleV3';
 import type {RasterRegion} from './liveRaster';
 Object.defineProperty(globalThis,'document',{value:{createElement:(tag:string)=>{if(tag!=='canvas')throw Error('Unsupported worker element');return new OffscreenCanvas(1,1);}}});
-type Message={kind:'begin'|'update'|'cancel';token:number;serial:number;width:number;height:number;base?:ImageBitmap;readFrequently?:boolean;nativeDelta?:boolean;basePixels?:Uint8ClampedArray;deltaPixels?:Uint8ClampedArray;deltaRegion?:RasterRegion;seeded?:boolean;compactReplies?:boolean;reuseSurfaces?:boolean;stroke?:Stroke;pointDelta?:Point[];resetPoints?:boolean;final?:boolean};
+type Message={kind:'begin'|'update'|'cancel';token:number;serial:number;width:number;height:number;base?:ImageBitmap;readFrequently?:boolean;nativeDelta?:boolean;basePixels?:Uint8ClampedArray;deltaPixels?:Uint8ClampedArray;deltaRegion?:RasterRegion;seeded?:boolean;compactReplies?:boolean;blendSample?:BlendSampleSource;reuseSurfaces?:boolean;stroke?:Stroke;pointDelta?:Point[];resetPoints?:boolean;final?:boolean};
 const worker=self as unknown as {onmessage:(e:MessageEvent<Message>)=>void;postMessage:(data:unknown,transfer?:Transferable[])=>void};
 let surfaceMode:boolean|undefined;
 let token=0,base:OffscreenCanvas|undefined,target:OffscreenCanvas|undefined,region:RasterRegion|undefined;
@@ -60,7 +61,7 @@ worker.onmessage=async({data:j})=>{
    if(j.basePixels){if(lastPixels?.length===j.basePixels.length)lastPixels.set(j.basePixels);else lastPixels=j.basePixels.slice();}else if(j.kind!=='cancel'||!j.reuseSurfaces)lastPixels=undefined;
    deltaSupport=j.seeded?j.deltaRegion:undefined;deltaRegion=j.deltaRegion;deltaBase=undefined;
    for(const c of [deltaRead,deltaMask,deltaPaint])if(c)c.width=c.height=0;deltaRead=deltaMask=deltaPaint=undefined;
-   resetWetSmudgeCaches();resetGentleBlend();resetSilkBlend();if(target)resetPigmentMix(target as unknown as HTMLCanvasElement,true);nativeStrokeRaster?.reset();token=j.token;region=undefined;
+   resetWetSmudgeCaches();resetGentleBlend();resetSilkBlend();resetBrushBlend();setLiveBlendSample(j.kind==='begin'?j.blendSample:undefined);if(target)resetPigmentMix(target as unknown as HTMLCanvasElement,true);nativeStrokeRaster?.reset();token=j.token;region=undefined;
    if(nativeMask)nativeMask.getContext('2d')!.reset();
    if(j.kind==='cancel'){if(!j.reuseSurfaces){if(target)resetPigmentMix(target as unknown as HTMLCanvasElement);for(const c of [base,target,nativeMask])if(c)c.width=c.height=0;base=target=nativeMask=undefined;nativeStrokeRaster=undefined;lastPixels=undefined;surfaceMode=undefined;}return;}
    const readFrequently=j.nativeDelta||j.readFrequently!==false;
@@ -102,6 +103,19 @@ worker.onmessage=async({data:j})=>{
   if(s.silkBlendVersion===1||s.silkBlendVersion===2){
    // v0.5.238 Silk Blend: incremental; only tiles touched by new dabs come back.
    r=applySilkBlend(tc,bc,s,0,0,undefined,bc)??{x:0,y:0,width:1,height:1};
+  }else if(s.brushBlendVersion===1&&s.tool==='brush'){
+   // v0.5.240 Blend mode: the brush's own mask (tip, grain, pressure, spacing)
+   // grows live; the blend engine adds dabs incrementally. Final restores and
+   // renders the canonical one-pass blend over the final mask (== reload).
+   if(!nativeMask||nativeMask.width!==target.width||nativeMask.height!==target.height){nativeMask=new OffscreenCanvas(target.width,target.height);nativeStrokeRaster??=new LiveStrokeRaster();}
+   nativeStrokeRaster??=new LiveStrokeRaster();
+   const maskContext=nativeMask.getContext('2d')! as unknown as CanvasRenderingContext2D;
+   if(j.final){nativeStrokeRaster.reset();maskContext.reset();drawStroke(maskContext,s,'final',currentGeometry());}
+   else nativeStrokeRaster.paint(maskContext,s,currentGeometry());
+   const changed=applyBrushBlendLive(tc,nativeMask as unknown as HTMLCanvasElement,s,bc,!!j.final,s.points);
+   const updated=finiteRegion(changed??{x:0,y:0,width:1,height:1},target.width,target.height,()=>({x:0,y:0,width:1,height:1}));
+   region=union(region,updated);
+   r=j.final?finiteRegion(region,target.width,target.height,fullBounds):updated;
   }else if(!!s.nativeMixVersion||(s.paintTipVersion===2||s.dryBristleVersion===3)&&s.brushTip!=='color-blender'){
    if(!nativeMask||nativeMask.width!==target.width||nativeMask.height!==target.height){nativeMask=new OffscreenCanvas(target.width,target.height);nativeStrokeRaster??=new LiveStrokeRaster();}
    // Rebuild the canonical final mask, but retain carried pigment: contacts

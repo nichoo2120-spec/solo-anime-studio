@@ -1,8 +1,9 @@
+import type {BlendSampleSource} from './brushBlend';
 import type {Point,Stroke} from '../core/model';
 import type {RasterRegion} from './liveRaster';
 const canvas=(width:number,height:number)=>{const c=document.createElement('canvas');c.width=width;c.height=height;return c;};
 const samePoint=(a:Point|undefined,b:Point|undefined)=>!!a&&!!b&&a.x===b.x&&a.y===b.y&&a.p===b.p&&a.v===b.v;
-export const workerBlendEligible=(s:Pick<Stroke,'tool'|'coloringEngine'|'coloringAppearanceVersion'|'smudgeVersion'|'brushTip'|'nativeMixVersion'|'paintTipVersion'|'dryBristleVersion'|'silkBlendVersion'>)=>s.tool!=='eraser'&&(s.silkBlendVersion===1||s.silkBlendVersion===2||(s.paintTipVersion===2||s.dryBristleVersion===3)&&s.brushTip!=='color-blender'||!!s.nativeMixVersion||(s.coloringEngine===1&&s.brushTip==='color-blender'&&(s.coloringAppearanceVersion===3||s.smudgeVersion===2)));
+export const workerBlendEligible=(s:Pick<Stroke,'tool'|'coloringEngine'|'coloringAppearanceVersion'|'smudgeVersion'|'brushTip'|'nativeMixVersion'|'paintTipVersion'|'dryBristleVersion'|'silkBlendVersion'|'brushBlendVersion'>)=>s.tool!=='eraser'&&(s.brushBlendVersion===1||s.silkBlendVersion===1||s.silkBlendVersion===2||(s.paintTipVersion===2||s.dryBristleVersion===3)&&s.brushTip!=='color-blender'||!!s.nativeMixVersion||(s.coloringEngine===1&&s.brushTip==='color-blender'&&(s.coloringAppearanceVersion===3||s.smudgeVersion===2)));
 export type NativeMixSeed={mask:HTMLCanvasElement;paint:HTMLCanvasElement;box:{x:number;y:number;w:number;h:number};tiles:Map<string,{x:number;y:number;w:number;h:number}>};
 export type BlendBaseline={pixels:Uint8ClampedArray;region:RasterRegion;seed?:NativeMixSeed};
 export type BlendDelta={mask:HTMLCanvasElement;patch:HTMLCanvasElement;tiles:Map<string,{x:number;y:number;w:number;h:number}>;revision:number;final?:boolean;group?:BlendBaseline;support?:RasterRegion;dirty?:RasterRegion;box?:{x:number;y:number;w:number;h:number}};
@@ -16,6 +17,8 @@ export class LiveBlendWorker{
  private worker?:Worker;private job?:Job;private token=0;private serial=0;private failed=false;private failures=0;
  private surface=canvas(1,1);private surfaceReadback=false;
  private dirty?:RasterRegion;private delta?:BlendDelta;
+ /** v0.5.240 Blend mode "All layers": page snapshot taken at pen-down. */
+ blendSample?:BlendSampleSource;
  constructor(private readonly request:()=>void){}
  warm(){
   if(this.worker||this.failed||typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined'||typeof createImageBitmap==='undefined')return;
@@ -43,7 +46,7 @@ export class LiveBlendWorker{
    this.surface.width=source.width;this.surface.height=source.height;this.surface.getContext('2d',{willReadFrequently:nativeDelta})!.drawImage(source,0,0);
    // Native ownership already has exact pixels; pass them directly. Other
    // blend modes retain their existing bitmap setup and readback behavior.
-   const begin=(bitmap?:ImageBitmap)=>{if(this.job!==j){bitmap?.close();return;}this.worker!.postMessage({kind:'begin',token,width:source.width,height:source.height,base:bitmap,readFrequently:!s.nativeMixVersion,nativeDelta,deltaPixels,deltaRegion:ownershipBase?.region,seeded:!!ownershipBase?.seed,compactReplies:nativeDelta},[...(bitmap?[bitmap]:[]),...(deltaPixels?[deltaPixels.buffer as ArrayBuffer]:[])]);j.ready=true;this.flush(j);};createImageBitmap(source).then(begin).catch(()=>this.fail());
+   const begin=(bitmap?:ImageBitmap)=>{if(this.job!==j){bitmap?.close();return;}this.worker!.postMessage({kind:'begin',token,width:source.width,height:source.height,base:bitmap,readFrequently:!s.nativeMixVersion,nativeDelta,deltaPixels,deltaRegion:ownershipBase?.region,seeded:!!ownershipBase?.seed,compactReplies:nativeDelta,blendSample:s.brushBlendVersion===1&&s.bbSample==='all'?this.blendSample:undefined},[...(bitmap?[bitmap]:[]),...(deltaPixels?[deltaPixels.buffer as ArrayBuffer]:[])]);j.ready=true;this.flush(j);};createImageBitmap(source).then(begin).catch(()=>this.fail());
   }
   const j=this.job!;if(j.geometry!==geometry){j.geometry=geometry;j.queued={stroke:s,final:false};this.flush(j);}return this.surface;
  }
