@@ -27,7 +27,7 @@ type Pending={token:number;layer:string;key:Key;operations:Layer['operations'];b
 type ViewPending={token:number;layer:string;key:Key;base?:Key;timer:ReturnType<typeof setTimeout>};
 // Distance-anchored width profiles retain their shape at display resolution;
 // routing them through a page bitmap made high-DPI and enlarged views pixelated.
-export const displayCleanInk=(s:Stroke&ArtworkOrigin)=>!s.stampVersion&&!s.widthPointVersion&&!s.inShot&&!s.inPreviousStage&&!s.nativeMixVersion&&!s.mixStops&&!s.paintTipVersion&&!s.textureStrength&&!(s.inkTipVersion===1&&s.inkImage&&(s.inkImageAmount??1)>0)&&!(s.pressure&&s.pressureOpacity)&&(
+export const displayCleanInk=(s:Stroke&ArtworkOrigin)=>!s.stampVersion&&!s.brushBlendVersion&&!s.widthPointVersion&&!s.inShot&&!s.inPreviousStage&&!s.nativeMixVersion&&!s.mixStops&&!s.paintTipVersion&&!s.textureStrength&&!(s.inkTipVersion===1&&s.inkImage&&(s.inkImageAmount??1)>0)&&!(s.pressure&&s.pressureOpacity)&&(
  !!s.engineVersion&&['studio-ink','contour-flow','technical','eraser-hard','g-pen','mapping','brush-pen'].includes(s.brushKind??'technical')||s.flatNibVersion===1
 );
 const native=(s:Stroke)=>!s.inkProfileVersion&&!s.inkTipVersion&&!s.pressureOpacity&&!s.taperStart&&!s.taperEnd&&!(s.pressure&&s.pressureWidth!==false)&&!s.velocityTaper&&['technical','eraser-hard'].includes(s.brushKind??'technical');

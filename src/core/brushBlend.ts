@@ -3,8 +3,29 @@
  * layer, shaped by that brush's own tip, texture, grain, pressure and spacing.
  * The renderer is engine/brushBlend.ts (built on the Silk Blend tile engine). */
 export type BlendSample='layer'|'all';
+/** v0.5.242 Blend character per brush family. */
+export type BlendStyle='water'|'dry'|'pencil'|'ink'|'air'|'oil'|'marker'|'texture'|'soft';
+export const blendStyles:readonly BlendStyle[]=['water','dry','pencil','ink','air','oil','marker','texture','soft'];
+export const blendStyleNames:Record<BlendStyle,string>={water:'Watercolor',dry:'Dry brush',pencil:'Pencil',ink:'Ink',air:'Airbrush',oil:'Oil paint',marker:'Marker',texture:'Textured',soft:'Soft paint'};
+export const isBlendStyle=(v:unknown):v is BlendStyle=>typeof v==='string'&&(blendStyles as readonly string[]).includes(v);
+const INKS=['g-pen','mapping','technical','brush-pen','studio-ink','contour-flow'];
+/** Which family a brush blends like (from its kind and tip; custom brushes keep their source's). */
+export function blendStyleFor(s:{brushKind?:string;brushTip?:string}):BlendStyle{
+ const kind=s.brushKind??'',tip=s.brushTip??'';
+ if(tip.startsWith('water-')||tip==='wash'||tip.startsWith('wash-')||kind.startsWith('watercolor'))return 'water';
+ if(kind.startsWith('dry-')||kind==='dry'||tip==='chalk')return 'dry';
+ if(kind.startsWith('graphite-'))return 'pencil';
+ if(INKS.includes(kind))return 'ink';
+ if(kind==='coloring-air'||kind==='airbrush'||tip==='color-air')return 'air';
+ if(kind==='marker'||tip==='felt')return 'marker';
+ if(kind==='coloring-texture'||tip==='color-texture')return 'texture';
+ if(kind==='flat'||kind==='coloring-solid'||tip==='bristle'||tip==='flat-bristle'||kind==='paint'&&tip!=='soft-round')return 'oil';
+ return 'soft';
+}
 export type BrushBlendControls={
- brushBlendVersion?:1;
+ brushBlendVersion?:1|2;
+ /** v2 (v0.5.242): the brush family's blend character (watercolor, dry, pencil, ink, ...). */
+ bbStyle?:BlendStyle;
  /** Blend Amount: how strongly the result replaces the original (like opacity of the blend). */
  bbAmount?:number;
  /** Colour Pickup / Load: how fast the brush picks up the colour under it. */
@@ -32,7 +53,7 @@ export type BrushBlendControls={
  /** Stroke-only: all-layers sample snapshot (opaque PNG) and its document rectangle. */
  bbSamplePng?:string;bbSampleRect?:{x:number;y:number;width:number;height:number};
 };
-export type BrushBlendSettings=Omit<BrushBlendControls,'brushBlendVersion'|'bbCarry'|'bbSamplePng'|'bbSampleRect'>&{bbEnabled?:boolean};
+export type BrushBlendSettings=Omit<BrushBlendControls,'brushBlendVersion'|'bbStyle'|'bbCarry'|'bbSamplePng'|'bbSampleRect'>&{bbEnabled?:boolean};
 export const blendDefaults:Required<Omit<BrushBlendSettings,'bbEnabled'>>={bbAmount:.85,bbPickup:.5,bbWetness:.4,bbMix:.6,bbFlow:.6,bbStretch:.45,bbSample:'layer',bbClean:true,bbPaintLoad:0,bbPressure:true,bbProtectAlpha:false};
 export const blendLimits=[['bbAmount',0,1],['bbPickup',0,1],['bbWetness',0,1],['bbMix',0,1],['bbFlow',0,1],['bbStretch',0,1],['bbPaintLoad',0,1]] as const;
 export const blendFlags=['bbClean','bbPressure','bbProtectAlpha'] as const;
@@ -51,7 +72,7 @@ const clamp01=(v:unknown,fallback:number)=>typeof v==='number'&&Number.isFinite(
  * Paint mode strokes stay byte-identical to v0.5.239. */
 export function brushBlendMetadata(s:BrushBlendSettings&Shape):BrushBlendControls{
  if(!s.bbEnabled||!canBrushBlend(s))return {};
- const out:BrushBlendControls={brushBlendVersion:1};
+ const out:BrushBlendControls={brushBlendVersion:2,bbStyle:blendStyleFor(s)};
  for(const [key] of blendLimits)out[key]=clamp01(s[key],blendDefaults[key]);
  out.bbSample=isBlendSample(s.bbSample)?s.bbSample:'layer';
  for(const key of blendFlags)out[key]=typeof s[key]==='boolean'?s[key]:blendDefaults[key];
@@ -70,7 +91,8 @@ export function sanitizeBrushBlend(p:Partial<BrushBlendSettings>,result:BrushBle
 export function validBrushBlendStroke(o:Record<string,unknown>){
  const present=Object.keys(o).some(k=>k==='brushBlendVersion'||k.startsWith('bb'));
  if(!present)return true;
- if(o.brushBlendVersion!==1||o.tool!=='brush')return false;
+ if(o.brushBlendVersion!==1&&o.brushBlendVersion!==2||o.tool!=='brush')return false;
+ if(o.brushBlendVersion===1?o.bbStyle!==undefined:!isBlendStyle(o.bbStyle))return false;
  for(const [key] of blendLimits){const v=o[key];if(v!==undefined&&(typeof v!=='number'||!Number.isFinite(v)||v<0||v>1))return false;}
  if(o.bbSample!==undefined&&!isBlendSample(o.bbSample))return false;
  for(const key of blendFlags)if(o[key]!==undefined&&typeof o[key]!=='boolean')return false;
@@ -81,6 +103,6 @@ export function validBrushBlendStroke(o:Record<string,unknown>){
   for(const k of ['x','y','width','height'])if(!Number.isInteger(r[k]))return false;
   if((r.width as number)<1||(r.height as number)<1||(r.width as number)*(r.height as number)>16777216)return false;
  }
- for(const k of Object.keys(o))if(k.startsWith('bb')&&!['bbAmount','bbPickup','bbWetness','bbMix','bbFlow','bbStretch','bbSample','bbClean','bbPaintLoad','bbPressure','bbProtectAlpha','bbCarry','bbSamplePng','bbSampleRect'].includes(k))return false;
+ for(const k of Object.keys(o))if(k.startsWith('bb')&&!['bbAmount','bbPickup','bbWetness','bbMix','bbFlow','bbStretch','bbSample','bbClean','bbPaintLoad','bbPressure','bbProtectAlpha','bbCarry','bbSamplePng','bbSampleRect','bbStyle'].includes(k))return false;
  return true;
 }

@@ -1,0 +1,126 @@
+{
+ "families": [
+  [
+   "water-wet",
+   "Soft Wet Watercolor"
+  ],
+  [
+   "water-rough",
+   "Rough Watercolor"
+  ],
+  [
+   "dry-paint",
+   "Dry Paint Brush"
+  ],
+  [
+   "dry-ink-bristle",
+   "Dry Ink Brush"
+  ],
+  [
+   "hb",
+   "HB Pencil"
+  ],
+  [
+   "2b",
+   "2B Pencil"
+  ],
+  [
+   "g-pen",
+   "G-Pen"
+  ],
+  [
+   "brush-pen",
+   "Brush Pen"
+  ],
+  [
+   "color-air",
+   "Airbrush"
+  ],
+  [
+   "paint",
+   "Simple Paint (oil)"
+  ],
+  [
+   "flat",
+   "Flat Brush"
+  ],
+  [
+   "marker",
+   "Soft Marker"
+  ],
+  [
+   "color-texture",
+   "Textured Paint"
+  ],
+  [
+   "color-soft",
+   "Soft Paint"
+  ]
+ ],
+ "colW": 74.31428571428572,
+ "clip": {
+  "x": 301.8,
+  "y": 314.08,
+  "width": 1048.4,
+  "height": 240
+ },
+ "states": [
+  [
+   "water-wet",
+   "true"
+  ],
+  [
+   "water-rough",
+   "true"
+  ],
+  [
+   "dry-paint",
+   "true"
+  ],
+  [
+   "dry-ink-bristle",
+   "true"
+  ],
+  [
+   "hb",
+   "true"
+  ],
+  [
+   "2b",
+   "true"
+  ],
+  [
+   "g-pen",
+   "true"
+  ],
+  [
+   "brush-pen",
+   "true"
+  ],
+  [
+   "color-air",
+   "true"
+  ],
+  [
+   "paint",
+   "true"
+  ],
+  [
+   "flat",
+   "true"
+  ],
+  [
+   "marker",
+   "true"
+  ],
+  [
+   "color-texture",
+   "true"
+  ],
+  [
+   "color-soft",
+   "true"
+  ]
+ ],
+ "errors": []
+}

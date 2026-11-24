@@ -1,6 +1,7 @@
 import {memo} from 'react';
 import {ExactRange} from './ExactRange';
-import {blendDefaults,blendPresets,canBrushBlend,isBlendSample,type BrushBlendSettings} from '../core/brushBlend';
+import {blendDefaults,blendPresets,canBrushBlend,isBlendSample,blendStyleFor,blendStyleNames,type BrushBlendSettings,type BlendStyle} from '../core/brushBlend';
+const styleHints:Record<BlendStyle,string>={water:'soft wet bleed, transparent pigment mixing, a darker wet edge and a cloudy, grainy wash',dry:'rough, broken, scratchy drag with bristle gaps',pencil:'a gentle graphite smudge with paper grain',ink:'a crisp wet-ink smear that drags colour a long way',air:'a very soft, wide airbrush blur',oil:'thick, buttery drag with soft bristle streaks',marker:'an even, transparent marker bleed',texture:'blending through a canvas grain',soft:'smooth, soft blending'};
 import type {BrushSettings} from '../engine/StudioEngine';
 type Patch=(p:Partial<BrushSettings>)=>void;
 /** v0.5.240 Paint / Blend switch, shown for every paint brush. */
@@ -20,6 +21,7 @@ export const BrushBlendSettingsPanel=memo(function BrushBlendSettingsPanel({sett
  const reset=()=>{const values:Partial<BrushBlendSettings>={...d};patch(values);};
  return <div className="brush-blend-panel" role="group" aria-label="Blend settings">
   <BrushBlendToggle settings={s} patch={patch} shortcut={shortcut}/>
+  <p className="hint brush-blend-style" aria-label="Blend style">Blends like <strong>{blendStyleNames[blendStyleFor(s)]}</strong>: {styleHints[blendStyleFor(s)]}.</p>
   <p className="hint">Blend mode adds no colour. The brush blends the colours already on the canvas using its own tip, texture, grain, pressure and spacing.{shortcut?` Press ${shortcut.toUpperCase()} to switch Paint / Blend.`:''}</p>
   <div className="silk-presets" role="group" aria-label="Blend presets">{blendPresets.map(p=><button key={p.id} type="button" className={active===p.id?'active':''} aria-pressed={active===p.id} onClick={()=>patch({...p.values,bbEnabled:true})}>{p.name}</button>)}</div>
   <fieldset className="brush-blend-controls" disabled={!s.bbEnabled}>

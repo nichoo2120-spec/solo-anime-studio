@@ -191,7 +191,7 @@ export class StudioEngine {
  private blendPageSample?:BlendSampleSource;private lastBlendEnd?:{layer:string;x:number;y:number;r:number};
  private prepareBrushBlend(s:Stroke,layer:Layer,doc:Project){
   this.blendPageSample=undefined;this.blendWorker.blendSample=undefined;setLiveBlendSample(undefined);
-  if(s.brushBlendVersion!==1)return;
+  if(s.brushBlendVersion!==1&&s.brushBlendVersion!==2)return;
   if(s.tool!=='brush'){for(const k of Object.keys(s))if(k==='brushBlendVersion'||k.startsWith('bb'))delete (s as Record<string,unknown>)[k];return;}
   s.nativeMixVersion=undefined;s.nativeMixPickupVersion=undefined;s.nativeMixAmount=undefined;s.nativeMixPaintLoad=undefined;s.nativeMixRadius=undefined;
   if(s.bbClean===false&&this.lastBlendEnd&&this.lastBlendEnd.layer===layer.id&&layer.operations.length){const e=this.lastBlendEnd;try{s.bbCarry=encodeCarry(this.renderer.get(layer,doc),e.x,e.y,e.r);}catch{/* no carry */}}
@@ -221,7 +221,7 @@ export class StudioEngine {
    const {left,top,right,bottom}=strokeRasterExtent(stroke),p=this.store.getSnapshot();
    if(left>=0&&top>=0&&right<=p.width&&bottom<=p.height)stroke={...stroke,worldStroke:undefined};
   }
-  if(stroke.brushBlendVersion===1)stroke=this.finishBrushBlend(stroke);
+  if(stroke.brushBlendVersion===1||stroke.brushBlendVersion===2)stroke=this.finishBrushBlend(stroke);
   const snapshot=strokeSnapshot(stroke);
   if(snapshot.worldStroke&&this.worldOnlyStroke)return snapshot;
   if(!this.strokeMirror&&this.blendSource&&this.blendWorker.matches(snapshot,this.blendSource)){const pending=this.blendWorker.finish(snapshot);if(pending){this.finalBlendResult={stroke:snapshot,base:this.blendSource,...pending};const ms=performance.now()-start;this.performance.record('finalProcessingMs',ms);this.diagnostics.timing('finalProcessingMs',ms);return snapshot;}}

@@ -26,7 +26,9 @@ const paint=stockPresets.find(p=>p.id==='soft-paint')!;
 function stroke(points:Point[],blend:Record<string,unknown>={},patch:Partial<Stroke>={}):Stroke{
  const settings={...paint.settings,bbEnabled:true,...blend};
  const {bbEnabled:_e,...plain}=settings;
- return {...plain,...brushStrokeMetadata(settings),id:'bb',kind:'stroke',tool:'brush',color:'#00ff00',size:40,opacity:1,pressure:true,response:1,points,...patch} as Stroke;
+ // v0.5.240 strokes (brushBlendVersion 1): the frozen v1 recipe is tested here; v2 lives in brush-blend-v242.test.ts.
+ const {bbStyle:_st,...meta}=brushStrokeMetadata(settings) as Record<string,unknown>;
+ return {...plain,...meta,brushBlendVersion:1,id:'bb',kind:'stroke',tool:'brush',color:'#00ff00',size:40,opacity:1,pressure:true,response:1,points,...patch} as Stroke;
 }
 const line=(x0:number,x1:number,y:number,n=60)=>Array.from({length:n},(_,i)=>{const t=i/(n-1);return {x:x0+(x1-x0)*t,y,p:.4+.6*Math.sin(t*Math.PI)};});
 const hash=(d:Uint8ClampedArray)=>{let h=2166136261;for(let i=0;i<d.length;i++){h^=d[i];h=Math.imul(h,16777619);}return h>>>0;};
@@ -42,7 +44,7 @@ describe('Paint / Blend switch v0.5.240',()=>{
   for(const p of stockPresets){const m=brushStrokeMetadata(p.settings) as Record<string,unknown>;expect(Object.keys(m).filter(k=>k.startsWith('bb')||k==='brushBlendVersion'),p.id).toEqual([]);
    const off=brushStrokeMetadata({...p.settings,bbEnabled:false,bbAmount:.2,bbSample:'all'});expect(JSON.stringify(off),p.id).toBe(JSON.stringify(m));}
   expect(brushBlendMetadata({brushKind:'paint'})).toEqual({});
-  expect(brushStrokeMetadata({...paint.settings,bbEnabled:true})).toMatchObject({brushBlendVersion:1,...blendDefaults});
+  expect(brushStrokeMetadata({...paint.settings,bbEnabled:true})).toMatchObject({brushBlendVersion:2,bbStyle:'soft',...blendDefaults});
  });
  it('Blend mode adds no brush colour and blends the colours already there',()=>{
   const s=stroke(line(120,320,100)),c=run(s),before=scene().data;let changed=0,green=0;
@@ -92,7 +94,7 @@ describe('Paint / Blend switch v0.5.240',()=>{
  it('saves Blend strokes in projects and rejects broken Blend data',()=>{
   const p=newProject(),s=stroke(line(10,90,40,10),{bbSample:'all'},{bbSamplePng:'data:image/png;base64,AAAA',bbSampleRect:{x:0,y:0,width:10,height:10},bbCarry:'AAAA'});activeLayer(p).operations=[s];
   expect(validateProject(JSON.parse(JSON.stringify(p)))).toEqual(p);
-  for(const patch of [{bbAmount:2},{bbSample:'moon'},{brushBlendVersion:2},{tool:'eraser'},{bbClean:'yes'},{bbSampleRect:{x:0,y:0,width:.5,height:1}},{bbSamplePng:'http://x'},{bbCarry:'<script>'},{bbWhatever:1}] as unknown as Partial<Stroke>[]){activeLayer(p).operations=[{...s,...patch} as Stroke];expect(()=>validateProject(JSON.parse(JSON.stringify(p))),JSON.stringify(patch)).toThrow();}
+  for(const patch of [{bbAmount:2},{bbSample:'moon'},{brushBlendVersion:3},{bbStyle:'water'},{tool:'eraser'},{bbClean:'yes'},{bbSampleRect:{x:0,y:0,width:.5,height:1}},{bbSamplePng:'http://x'},{bbCarry:'<script>'},{bbWhatever:1}] as unknown as Partial<Stroke>[]){activeLayer(p).operations=[{...s,...patch} as Stroke];expect(()=>validateProject(JSON.parse(JSON.stringify(p))),JSON.stringify(patch)).toThrow();}
   const {brushBlendVersion:_v,...noVersion}=s;activeLayer(p).operations=[noVersion as Stroke];expect(()=>validateProject(JSON.parse(JSON.stringify(p)))).toThrow();
  });
  it('one Blend stroke is exactly one undo step',()=>{

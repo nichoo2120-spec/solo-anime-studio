@@ -17,6 +17,7 @@ import type {RasterRegion} from './liveRaster';
 import {SilkSurface,TILE,PATCH,CELLS,type Tile} from './silkBlend';
 import {finalGeometry} from './geometryCache';
 import {paintSamples} from './paintPass';
+import {BrushBlendGestureV2} from './brushBlendStyles';
 
 const clamp01=(v:number)=>v<0?0:v>1?1:v;
 type Ctx=CanvasRenderingContext2D;
@@ -68,7 +69,7 @@ export async function decodeBlendSample(png:string,rect:{x:number;y:number;width
 export function sampleFromCanvas(c:Readable,rect:{x:number;y:number;width:number;height:number}):BlendSampleSource{
  const ctx=c.getContext('2d') as Ctx;return {data:ctx.getImageData(rect.x,rect.y,rect.width,rect.height).data,...rect};
 }
-function sampleSnapshot(src:BlendSampleSource,x:number,y:number,out:Float32Array,o:number){
+export function sampleSnapshot(src:BlendSampleSource,x:number,y:number,out:Float32Array,o:number){
  const fx=x-.5-src.x,fy=y-.5-src.y,ix=Math.floor(fx),iy=Math.floor(fy),ax=fx-ix,ay=fy-iy;
  out[o]=out[o+1]=out[o+2]=out[o+3]=0;
  for(let q=0;q<4;q++){const px=ix+(q&1),py=iy+(q>>1),wt=((q&1)?ax:1-ax)*((q>>1)?ay:1-ay);if(wt<=0||px<0||py<0||px>=src.width||py>=src.height)continue;
@@ -207,12 +208,17 @@ const union=(a:RasterRegion|undefined,b:RasterRegion|undefined)=>{if(!a)return b
 export function renderBrushBlend(ctx:Ctx,mask:Readable,s:Stroke,maskX=0,maskY=0,read?:Ctx):RasterRegion|undefined{
  if(s.opacity<=0||!s.points.length)return undefined;
  const W=ctx.canvas.width,H=ctx.canvas.height,reader=new MaskReader(mask.getContext('2d') as Ctx,maskX,maskY,W,H);
- const g=new BrushBlendGesture(s,W,H,read??ctx,reader,blendSampleFor(s));g.advance(blendPath(s));return g.flush(ctx,true);
+ const g=gestureFor(s,W,H,read??ctx,reader);g.advance(blendPath(s));return g.flush(ctx,true);
 }
 
 /** Live (blend worker): incremental dabs over the growing brush mask. The final
  * call restores the live pixels and renders the canonical pass. */
-let live:{id:string;target:unknown;gesture:BrushBlendGesture}|undefined;
+/** v1 strokes keep the frozen v0.5.240 recipe; v2 strokes blend in their family style. */
+type AnyGesture=BrushBlendGesture|BrushBlendGestureV2;
+function gestureFor(s:Stroke,W:number,H:number,read:Ctx,reader:MaskReader):AnyGesture{
+ return s.brushBlendVersion===2?new BrushBlendGestureV2(s,W,H,read,reader,blendSampleFor(s),decodeCarry(s.bbCarry),sampleSnapshot):new BrushBlendGesture(s,W,H,read,reader,blendSampleFor(s));
+}
+let live:{id:string;target:unknown;gesture:AnyGesture}|undefined;
 export function resetBrushBlend(){live=undefined;}
 export function applyBrushBlendLive(ctx:Ctx,mask:Readable,s:Stroke,base:Readable,final:boolean,livePath:Point[]):RasterRegion|undefined{
  if(s.opacity<=0||!s.points.length)return undefined;
@@ -224,7 +230,7 @@ export function applyBrushBlendLive(ctx:Ctx,mask:Readable,s:Stroke,base:Readable
  let restored:RasterRegion|undefined;
  if(live&&(live.id!==s.id||live.target!==ctx.canvas||live.gesture.pointCount>livePath.length)){if(live.id===s.id&&live.target===ctx.canvas)restored=live.gesture.restore(ctx);live=undefined;}
  const reader=new MaskReader(mask.getContext('2d') as Ctx,0,0,W,H);
- if(!live)live={id:s.id,target:ctx.canvas,gesture:new BrushBlendGesture(s,W,H,read,reader,blendSampleFor(s))};else live.gesture.setMask(reader);
+ if(!live)live={id:s.id,target:ctx.canvas,gesture:gestureFor(s,W,H,read,reader)};else live.gesture.setMask(reader);
  live.gesture.advance(livePath);
  return union(restored,live.gesture.flush(ctx,!!restored));
 }

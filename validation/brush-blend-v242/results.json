@@ -1,0 +1,685 @@
+{
+ "rows": [
+  {
+   "id": "water-wet",
+   "style": "water",
+   "version": 2,
+   "ms": 137.1,
+   "v1": {
+    "changed": 16801,
+    "alphaDrop": 7903,
+    "green": 0,
+    "meanLum": 122.5,
+    "hf": 12.16,
+    "gaps": 0.655
+   },
+   "v2": {
+    "changed": 36868,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 122.3,
+    "hf": 6.67,
+    "gaps": 0.014
+   },
+   "hash": 1334318371
+  },
+  {
+   "id": "water-rough",
+   "style": "water",
+   "version": 2,
+   "ms": 110.9,
+   "v1": {
+    "changed": 14391,
+    "alphaDrop": 7511,
+    "green": 0,
+    "meanLum": 123.2,
+    "hf": 10.21,
+    "gaps": 0.67
+   },
+   "v2": {
+    "changed": 32976,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 122.5,
+    "hf": 8.03,
+    "gaps": 0.01
+   },
+   "hash": 2027199930
+  },
+  {
+   "id": "water-flat",
+   "style": "water",
+   "version": 2,
+   "ms": 93.4,
+   "v1": {
+    "changed": 16963,
+    "alphaDrop": 8533,
+    "green": 0,
+    "meanLum": 121.2,
+    "hf": 7.85,
+    "gaps": 0.615
+   },
+   "v2": {
+    "changed": 33580,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 122.4,
+    "hf": 7.88,
+    "gaps": 0.012
+   },
+   "hash": 1073602244
+  },
+  {
+   "id": "dry-paint",
+   "style": "dry",
+   "version": 2,
+   "ms": 83.6,
+   "v1": {
+    "changed": 8924,
+    "alphaDrop": 4635,
+    "green": 0,
+    "meanLum": 119.4,
+    "hf": 22.36,
+    "gaps": 0.725
+   },
+   "v2": {
+    "changed": 18910,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 125,
+    "hf": 13.2,
+    "gaps": 0.219
+   },
+   "hash": 3960243216
+  },
+  {
+   "id": "dry-ink-bristle",
+   "style": "dry",
+   "version": 2,
+   "ms": 58.5,
+   "v1": {
+    "changed": 7361,
+    "alphaDrop": 3984,
+    "green": 0,
+    "meanLum": 123.3,
+    "hf": 29.85,
+    "gaps": 0.816
+   },
+   "v2": {
+    "changed": 17437,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 129.5,
+    "hf": 16.81,
+    "gaps": 0.359
+   },
+   "hash": 1463313841
+  },
+  {
+   "id": "dry",
+   "style": "dry",
+   "version": 2,
+   "ms": 72.1,
+   "v1": {
+    "changed": 14899,
+    "alphaDrop": 7369,
+    "green": 0,
+    "meanLum": 123.9,
+    "hf": 14.75,
+    "gaps": 0.7
+   },
+   "v2": {
+    "changed": 35031,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 125.6,
+    "hf": 8.7,
+    "gaps": 0.103
+   },
+   "hash": 12408684
+  },
+  {
+   "id": "hb",
+   "style": "pencil",
+   "version": 2,
+   "ms": 70.6,
+   "v1": {
+    "changed": 14642,
+    "alphaDrop": 7597,
+    "green": 0,
+    "meanLum": 122.2,
+    "hf": 10.17,
+    "gaps": 0.682
+   },
+   "v2": {
+    "changed": 16289,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 121.5,
+    "hf": 13.35,
+    "gaps": 0.584
+   },
+   "hash": 3709809603
+  },
+  {
+   "id": "2b",
+   "style": "pencil",
+   "version": 2,
+   "ms": 64.7,
+   "v1": {
+    "changed": 16290,
+    "alphaDrop": 8354,
+    "green": 0,
+    "meanLum": 121.2,
+    "hf": 8.51,
+    "gaps": 0.635
+   },
+   "v2": {
+    "changed": 17232,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 121.6,
+    "hf": 12.17,
+    "gaps": 0.543
+   },
+   "hash": 3529147836
+  },
+  {
+   "id": "g-pen",
+   "style": "ink",
+   "version": 2,
+   "ms": 56.4,
+   "v1": {
+    "changed": 16282,
+    "alphaDrop": 8434,
+    "green": 0,
+    "meanLum": 121.1,
+    "hf": 7.01,
+    "gaps": 0.582
+   },
+   "v2": {
+    "changed": 30075,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 124.5,
+    "hf": 3.86,
+    "gaps": 0.034
+   },
+   "hash": 904341772
+  },
+  {
+   "id": "brush-pen",
+   "style": "ink",
+   "version": 2,
+   "ms": 52.5,
+   "v1": {
+    "changed": 13156,
+    "alphaDrop": 7130,
+    "green": 0,
+    "meanLum": 121.1,
+    "hf": 7.72,
+    "gaps": 0.605
+   },
+   "v2": {
+    "changed": 24115,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 125.8,
+    "hf": 4.37,
+    "gaps": 0.055
+   },
+   "hash": 4048856619
+  },
+  {
+   "id": "technical",
+   "style": "ink",
+   "version": 2,
+   "ms": 48.6,
+   "v1": {
+    "changed": 21972,
+    "alphaDrop": 10884,
+    "green": 0,
+    "meanLum": 123.6,
+    "hf": 6.68,
+    "gaps": 0.522
+   },
+   "v2": {
+    "changed": 37424,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 124.7,
+    "hf": 3.53,
+    "gaps": 0.019
+   },
+   "hash": 1455917650
+  },
+  {
+   "id": "color-air",
+   "style": "air",
+   "version": 2,
+   "ms": 66.1,
+   "v1": {
+    "changed": 6521,
+    "alphaDrop": 3795,
+    "green": 0,
+    "meanLum": 125.5,
+    "hf": 18.92,
+    "gaps": 0.819
+   },
+   "v2": {
+    "changed": 12105,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 121.4,
+    "hf": 8.54,
+    "gaps": 0.618
+   },
+   "hash": 1960601738
+  },
+  {
+   "id": "paint",
+   "style": "oil",
+   "version": 2,
+   "ms": 77.5,
+   "v1": {
+    "changed": 15603,
+    "alphaDrop": 8368,
+    "green": 0,
+    "meanLum": 120.2,
+    "hf": 8.31,
+    "gaps": 0.584
+   },
+   "v2": {
+    "changed": 32955,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 124.9,
+    "hf": 3.42,
+    "gaps": 0.017
+   },
+   "hash": 3065902955
+  },
+  {
+   "id": "flat",
+   "style": "oil",
+   "version": 2,
+   "ms": 67.4,
+   "v1": {
+    "changed": 14116,
+    "alphaDrop": 7496,
+    "green": 0,
+    "meanLum": 120.5,
+    "hf": 7.52,
+    "gaps": 0.581
+   },
+   "v2": {
+    "changed": 28639,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 123.8,
+    "hf": 3.6,
+    "gaps": 0.021
+   },
+   "hash": 2947709370
+  },
+  {
+   "id": "color-solid",
+   "style": "oil",
+   "version": 2,
+   "ms": 45.8,
+   "v1": {
+    "changed": 16504,
+    "alphaDrop": 8829,
+    "green": 0,
+    "meanLum": 118.3,
+    "hf": 6.38,
+    "gaps": 0.588
+   },
+   "v2": {
+    "changed": 32833,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 124.4,
+    "hf": 3.45,
+    "gaps": 0.019
+   },
+   "hash": 837602194
+  },
+  {
+   "id": "marker",
+   "style": "marker",
+   "version": 2,
+   "ms": 58.7,
+   "v1": {
+    "changed": 13906,
+    "alphaDrop": 7286,
+    "green": 0,
+    "meanLum": 120,
+    "hf": 7.34,
+    "gaps": 0.598
+   },
+   "v2": {
+    "changed": 23863,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 123.7,
+    "hf": 4.14,
+    "gaps": 0.188
+   },
+   "hash": 115635827
+  },
+  {
+   "id": "color-texture",
+   "style": "texture",
+   "version": 2,
+   "ms": 103.6,
+   "v1": {
+    "changed": 13712,
+    "alphaDrop": 7168,
+    "green": 0,
+    "meanLum": 122.3,
+    "hf": 16.2,
+    "gaps": 0.682
+   },
+   "v2": {
+    "changed": 20935,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 123.3,
+    "hf": 11.05,
+    "gaps": 0.37
+   },
+   "hash": 1022677824
+  },
+  {
+   "id": "color-soft",
+   "style": "soft",
+   "version": 2,
+   "ms": 59.5,
+   "v1": {
+    "changed": 11062,
+    "alphaDrop": 6248,
+    "green": 0,
+    "meanLum": 120.9,
+    "hf": 9.57,
+    "gaps": 0.669
+   },
+   "v2": {
+    "changed": 17967,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 121.6,
+    "hf": 5.55,
+    "gaps": 0.383
+   },
+   "hash": 1752508260
+  },
+  {
+   "id": "soft-paint",
+   "style": "soft",
+   "version": 2,
+   "ms": 54,
+   "v1": {
+    "changed": 9728,
+    "alphaDrop": 5533,
+    "green": 0,
+    "meanLum": 126.1,
+    "hf": 15.36,
+    "gaps": 0.727
+   },
+   "v2": {
+    "changed": 18292,
+    "alphaDrop": 0,
+    "green": 0,
+    "meanLum": 124.6,
+    "hf": 6.84,
+    "gaps": 0.371
+   },
+   "hash": 966458815
+  }
+ ],
+ "settingRows": [
+  {
+   "id": "water-wet",
+   "k": "bbAmount",
+   "v": 0.3,
+   "diff": 118079
+  },
+  {
+   "id": "water-wet",
+   "k": "bbPickup",
+   "v": 1,
+   "diff": 111181
+  },
+  {
+   "id": "water-wet",
+   "k": "bbWetness",
+   "v": 1,
+   "diff": 108905
+  },
+  {
+   "id": "water-wet",
+   "k": "bbMix",
+   "v": 0,
+   "diff": 118828
+  },
+  {
+   "id": "water-wet",
+   "k": "bbFlow",
+   "v": 0.2,
+   "diff": 116509
+  },
+  {
+   "id": "water-wet",
+   "k": "bbStretch",
+   "v": 0,
+   "diff": 118738
+  },
+  {
+   "id": "water-wet",
+   "k": "bbPaintLoad",
+   "v": 0.5,
+   "diff": 125812
+  },
+  {
+   "id": "water-wet",
+   "k": "bbPressure",
+   "v": false,
+   "diff": 53018
+  },
+  {
+   "id": "water-wet",
+   "k": "bbProtectAlpha",
+   "v": true,
+   "diff": 25386
+  },
+  {
+   "id": "dry-paint",
+   "k": "bbAmount",
+   "v": 0.3,
+   "diff": 61312
+  },
+  {
+   "id": "dry-paint",
+   "k": "bbPickup",
+   "v": 1,
+   "diff": 60468
+  },
+  {
+   "id": "dry-paint",
+   "k": "bbWetness",
+   "v": 1,
+   "diff": 26422
+  },
+  {
+   "id": "dry-paint",
+   "k": "bbMix",
+   "v": 0,
+   "diff": 62008
+  },
+  {
+   "id": "dry-paint",
+   "k": "bbFlow",
+   "v": 0.2,
+   "diff": 61596
+  },
+  {
+   "id": "dry-paint",
+   "k": "bbStretch",
+   "v": 0,
+   "diff": 61910
+  },
+  {
+   "id": "dry-paint",
+   "k": "bbPaintLoad",
+   "v": 0.5,
+   "diff": 63688
+  },
+  {
+   "id": "dry-paint",
+   "k": "bbPressure",
+   "v": false,
+   "diff": 29524
+  },
+  {
+   "id": "dry-paint",
+   "k": "bbProtectAlpha",
+   "v": true,
+   "diff": 12287
+  },
+  {
+   "id": "paint",
+   "k": "bbAmount",
+   "v": 0.3,
+   "diff": 103899
+  },
+  {
+   "id": "paint",
+   "k": "bbPickup",
+   "v": 1,
+   "diff": 102302
+  },
+  {
+   "id": "paint",
+   "k": "bbWetness",
+   "v": 1,
+   "diff": 79049
+  },
+  {
+   "id": "paint",
+   "k": "bbMix",
+   "v": 0,
+   "diff": 104824
+  },
+  {
+   "id": "paint",
+   "k": "bbFlow",
+   "v": 0.2,
+   "diff": 104570
+  },
+  {
+   "id": "paint",
+   "k": "bbStretch",
+   "v": 0,
+   "diff": 104804
+  },
+  {
+   "id": "paint",
+   "k": "bbPaintLoad",
+   "v": 0.5,
+   "diff": 107429
+  },
+  {
+   "id": "paint",
+   "k": "bbPressure",
+   "v": false,
+   "diff": 56699
+  },
+  {
+   "id": "paint",
+   "k": "bbProtectAlpha",
+   "v": true,
+   "diff": 23724
+  }
+ ],
+ "protectedGain": 0,
+ "workerRows": [
+  {
+   "id": "water-wet",
+   "diff": 0
+  },
+  {
+   "id": "water-rough",
+   "diff": 0
+  },
+  {
+   "id": "water-flat",
+   "diff": 0
+  },
+  {
+   "id": "dry-paint",
+   "diff": 0
+  },
+  {
+   "id": "dry-ink-bristle",
+   "diff": 0
+  },
+  {
+   "id": "dry",
+   "diff": 0
+  },
+  {
+   "id": "hb",
+   "diff": 0
+  },
+  {
+   "id": "2b",
+   "diff": 0
+  },
+  {
+   "id": "g-pen",
+   "diff": 0
+  },
+  {
+   "id": "brush-pen",
+   "diff": 0
+  },
+  {
+   "id": "technical",
+   "diff": 0
+  },
+  {
+   "id": "color-air",
+   "diff": 0
+  },
+  {
+   "id": "paint",
+   "diff": 0
+  },
+  {
+   "id": "flat",
+   "diff": 0
+  },
+  {
+   "id": "color-solid",
+   "diff": 0
+  },
+  {
+   "id": "marker",
+   "diff": 0
+  },
+  {
+   "id": "color-texture",
+   "diff": 0
+  },
+  {
+   "id": "color-soft",
+   "diff": 0
+  },
+  {
+   "id": "soft-paint",
+   "diff": 0
+  }
+ ],
+ "errors": []
+}

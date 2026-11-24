@@ -27,7 +27,8 @@ try{
    const g=x.createLinearGradient(560,0,740,0);g.addColorStop(0,'rgba(40,180,120,1)');g.addColorStop(1,'rgba(40,180,120,0)');x.fillStyle=g;x.fillRect(560,30,180,160);
    x.strokeStyle='#111';x.lineWidth=3;for(let i=0;i<6;i++){x.beginPath();x.moveTo(40+i*110,40);x.lineTo(90+i*110,180);x.stroke();}return c;};
   const pts=(L=160)=>Array.from({length:L},(_,i)=>{const t=i/(L-1);return {x:40+t*680,y:110+45*Math.sin(t*Math.PI*3),p:.35+.65*Math.sin(t*Math.PI)};});
-  const strokeFor=(id,extra={},blend={})=>{const preset=stockPresets.find(p=>p.id===id);const settings={...preset.settings,bbEnabled:true,...blend};return {...settings,...brushStrokeMetadata(settings),id:'blend-qa-'+id,kind:'stroke',tool:'brush',color:'#00ff00',size:46,opacity:1,pressure:true,response:1,points:pts(),...extra};};
+  // v0.5.240 recipe (brushBlendVersion 1) stays frozen; v2 is tested in brush-blend-v242-browser.mjs
+  const strokeFor=(id,extra={},blend={})=>{const preset=stockPresets.find(p=>p.id===id);const settings={...preset.settings,bbEnabled:true,...blend};const {bbStyle:_st,...meta}=brushStrokeMetadata(settings);return {...settings,...meta,brushBlendVersion:1,id:'blend-qa-'+id,kind:'stroke',tool:'brush',color:'#00ff00',size:46,opacity:1,pressure:true,response:1,points:pts(),...extra};};
   // Reload path exactly as LayerRenderer replays a stroke.
   const reload=(s,base)=>{const res=make();const ctx=res.getContext('2d');ctx.drawImage(base,0,0);const mask=make();drawStroke(mask.getContext('2d'),s);compositePaintStroke(ctx,mask,s);return res;};
   const brushes=['hb','g-pen','soft-paint','paint','marker','dry','water-wet','color-air','color-texture'];

@@ -56,3 +56,22 @@
 - 16:45 IST (clock check: earlier notes' times ran ahead; real time now 16:45): v241 bytes harness compat 620/620, old 80/80, oldv 36/36 identical; livefinal same. Perf d239/d241 interleaved: Silk rows same; solid looked slower in 2 of 3 runs -> rerunning solid-only x5 (perfs*). brush-shape new case p95 ~200 / pen-up ~500 -> looking at stampBrush speed.
 - 17:15 IST: solid-only x5 interleaved: v241 = v239 (p95 33/67, pen-up 135/155 vs 126/191). Made stamp live preview incremental (redraw only changed dabs; stampPlan/stampChange in stampBrush.ts, liveRaster keeps plan+canvas). Shape browser test passes (live final == reload 0; incremental preview within old-engine AA range), app commit == reload 0 diff. Next: rebuild + brush-shape perf.
 - 17:25 IST: post-change checks: vitest 474/474, regression same 21 as base, check-* same as base, ink-tip/compact/brush-settings/live-brush/high-dpi pass, shape+blend UI pass. brush-shape perf (3 runs): p95 83-117 (30) / 100-183 (150), pen-up 300-470 / ~530. Committing v0.5.241.
+- 16:56 IST: v0.5.241 committed dfd454d and pushed; waiting on Actions.
+- note: the 17:15/17:20/17:25 IST stamps above were wrong (box clock was ~16:30-16:55 then); order is right.
+- 16:57 IST: zip v241, REPORT.md (240+241) and MASTER Part 21 written (release status placeholder until Actions finishes).
+- 17:15 IST: v0.5.241 published (run 45384239541 success, 17:08 IST), non-draft, latest; exe/blockmap/latest.yml verified. REPORT.md + MASTER Part 21 finalised. Build A–E DONE.
+
+## v0.5.242 (owner pt86u): watercolor Blend must blend like watercolor; per-family Blend character
+- 17:26 IST: started. Base dfd454d (v0.5.241). Plan: reproduce in app (before screenshot), study brushBlend engine + Silk Wet v2, add brushBlendVersion 2 with family profiles, tests, guards, perf, push.
+- 17:33 IST: repro in real app (tests/brush-blend-v242-families-ui.mjs, validation/brush-blend-v242/families-before.png): (1) pencils (HB/2B) and G-Pen/Brush Pen? paint black instead of blending; (2) other brushes barely blend - colour refreshes every few px (no drag) and is weak; (3) zig-zag past paint pulls transparency in -> pale/white halos; (4) no family character (watercolor looks like any other).
+- 17:36 IST: root causes: (a) InkDisplay.displayCleanInk shows ink-brush (G-Pen, Brush Pen…) Blend strokes as clean ink paint; (b) v1 blend refreshes the carried colour every ~3 px (pickup .03+.6p per dab) so little drag, weak strength, raw mask alpha (watercolour mask is thin); (c) v1 lerps alpha toward the sampled patch -> pulls transparency in (white halos); (d) one recipe for all brushes. Plan: brushBlendVersion 2 + bbStyle (water/dry/pencil/ink/air/oil/marker/texture/soft) in new src/engine/brushBlendStyles.ts; v1 path untouched.
+- 17:39 IST: v2 engine written (src/engine/brushBlendStyles.ts), core bbStyle/blendStyleFor + validation, v1/v2 dispatch (gestureFor), displayCleanInk excludes blend strokes. v240 unit tests pinned to v1 strokes; pass.
+- 17:42 IST: tests/brush-blend-v242-browser.mjs PASS (19 stock brushes, 9 styles, all distinct; alphaDrop 0 = no halos; no green; settings each >500 px; protect 0; worker live==final 0 for every family). Sheet validation/brush-blend-v242/families-sheet.png (v1 left / v2 right). Tuned pick/gain; airbrush coverage gain 2.6.
+- 17:43 IST: v1 Blend strokes byte-identical vs v0.5.241 tree (78/78 renders, sas_b24_out/v1hash.mjs).
+- 17:44 IST: tests/brush-blend-v242.test.ts 13/13 PASS; Blend panel now shows 'Blends like <family>'.
+- 17:50 IST: real-app after run showed weak watercolor drag; tuned water profile (pick .5, drag 1.6, gain 2.6, coverage lift 2.2). v242 browser PASS, vitest 14/14.
+- 17:53 IST: real-app after saved; comparison validation/brush-blend-v242/families-before-after.png built (14 brushes, 9 families).
+- 18:05 IST: bytes harness work242: compat 620/620, old 80/80, oldv 36/36 identical; livefinal same as work241. Full guards (all242.sh) running.
+- 18:27 IST: all242.sh finished: tsc 0, vitest 488/488, blend/shape/blend242 browser+UI all PASS, regression 21 fails = same names as base, base-known 6 fails unchanged. parity155-1 failed once under load (harness ran concurrently; color-solid paint, not Blend); rerun alone 3/3 PASS -> flake, not a new failure.
+- 18:42 IST: perf v242 vs v241 (3 interleaved full runs + 6 pencil rechecks with order swapped): all cases equal within noise incl. new blend-water/blend-dry cases; perf242_medians.txt.
+- 18:42 IST: committing v0.5.242 and pushing (pt86u).

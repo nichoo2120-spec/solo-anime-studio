@@ -103,7 +103,7 @@ worker.onmessage=async({data:j})=>{
   if(s.silkBlendVersion===1||s.silkBlendVersion===2){
    // v0.5.238 Silk Blend: incremental; only tiles touched by new dabs come back.
    r=applySilkBlend(tc,bc,s,0,0,undefined,bc)??{x:0,y:0,width:1,height:1};
-  }else if(s.brushBlendVersion===1&&s.tool==='brush'){
+  }else if((s.brushBlendVersion===1||s.brushBlendVersion===2)&&s.tool==='brush'){
    // v0.5.240 Blend mode: the brush's own mask (tip, grain, pressure, spacing)
    // grows live; the blend engine adds dabs incrementally. Final restores and
    // renders the canonical one-pass blend over the final mask (== reload).

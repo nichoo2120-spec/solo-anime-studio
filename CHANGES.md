@@ -1,3 +1,11 @@
+## v0.5.242 — Family-style Blend mode (owner pt86u)
+
+- `brushBlendVersion:2` + `bbStyle` (water|dry|pencil|ink|air|oil|marker|texture|soft, from `blendStyleFor`) for new Blend strokes; v1 strokes keep `BrushBlendGesture` byte-identically (78/78 render hashes vs v0.5.241). Validation: v1 forbids `bbStyle`, v2 requires a valid one.
+- New `src/engine/brushBlendStyles.ts` (`BrushBlendGestureV2`): per-family profiles (pickup, nib mean, bleed passes, optical-density mixing, drag, falloff), slow reservoir reload, alpha-preserving deposit (no halos), watercolor wet front / tide line / cloud / grain from the Silk Wet v2 fields, dry bristle gaps and scratches, pencil and canvas grain, oil streaks. Dispatch via `gestureFor()` in renderBrushBlend, live preview and the worker.
+- Fix: `InkDisplay.displayCleanInk` no longer draws Blend-mode ink strokes as clean ink.
+- UI: Blend settings show "Blends like <family>".
+- Tests: `tests/brush-blend-v242.test.ts` (14), `tests/brush-blend-v242-browser.mjs` (19 stock brushes, families sheet), `tests/brush-blend-v242-families-ui.mjs` (real app, before/after per family).
+
 ## v0.5.241 — Tip shape, Dual brush, My brushes
 
 - New `src/core/brushShape.ts` and `src/engine/stampBrush.ts`: a stamp engine used only when Tip shape (`tsEnabled`) or Dual brush (`dbEnabled`) is on. New stroke fields `stampVersion:1`, `stampTip/stampHardness/stampTexture`, `tsRoundness/tsAngle/tsScaleX/tsScaleY/tsFlipX/tsFlipY/tsFollow/tsTilt` and `dbTip/dbHardness/dbTexture/dbMode/dbScale/dbSpacing/dbScatter/dbCount/dbAmount`; points get `az/alt` only with pen tilt on. Validated on load; old strokes carry none of these and render byte-identically.
