@@ -17,7 +17,7 @@ export function renderBrushPreview(c:HTMLCanvasElement,mask:HTMLCanvasElement,{s
  // One natural gesture in every section. Never add periodic hand jitter to
  // demonstrate smoothing: it invents a rope-like stroke the artist did not draw.
  const points=Array.from({length:180},(_,i)=>{const t=i/179;return {x:(12+t*(width-24))*scale,y:(height*.5-Math.sin(t*Math.PI*2)*height*.15)*scale,p:.06+Math.sin(t*Math.PI)*.94,v:.2+.8*Math.sin(t*Math.PI*2)**2};});
- const mix=!eraser&&!!settings.nativeMixEnabled,pickup=!eraser&&!mix&&!!(settings.mixColors||settings.watercolorMode==='wet'),blender=settings.brushTip==='color-blender';
+ const mix=!eraser&&!!settings.nativeMixEnabled,pickup=!eraser&&!mix&&!!(settings.mixColors||settings.watercolorMode==='wet'),blender=settings.brushTip==='color-blender'||settings.brushKind==='silk-blend';
  const s:Stroke={...settings,...brushStrokeMetadata(settings),size,captureZoom:1/scale,inkProfileLength:settings.inkProfileLength===undefined?undefined:settings.inkProfileLength*scale,inkFlowLength:settings.inkFlowLength===undefined?undefined:settings.inkFlowLength*scale,inkGrainScale:(settings.inkGrainScale??1)*scale,inkImageScale:(settings.inkImageScale??1)*scale,kind:'stroke',id:'preview',tool:eraser?'eraser':'brush',points,color:mix?settings.color:'#d9e2e5',pressure:settings.pressure,
   nativeMixVersion:mix?3:undefined,nativeMixPickupVersion:mix?3:undefined,nativeMixAmount:mix?settings.mixAmount??.58:undefined,nativeMixRadius:mix?Math.max(.02,Math.min(1,(settings.mixPickupLen??1)/2)):undefined,nativeMixPaintLoad:mix?settings.mixPaintLoad??0:undefined};
  // Mixing and erasing need existing paint to act on; a blank thumbnail hides

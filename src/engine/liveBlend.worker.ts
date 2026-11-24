@@ -3,6 +3,7 @@ import type {Point,Stroke} from '../core/model';
 import {compositePaintStroke,strokeRasterBounds} from './paintCompositing';
 import {resetWetSmudgeCaches} from './wetSmudge';
 import {resetGentleBlend,applyGentleBlend} from './gentleBlend';
+import {resetSilkBlend,applySilkBlend} from './silkBlend';
 import {LiveStrokeRaster} from './liveRaster';
 import {strokeGeometry} from './strokeGeometry';
 import {finalGeometry} from './geometryCache';
@@ -59,7 +60,7 @@ worker.onmessage=async({data:j})=>{
    if(j.basePixels){if(lastPixels?.length===j.basePixels.length)lastPixels.set(j.basePixels);else lastPixels=j.basePixels.slice();}else if(j.kind!=='cancel'||!j.reuseSurfaces)lastPixels=undefined;
    deltaSupport=j.seeded?j.deltaRegion:undefined;deltaRegion=j.deltaRegion;deltaBase=undefined;
    for(const c of [deltaRead,deltaMask,deltaPaint])if(c)c.width=c.height=0;deltaRead=deltaMask=deltaPaint=undefined;
-   resetWetSmudgeCaches();resetGentleBlend();if(target)resetPigmentMix(target as unknown as HTMLCanvasElement,true);nativeStrokeRaster?.reset();token=j.token;region=undefined;
+   resetWetSmudgeCaches();resetGentleBlend();resetSilkBlend();if(target)resetPigmentMix(target as unknown as HTMLCanvasElement,true);nativeStrokeRaster?.reset();token=j.token;region=undefined;
    if(nativeMask)nativeMask.getContext('2d')!.reset();
    if(j.kind==='cancel'){if(!j.reuseSurfaces){if(target)resetPigmentMix(target as unknown as HTMLCanvasElement);for(const c of [base,target,nativeMask])if(c)c.width=c.height=0;base=target=nativeMask=undefined;nativeStrokeRaster=undefined;lastPixels=undefined;surfaceMode=undefined;}return;}
    const readFrequently=j.nativeDelta||j.readFrequently!==false;
@@ -98,7 +99,10 @@ worker.onmessage=async({data:j})=>{
   const currentGeometry=()=>geometry??=j.final?finalGeometry(s):strokeGeometry(s.nativeMixVersion?mixPreviewGeometryStroke(s):s,'live');
   const fullBounds=()=>bounds??=strokeRasterBounds(s,target!.width,target!.height,currentGeometry());
   const ownershipBounds=()=>deltaRegion&&deltaRegion.width>0&&deltaRegion.height>0?union(deltaRegion,fullBounds()):fullBounds();
-  if(!!s.nativeMixVersion||(s.paintTipVersion===2||s.dryBristleVersion===3)&&s.brushTip!=='color-blender'){
+  if(s.silkBlendVersion===1){
+   // v0.5.238 Silk Blend: incremental; only tiles touched by new dabs come back.
+   r=applySilkBlend(tc,bc,s,0,0,undefined,bc)??{x:0,y:0,width:1,height:1};
+  }else if(!!s.nativeMixVersion||(s.paintTipVersion===2||s.dryBristleVersion===3)&&s.brushTip!=='color-blender'){
    if(!nativeMask||nativeMask.width!==target.width||nativeMask.height!==target.height){nativeMask=new OffscreenCanvas(target.width,target.height);nativeStrokeRaster??=new LiveStrokeRaster();}
    // Rebuild the canonical final mask, but retain carried pigment: contacts
    // depend only on the unchanged raw path, not the provisional brush geometry.

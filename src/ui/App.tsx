@@ -64,6 +64,8 @@ import {VectorStudio,type VectorDefaults} from './VectorStudio';
 import {activePreset,activeInputPreset,restoreBrushLibrary,updatePreset,type BrushLibrary} from '../core/brushes';
 import {vectorSvg,type VectorLine} from '../engine/vector';
 import {toolRegistry,allTools} from './icons';
+import {SilkBlendIcon} from './SilkBlendIcon';
+import {SILK_BRUSH_ID} from '../core/silkBlend';
 import {StudioStrokeSelectIcon,StudioLassoIcon,StudioFreeformIcon,StudioMoveIcon,StudioScaleIcon,StudioRotateObjectIcon,StudioPerspectiveIcon,StudioPerspectiveMoveIcon} from './StudioToolIcons';
 import {initialShortcuts,normalizeShortcuts,keyChord,type ShortcutCommand} from '../core/shortcuts';
 import {quickAction,timelineDeleteKey,steppedBrushSize,quickShortcutGuide} from '../core/keyboardActions';
@@ -140,9 +142,10 @@ export function App(){
   mute:(value:boolean)=>audioActionDelegates.current.mute(value),
   seek:(seconds:number)=>audioActionDelegates.current.seek(seconds)
  });
- const wheelDelegates=useRef({action:(_action:'previous-cel'|'next-cel'|'onion-skin')=>{}});
+ const wheelDelegates=useRef({action:(_action:'previous-cel'|'next-cel'|'onion-skin')=>{},silk:()=>{}});
  const wheelCallbacks=useRef({
-  action:(action:'previous-cel'|'next-cel'|'onion-skin')=>wheelDelegates.current.action(action)
+  action:(action:'previous-cel'|'next-cel'|'onion-skin')=>wheelDelegates.current.action(action),
+  silk:()=>wheelDelegates.current.silk()
  });
  // Stable props let large drawing inspector and Tool Wheel skip unrelated
  // document commits. The delegates are refreshed before each render so button
@@ -216,6 +219,9 @@ export function App(){
  const autosaveRetry=useRef<ReturnType<typeof setTimeout>|null>(null);
  useEffect(()=>()=>{if(autosaveRetry.current)clearTimeout(autosaveRetry.current);autosaveRetry.current=null;},[]);
  const notify=(text:string)=>setMessage(text);
+ // v0.5.238 Silk Blend: B / toolbar / wheel switch between your brush and Silk Blend.
+ const lastPaintBrush=useRef<string|null>(null);
+ const chooseSilk=(on?:boolean)=>{if(operationLock.current||engine.current?.drawing)return;const wasBrush=toolIntent.current==='brush';setBrushLibrary(old=>{const silk=old.brushId===SILK_BRUSH_ID,want=on??(!wasBrush||!silk);if(want===silk)return old;if(want){lastPaintBrush.current=old.brushId;return {...old,brushId:SILK_BRUSH_ID};}const back=lastPaintBrush.current;return {...old,brushId:back&&back!==SILK_BRUSH_ID&&old.presets.some(p=>p.id===back&&p.category!=='Eraser')?back:'hb'};});if(!wasBrush)chooseTool('brush');};
  const chooseTool=(t:Tool)=>{if(operationLock.current)return;if(t==='transform'){setRightTab('inspector');setLayout(old=>({...old,rightClosed:false}));}setAdvancedStrokeTransform(false);setAddingMotionDot(false);toolIntent.current=t;syncInput(t,libraryIntent.current);setTool(t);if(t==='stroke-select')engine.current?.setStrokeMode('select');};
  useEffect(()=>{mounted.current=true;const e=new StudioEngine(canvas.current!,store,notify);engine.current=e;setEngineReady(e);syncInput(toolIntent.current,libraryIntent.current);e.confirmFill=message=>new Promise(resolve=>setFillQuestion({message,resolve}));e.onMirrorChange=()=>{writePreference('mirror-drawing',e.mirrorDrawing);setMirrorRevision(v=>v+1);};const mirrorSaved=readPreference<any>('mirror-drawing',null);if(mirrorSaved&&typeof mirrorSaved==='object'){if(['vertical','horizontal'].includes(mirrorSaved.axis))e.mirrorDrawing.axis=mirrorSaved.axis;for(const key of ['enabled','showLine','lockCenter'] as const)if(typeof mirrorSaved[key]==='boolean')e.mirrorDrawing[key]=mirrorSaved[key];if(Number.isFinite(mirrorSaved.pivot?.x)&&Number.isFinite(mirrorSaved.pivot?.y))e.mirrorDrawing.pivot={x:Math.max(0,Math.min(1,mirrorSaved.pivot.x)),y:Math.max(0,Math.min(1,mirrorSaved.pivot.y))};}e.onLoad=p=>{saved.current=p;};e.restoreView=p=>views.read(p);e.onView=v=>{camera.publish(v);if(cameraOverlayNeeded.current)setView(v);playback.current?.setView(v);views.remember(store.getSnapshot(),v);};e.onTransform=setTransform;e.onStrokeSelection=setStrokeCount;e.onStrokeMode=setStrokeMode;e.onColor=setDrawingColor;e.vectors.onSelect=setVectorId;e.smoothing.onChange=setSmoothingActive;e.onSelection=has=>{setHasSelection(has);if(!has)setTransform({dx:0,dy:0,scale:1,angle:0});};e.onBusy=b=>{operationLock.current=b;setBusy(b);};e.fit();const diagnostics={recorder:{start:()=>e.recorder.start(),pause:()=>e.recorder.pause(),resume:()=>e.recorder.resume(),stop:()=>e.recorder.stop(),status:()=>e.recorder.getSnapshot(),export:()=>e.recorder.export()},build:buildInfo,status:()=>e.diagnosticSnapshot(),replay:replayTrace,performance:{start:()=>e.performance.start(),stop:()=>e.performance.stop(),export:()=>e.performance.export()},start:()=>e.diagnostics.start(),stop:()=>e.diagnostics.stop(),clear:()=>e.diagnostics.clear(),export:()=>e.diagnostics.export(),download:()=>downloadBlob(new Blob([JSON.stringify(e.diagnostics.export(),null,2)],{type:'application/json'}),'solo-stroke-traces.json')};(window as unknown as {soloStrokeDiagnostics?:typeof diagnostics}).soloStrokeDiagnostics=diagnostics;return()=>{mounted.current=false;e.dispose();engine.current=null;delete (window as unknown as {soloStrokeDiagnostics?:unknown}).soloStrokeDiagnostics;};},[store]);
 
@@ -977,7 +983,8 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
   if(!cmd&&!e.altKey&&!e.shiftKey&&e.key.toLowerCase()==='b'&&!target.closest('input,textarea,select,[contenteditable=true]')){
    e.preventDefault();
    if(!e.repeat){
-     if(toolIntent.current!=='brush')chooseTool('brush');
+     // First B selects the Brush tool; each further B switches your brush <-> Silk Blend.
+     if(toolIntent.current!=='brush')chooseTool('brush');else chooseSilk();
    }
    return;
   }
@@ -989,7 +996,8 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
   window.addEventListener('keydown',keydown);window.addEventListener('keyup',keyup);window.addEventListener('blur',blur);return()=>{window.removeEventListener('keydown',keydown);window.removeEventListener('keyup',keyup);window.removeEventListener('blur',blur);};
  },[doc,shortcuts,linkTargetFrameId,modal,hasSelection,tool,vectorId,fillQuestion,renameId,busy,flipPreview,strokeCount,multiCelAvailable,batchCanvasMode,closingTab]);
   wheelDelegates.current={
-   action:action=>{if(action==='onion-skin')setOnionSettings(settings=>({...settings,enabled:!settings.enabled}));else stepDrawingFrame(action==='previous-cel'?-1:1);}
+   action:action=>{if(action==='onion-skin')setOnionSettings(settings=>({...settings,enabled:!settings.enabled}));else stepDrawingFrame(action==='previous-cel'?-1:1);},
+   silk:()=>chooseSilk()
   };
  const layer=activeLayer(doc),activeTool=allTools.find(t=>t.id===tool)!;
  const selectedVector=layer.operations.find(o=>o.kind==='vector'&&o.id===vectorId) as VectorLine|undefined;
@@ -1112,7 +1120,7 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
  const menus:Record<string,{label:string;action:()=>void;disabled?:boolean}[]>={
   File:[{label:'Close Project · Ctrl+W',disabled:!tabIds.length,action:()=>{if(activeTabId.current)requestCloseProject(activeTabId.current);}},{label:'Project Home…',action:()=>void showOnboarding()},{label:'New Project…',action:startNew},{label:'Open / Manage Projects · Ctrl+Alt+O',action:()=>void listProjects()},{label:'Place Image…',action:()=>imageInput.current?.click()},{label:'Import backup…',action:()=>fileInput.current?.click()},{label:'Save · Ctrl/⌘ S',action:()=>void save()},{label:'Save As…',action:beginSaveAs},{label:'Download editable backup',action:()=>downloadProject(doc)},{label:'Recover snapshot…',action:()=>void showSnapshots()},{label:'Rename project…',action:()=>{setName(doc.name);setModal('rename');}},{label:'Export PNG',action:showExport},{label:'Export animation PNG sequence…',action:()=>setModal('sequence')}],
   Select:[{label:'Stroke Select · S',action:()=>chooseTool('stroke-select')},{label:'Lasso · L',action:()=>chooseTool('lasso')},{label:'Rectangle · M',action:()=>chooseTool('rectangle')},{label:'Select All · Ctrl/⌘ A',action:()=>void editing('all')},{label:'Deselect · Ctrl/⌘ D',action:()=>void editing('deselect')}],
-  Tools:[{label:'Brush · B',action:()=>chooseTool('brush')},{label:'Vector Pen · N',action:()=>chooseTool('vector')},{label:'Eraser · E',action:()=>chooseTool('eraser')},{label:'Fill · G',action:()=>chooseTool('fill')},{label:'Eyedropper · I',action:()=>chooseTool('eyedropper')}],
+  Tools:[{label:'Brush · B',action:()=>chooseTool('brush')},{label:'Silk Blend · B B',action:()=>chooseSilk(true)},{label:'Vector Pen · N',action:()=>chooseTool('vector')},{label:'Eraser · E',action:()=>chooseTool('eraser')},{label:'Fill · G',action:()=>chooseTool('fill')},{label:'Eyedropper · I',action:()=>chooseTool('eyedropper')}],
   Transform:[{label:'Free Transform · T',action:()=>chooseTool('transform')},{label:'Move · V',action:()=>chooseTool('transform')},{label:'Multi-Cel Transform · Shift+T',action:openBatchTransform}],
   Edit:[{label:'Undo · Ctrl/⌘ Z',action:undo,disabled:!store.canUndo},{label:'Redo · Ctrl/⌘ Shift Z / Y',action:redo,disabled:!store.canRedo},...([['Select All · Ctrl/⌘ A','all'],['Deselect · Ctrl/⌘ D','deselect'],['Cut · Ctrl/⌘ X','cut'],['Copy · Ctrl/⌘ C','copy'],['Paste · Ctrl/⌘ V','paste']] as const).map(([label,command])=>({label,action:()=>void editing(command)})),...allTools.map(t=>({label:t.name+' · '+shortcuts[t.id].toUpperCase(),action:()=>chooseTool(t.id)})),{label:'Keyboard shortcuts…',action:()=>setModal('settings')}],
   View:[{label:outsideFrameLabel,action:toggleOutsideFrame,disabled:busy||sequenceBusy},{label:(focusMode?'Exit Canvas Focus Mode':'Canvas Focus Mode')+' · F9',action:()=>{setFocusMode(v=>!v);setOnionSettingsOpen(false);}},{label:'Compact timeline',action:()=>{setFocusMode(false);setLayout(old=>({...old,bottomClosed:false,bottom:160}));}},{label:'Fit canvas · F',action:()=>engine.current?.fit()},{label:'Reset rotation · Shift+R',action:()=>engine.current?.rotate(0)},{label:'Reset view · 100%',action:()=>engine.current?.reset()},{label:(doc.settings.guides?'Hide':'Show')+' frame guides',action:()=>commit({...doc,settings:{...doc.settings,guides:!doc.settings.guides}})},{label:'Toggle left panel',action:()=>setLayout({...layout,leftClosed:!layout.leftClosed})},{label:'Toggle inspector',action:()=>setLayout({...layout,rightClosed:!layout.rightClosed})},{label:'Toggle timeline region',action:()=>setLayout({...layout,bottomClosed:!layout.bottomClosed})}],
@@ -1199,7 +1207,8 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
     {layout.leftClosed?<div className="collapsed-tool-rail" role="toolbar" aria-label="Collapsed project and drawing tools">
       <IconButton label="Expand project and layers panel" onClick={()=>setLayout(old=>({...old,leftClosed:false}))}><PanelLeftOpen size={17}/></IconButton>
       <span className="rail-divider"/>
-      {toolRegistry.filter(t=>t.group==='draw'||t.id==='stroke-select').map(t=><IconButton key={t.id} label={t.name+' ('+t.key+')'} tooltip={t.name+' · '+(shortcuts[t.id as ShortcutCommand]?.toUpperCase()??t.key)} active={tool===t.id} onClick={()=>chooseTool(t.id)}><t.icon size={17}/></IconButton>)}
+      {toolRegistry.filter(t=>t.group==='draw'||t.id==='stroke-select').map(t=><IconButton key={t.id} label={t.name+' ('+t.key+')'} tooltip={t.name+' · '+(shortcuts[t.id as ShortcutCommand]?.toUpperCase()??t.key)} active={tool===t.id&&!(t.id==='brush'&&brushLibrary.brushId===SILK_BRUSH_ID)} onClick={()=>chooseTool(t.id)}><t.icon size={17}/></IconButton>)}
+      <IconButton label="Silk Blend (B B)" tooltip="Silk Blend · press B again to switch" active={tool==='brush'&&brushLibrary.brushId===SILK_BRUSH_ID} onClick={()=>chooseSilk(true)}><SilkBlendIcon size={17}/></IconButton>
       <span className="rail-divider"/>
       <IconButton label="Open layers panel" onClick={()=>setLayout(old=>({...old,leftClosed:false}))}><Layers size={17}/></IconButton>
      </div>:<>
@@ -1293,7 +1302,8 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
     const items = toolRegistry.filter(t => t.group === group);
     return <Fragment key={group}>
       {group !== 'draw' && <span className="tool-group-divider"/>}
-      {items.map(t => <IconButton key={t.id} label={t.name+' ('+t.key+')'} tooltip={t.name+' · '+(shortcuts[t.id as ShortcutCommand]?.toUpperCase()??t.key)} active={tool===t.id} onClick={()=>chooseTool(t.id)}><t.icon size={16}/></IconButton>)}
+      {items.map(t => <IconButton key={t.id} label={t.name+' ('+t.key+')'} tooltip={t.name+' · '+(shortcuts[t.id as ShortcutCommand]?.toUpperCase()??t.key)} active={tool===t.id&&!(t.id==='brush'&&brushLibrary.brushId===SILK_BRUSH_ID)} onClick={()=>chooseTool(t.id)}><t.icon size={16}/></IconButton>)}
+      {group==='draw'&&<IconButton label="Silk Blend (B B)" tooltip="Silk Blend · press B again to switch" active={tool==='brush'&&brushLibrary.brushId===SILK_BRUSH_ID} onClick={()=>chooseSilk(true)}><SilkBlendIcon size={16}/></IconButton>}
     </Fragment>;
   })}
 </div>
@@ -1395,7 +1405,7 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
       </div>
      </div>}
    </section>
-   <div className="wheel-overlay"><RadialToolbar shortcuts={shortcuts} onAction={wheelCallbacks.current.action} active={tool} onTool={stablePanelHandlers.current.choose} workspace={workbench} homeOpen={!layout.leftClosed&&!focusMode} onNotice={stablePanelHandlers.current.notice}/></div>
+   <div className="wheel-overlay"><RadialToolbar shortcuts={shortcuts} onAction={wheelCallbacks.current.action} active={tool} onTool={stablePanelHandlers.current.choose} workspace={workbench} homeOpen={!layout.leftClosed&&!focusMode} onNotice={stablePanelHandlers.current.notice} silkActive={tool==='brush'&&brushLibrary.brushId===SILK_BRUSH_ID} onSilk={wheelCallbacks.current.silk}/></div>
   </div>
   <footer className="app-footer"><span><i/> LOCAL WORKSPACE<span className="footer-divider"/>All artwork stays on this device</span><span>{busy?'Processing fill':hasSelection?'Selection active':'Ready to draw'}<span className="footer-divider"/>{frameSize.width} × {frameSize.height} px<span className="footer-divider"/><CameraPercent camera={camera}/></span></footer>
   <input ref={fileInput} type="file" accept=".json,.solo.json" multiple hidden onChange={async e=>{const files=[...(e.target.files??[])];e.target.value='';for(const file of files)try{await openProject(await importProject(file));}catch(err){notify('Import failed: '+String(err));}}}/>

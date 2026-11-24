@@ -1,0 +1,63 @@
+{
+  "rows": [
+    {
+      "mode": "soft",
+      "changed": 26684,
+      "green": 0,
+      "grey": 0,
+      "ms": 35.2
+    },
+    {
+      "mode": "wet",
+      "changed": 30872,
+      "green": 0,
+      "grey": 0,
+      "ms": 33.7
+    },
+    {
+      "mode": "smudge",
+      "changed": 30864,
+      "green": 0,
+      "grey": 0,
+      "ms": 30.1
+    },
+    {
+      "mode": "dry",
+      "changed": 28349,
+      "green": 0,
+      "grey": 0,
+      "ms": 46.5
+    },
+    {
+      "mode": "fast",
+      "changed": 26420,
+      "green": 0,
+      "grey": 0,
+      "ms": 20.6
+    }
+  ],
+  "workerRows": [
+    {
+      "mode": "soft",
+      "max": 0,
+      "diff": 0
+    },
+    {
+      "mode": "wet",
+      "max": 0,
+      "diff": 0
+    },
+    {
+      "mode": "smudge",
+      "max": 0,
+      "diff": 0
+    },
+    {
+      "mode": "dry",
+      "max": 0,
+      "diff": 0
+    }
+  ],
+  "workerErrors": [],
+  "errors": []
+}

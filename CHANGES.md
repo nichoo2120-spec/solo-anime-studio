@@ -1,3 +1,12 @@
+## v0.5.238 — Silk Blend brush (new)
+
+- New blending brush **Silk Blend** (`src/engine/silkBlend.ts`, `src/core/silkBlend.ts`), written from scratch to replace the removed Mix brush. Brush-local "silk patch" pickup in premultiplied float RGBA (no halos), exact-distance dabs (no gaps), 64 px tile reads/writes only.
+- Modes Soft / Wet / Smudge / Dry, sliders Size, Opacity, Blend Strength, Colour Pickup, Wetness, Smoothing, Spacing, Texture; presets Silk Soft / Silk Wet / Silk Dry and Reset (`src/ui/SilkBlendPanel.tsx`).
+- New stroke field `silkBlendVersion:1` (+ silkMode/silkStrength/silkPickup/silkWetness/silkTexture); validated on load. Live preview runs incrementally in the existing blend worker; live and reload give identical pixels.
+- Toolbar button and new icon (`src/ui/SilkBlendIcon.tsx`), tool-wheel slot + SILK footer switch, B then B switches Brush <-> Silk Blend, Tools menu entry.
+- Tests: `tests/silk-blend-v238.test.ts` (14), `tests/silk-v238-browser.mjs` (real browser + real worker parity), `perf/silk-v238-perf.mjs`. Four preset-count tests now leave out the new Blend family.
+- Every other brush and every saved stroke renders byte-identically to v0.5.237.
+
 ## v0.5.175 — Less redraw after pen-up, undo and redo
 
 - New `src/engine/commitBand.ts`: when the only change since the last exact frame is pencil/solid strokes added or removed at the end of layers, only the strip of screen those strokes cover is redrawn (same fixed-left-origin clip as live drawing). A repeat render with nothing new repaints nothing.

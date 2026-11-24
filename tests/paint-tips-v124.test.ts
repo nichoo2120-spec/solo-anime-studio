@@ -10,7 +10,7 @@ describe('textured painting tips',()=>{
   const values=Array.from({length:100},(_,i)=>paintTipCoverage('chalk',(i%10-5)/15,(Math.floor(i/10)-5)/15,.9));expect(Math.max(...values)-Math.min(...values)).toBeGreaterThan(.4);
  });
  it('upgrades stock paint settings while keeping older custom tips and chosen round tips',()=>{
-  const fresh=newBrushLibrary();for(const p of fresh.presets.filter(p=>p.category==='Paint'&&p.id!=='airbrush'))expect(p.settings.brushTip).toBeTruthy();
+  const fresh=newBrushLibrary();for(const p of fresh.presets.filter(p=>p.category==='Paint'&&p.id!=='airbrush'&&p.id!=='silk-blend'))expect(p.settings.brushTip).toBeTruthy();
   const old={...fresh,presets:[...fresh.presets.map(p=>({...p,settings:{...p.settings,brushTip:undefined}})),{...fresh.presets[10],id:'old-custom',custom:true,name:'Original custom',settings:{...fresh.presets[10].settings,brushTip:undefined}}]};
   const restored=restoreBrushLibrary(old);expect(restored.presets.find(p=>p.id==='paint')!.settings.brushTip).toBe('bristle');expect(restored.presets.find(p=>p.id==='old-custom')!.settings.brushTip).toBe('round');
   const invalid=JSON.parse(JSON.stringify(old));invalid.presets.at(-1).settings.brushTip='unrecognized-tip';expect(restoreBrushLibrary(invalid).presets.find(p=>p.id==='old-custom')!.settings.brushTip).toBe('round');
