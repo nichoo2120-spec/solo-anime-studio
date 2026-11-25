@@ -6,7 +6,9 @@ import type {Stroke} from '../core/model';
 import {drawStroke} from '../engine/renderer';
 import {renderBrushBlend} from '../engine/brushBlend';
 import type {BrushSettings} from '../engine/StudioEngine';
-import type {SilkBlendControls} from '../core/silkBlend';
+import {silkPresets,type SilkBlendControls} from '../core/silkBlend';
+import {SilkBlendPanel} from './SilkBlendPanel';
+import {renderSilkStroke} from '../engine/silkBlend';
 const styleHints:Record<BlendStyle,string>={water:'soft wet bleed, transparent pigment mixing and a cloudy, grainy wash',dry:'rough, broken, scratchy drag with bristle gaps',pencil:'a gentle graphite smudge with paper grain',ink:'a crisp wet-ink smear that drags colour a long way',air:'a very soft, wide airbrush blur',oil:'thick, buttery drag with soft bristle streaks',marker:'a crisp marker smudge',texture:'blending through a canvas grain',soft:'smooth, soft blending'};
 type Patch=(p:Partial<BrushSettings>)=>void;
 /** v0.5.240 Paint / Blend switch, shown for every paint brush. */
@@ -46,8 +48,8 @@ function BlendPreview({settings:s}:{settings:BrushSettings}){
     pressureFlow:false,pressureOpacity:false,response:settings.response,brushKind:settings.brushKind,
     textureStrength:settings.textureStrength,stabilization:Math.max(settings.stabilization,settings.bbSmoothing??0),
    };
-   drawStroke(mc,stroke);
-   renderBrushBlend(ctx,swatch,stroke);
+   if(stroke.silkBlendVersion)renderSilkStroke(ctx,stroke);
+   else{drawStroke(mc,stroke);renderBrushBlend(ctx,swatch,stroke);}
   });
   return()=>cancelAnimationFrame(frame);
  },[values]);
@@ -59,6 +61,16 @@ export const BrushBlendSettingsPanel=memo(function BrushBlendSettingsPanel({sett
  const familyDefaults=blendDefaultsFor(s),defaults=brushBlendSettingsFor(brushDefaults??s),values=brushBlendSettingsFor(s),mode:BlendMode=isBlendMode(s.bbMode)?s.bbMode:familyDefaults.bbMode,style=blendStyleFor(s);
  const active=blendPresets.find(p=>Object.entries(p.values).every(([k,v])=>((s as Record<string,unknown>)[k]??(familyDefaults as Record<string,unknown>)[k])===v))?.id;
  const reset=()=>patch({...defaults,bbEnabled:true});
+ const resetSilk=()=>{
+  const standard=silkPresets[0].values,b=brushDefaults;
+  patch({
+   silkMode:b?.silkMode??standard.silkMode,silkStrength:b?.silkStrength??standard.silkStrength,
+   silkPickup:b?.silkPickup??standard.silkPickup,silkWetness:b?.silkWetness??standard.silkWetness,
+   silkTexture:b?.silkTexture??standard.silkTexture,tipSpacing:b?.tipSpacing??standard.tipSpacing,
+   stabilization:b?.stabilization??standard.stabilization,opacity:b?.opacity??standard.opacity,
+   size:b?.size??s.size,
+  });
+ };
  const copyFromSilk=()=>patch({bbEnabled:true,bbMode:isBlendMode(silkSettings?.silkMode)?silkSettings.silkMode:familyDefaults.bbMode,bbAmount:silkSettings?.silkStrength??defaults.bbAmount,bbPickup:silkSettings?.silkPickup??defaults.bbPickup,bbWetness:silkSettings?.silkWetness??defaults.bbWetness,bbTextureKeep:silkSettings?.silkTexture??defaults.bbTextureKeep,bbSmoothing:silkSettings?.stabilization??defaults.bbSmoothing,bbEdgeDarkness:silkSettings?.edgeDarkness??0});
  const saveAs=()=>{const name=window.prompt('Name this brush in My brushes',s.brushKind?`${s.brushKind} blend`: 'Custom blend brush')?.trim();if(name)onSaveAs?.(name.slice(0,60));};
  return <div className="brush-blend-panel" role="group" aria-label="Blend settings">
@@ -66,6 +78,7 @@ export const BrushBlendSettingsPanel=memo(function BrushBlendSettingsPanel({sett
   {!s.bbEnabled?<p className="hint">Switch to Blend to adjust this brush’s blending. Its family look stays <strong>{blendStyleNames[style]}</strong>.</p>:<>
    <BlendPreview settings={s}/>
    <label className="studio-select">Blend style<select aria-label="Blend style" value={values.bbRenderStyle} onChange={e=>patch({bbRenderStyle:e.target.value as BlendRenderStyle})}>{Object.entries(blendRenderStyles).map(([key,name])=><option key={key} value={key}>{name}</option>)}</select></label>
+   {values.bbRenderStyle==='silk'?<SilkBlendPanel settings={s} patch={patch} reset={resetSilk}/>:<>
    <label className="studio-select">Blend mode<select aria-label="Blend mode" value={mode} onChange={e=>patch({bbMode:e.target.value as BlendMode})}>{blendModes.map(m=><option key={m} value={m}>{m[0].toUpperCase()+m.slice(1)}</option>)}</select></label>
    <p className="hint brush-blend-style" aria-label="Brush family style">Brush character: <strong>{blendStyleNames[style]}</strong> — {styleHints[style]}.</p>
    <p className="hint">Blend mode uses this brush’s nib and grain to mix existing canvas colours. {shortcut?`Press ${shortcut.toUpperCase()} to switch Paint / Blend.`:''}</p>
@@ -96,7 +109,9 @@ export const BrushBlendSettingsPanel=memo(function BrushBlendSettingsPanel({sett
      <label className="check-row"><span>Protect transparency</span><input aria-label="Protect transparency" type="checkbox" checked={s.bbProtectAlpha??defaults.bbProtectAlpha} onChange={e=>patch({bbProtectAlpha:e.target.checked})}/></label>
     </fieldset>
    </details>
-   <div className="silk-actions brush-blend-actions"><button type="button" onClick={copyFromSilk}>Copy settings from Silk Blend</button><button type="button" onClick={saveAs}>Save as My Brush</button><button type="button" aria-label="Reset Blend settings" onClick={reset}>Reset to brush default</button></div>
+   <div className="silk-actions brush-blend-actions"><button type="button" onClick={copyFromSilk}>Copy settings from Silk Blend</button><button type="button" aria-label="Reset Blend settings" onClick={reset}>Reset to brush default</button></div>
+   </>}
+   <div className="silk-actions brush-blend-actions"><button type="button" onClick={saveAs}>Save as My Brush</button></div>
   </>}
  </div>;
 });

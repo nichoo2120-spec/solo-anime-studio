@@ -66,7 +66,7 @@ import {canBrushBlend} from '../core/brushBlend';
 import {vectorSvg,type VectorLine} from '../engine/vector';
 import {toolRegistry,allTools} from './icons';
 import {SilkBlendIcon} from './SilkBlendIcon';
-import {SILK_BRUSH_ID} from '../core/silkBlend';
+import {isSilkBlendActive} from '../core/silkBlend';
 import {StudioStrokeSelectIcon,StudioLassoIcon,StudioFreeformIcon,StudioMoveIcon,StudioScaleIcon,StudioRotateObjectIcon,StudioPerspectiveIcon,StudioPerspectiveMoveIcon} from './StudioToolIcons';
 import {initialShortcuts,normalizeShortcuts,keyChord,type ShortcutCommand} from '../core/shortcuts';
 import {quickAction,timelineDeleteKey,steppedBrushSize,quickShortcutGuide} from '../core/keyboardActions';
@@ -224,9 +224,17 @@ export function App(){
  const autosaveRetry=useRef<ReturnType<typeof setTimeout>|null>(null);
  useEffect(()=>()=>{if(autosaveRetry.current)clearTimeout(autosaveRetry.current);autosaveRetry.current=null;},[]);
  const notify=(text:string)=>setMessage(text);
- // v0.5.238 Silk Blend: B / toolbar / wheel switch between your brush and Silk Blend.
- const lastPaintBrush=useRef<string|null>(null);
- const chooseSilk=(on?:boolean)=>{if(operationLock.current||engine.current?.drawing)return;const wasBrush=toolIntent.current==='brush';setBrushLibrary(old=>{const silk=old.brushId===SILK_BRUSH_ID,want=on??(!wasBrush||!silk);if(want===silk)return old;if(want){lastPaintBrush.current=old.brushId;return {...old,brushId:SILK_BRUSH_ID};}const back=lastPaintBrush.current;return {...old,brushId:back&&back!==SILK_BRUSH_ID&&old.presets.some(p=>p.id===back&&p.category!=='Eraser')?back:'hb'};});if(!wasBrush)chooseTool('brush');};
+ // Silk entry points activate the style on the current brush.
+ const lastBrushKey=useRef(-Infinity);
+ const chooseSilk=(on=true)=>{
+  if(operationLock.current||engine.current?.drawing)return;
+  if(toolIntent.current!=='brush')chooseTool('brush');
+  setBrushLibrary(old=>{
+   const current=activePreset(old);
+   if(!canBrushBlend(current.settings)||on===isSilkBlendActive(current.settings))return old;
+   return updatePreset(old,current.id,{...current.settings,bbEnabled:on,bbRenderStyle:'silk'});
+  });
+ };
  const chooseTool=(t:Tool)=>{if(operationLock.current)return;if(t==='transform'){setRightTab('inspector');setLayout(old=>({...old,rightClosed:false}));}setAdvancedStrokeTransform(false);setAddingMotionDot(false);toolIntent.current=t;syncInput(t,libraryIntent.current);setTool(t);if(t==='stroke-select')engine.current?.setStrokeMode('select');};
  useEffect(()=>{mounted.current=true;const e=new StudioEngine(canvas.current!,store,notify);engine.current=e;setEngineReady(e);syncInput(toolIntent.current,libraryIntent.current);e.confirmFill=message=>new Promise(resolve=>setFillQuestion({message,resolve}));e.onMirrorChange=()=>{writePreference('mirror-drawing',e.mirrorDrawing);setMirrorRevision(v=>v+1);};const mirrorSaved=readPreference<any>('mirror-drawing',null);if(mirrorSaved&&typeof mirrorSaved==='object'){if(['vertical','horizontal'].includes(mirrorSaved.axis))e.mirrorDrawing.axis=mirrorSaved.axis;for(const key of ['enabled','showLine','lockCenter'] as const)if(typeof mirrorSaved[key]==='boolean')e.mirrorDrawing[key]=mirrorSaved[key];if(Number.isFinite(mirrorSaved.pivot?.x)&&Number.isFinite(mirrorSaved.pivot?.y))e.mirrorDrawing.pivot={x:Math.max(0,Math.min(1,mirrorSaved.pivot.x)),y:Math.max(0,Math.min(1,mirrorSaved.pivot.y))};}e.onLoad=p=>{saved.current=p;};e.restoreView=p=>views.read(p);e.onView=v=>{camera.publish(v);if(cameraOverlayNeeded.current)setView(v);playback.current?.setView(v);views.remember(store.getSnapshot(),v);};e.onTransform=setTransform;e.onStrokeSelection=setStrokeCount;e.onStrokeMode=setStrokeMode;e.onColor=setDrawingColor;e.vectors.onSelect=setVectorId;e.smoothing.onChange=setSmoothingActive;e.onSelection=has=>{setHasSelection(has);if(!has)setTransform({dx:0,dy:0,scale:1,angle:0});};e.onBusy=b=>{operationLock.current=b;setBusy(b);};e.fit();const diagnostics={recorder:{start:()=>e.recorder.start(),pause:()=>e.recorder.pause(),resume:()=>e.recorder.resume(),stop:()=>e.recorder.stop(),status:()=>e.recorder.getSnapshot(),export:()=>e.recorder.export()},build:buildInfo,status:()=>e.diagnosticSnapshot(),replay:replayTrace,performance:{start:()=>e.performance.start(),stop:()=>e.performance.stop(),export:()=>e.performance.export()},start:()=>e.diagnostics.start(),stop:()=>e.diagnostics.stop(),clear:()=>e.diagnostics.clear(),export:()=>e.diagnostics.export(),download:()=>downloadBlob(new Blob([JSON.stringify(e.diagnostics.export(),null,2)],{type:'application/json'}),'solo-stroke-traces.json')};(window as unknown as {soloStrokeDiagnostics?:typeof diagnostics}).soloStrokeDiagnostics=diagnostics;return()=>{mounted.current=false;e.dispose();engine.current=null;delete (window as unknown as {soloStrokeDiagnostics?:unknown}).soloStrokeDiagnostics;};},[store]);
 
@@ -705,9 +713,11 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
   const k=p.camera.keys.find(k=>k.frame===cameraExposure);
   commitCamera({...p,camera:setCameraKey(p.camera,{frame:cameraExposure,...st,x,y,ease:k?.ease??'ease-in-out'})},'Move camera');
  }
- function loadStudioProject(project:Project,expectedRevision?:number,history?:DocumentHistory){
+ async function loadStudioProject(project:Project,expectedRevision?:number,history?:DocumentHistory){
   const opened=!history&&project.shotFrame&&!frameOnly?openInfiniteWorkspace(project):project;
-  return engine.current!.load(opened,expectedRevision,history);
+  const loaded=await engine.current!.load(opened,expectedRevision,history);
+  if(loaded){const merged=mergeCustomBrushes(libraryIntent.current,project.customBrushes);if(merged.added)setBrushLibrary(merged.library);}
+  return loaded;
  }
  useEffect(()=>{engine.current?.setOutsideFrame(!frameOnly);},[frameOnly]);
  function toggleOutsideFrame(){
@@ -985,11 +995,12 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
 
   if((strokeCount>0||hasSelection)&&(e.key==='Delete'||e.key==='Backspace')&&!cmd&&!e.altKey){e.preventDefault();if(!e.repeat)engine.current?.deleteSelectedArtwork();return;}
   if((e.key==='Delete'||e.key==='Backspace')&&tool==='vector'&&vectorId){e.preventDefault();engine.current?.vectors.delete();return;}
+  if(e.key.toLowerCase()!=='b')lastBrushKey.current=-Infinity;
   if(!cmd&&!e.altKey&&!e.shiftKey&&e.key.toLowerCase()==='b'&&!target.closest('input,textarea,select,[contenteditable=true]')){
    e.preventDefault();
    if(!e.repeat){
-     // First B selects the Brush tool; each further B switches your brush <-> Silk Blend.
-     if(toolIntent.current!=='brush')chooseTool('brush');else chooseSilk();
+     if(e.timeStamp-lastBrushKey.current<=500){lastBrushKey.current=-Infinity;chooseSilk();}
+     else{lastBrushKey.current=e.timeStamp;chooseTool('brush');}
    }
    return;
   }
@@ -1002,8 +1013,9 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
  },[doc,shortcuts,linkTargetFrameId,modal,hasSelection,tool,vectorId,fillQuestion,renameId,busy,flipPreview,strokeCount,multiCelAvailable,batchCanvasMode,closingTab]);
   wheelDelegates.current={
    action:action=>{if(action==='onion-skin')setOnionSettings(settings=>({...settings,enabled:!settings.enabled}));else stepDrawingFrame(action==='previous-cel'?-1:1);},
-   silk:()=>chooseSilk()
+   silk:()=>chooseSilk(!(toolIntent.current==='brush'&&isSilkBlendActive(activePreset(libraryIntent.current).settings)))
   };
+ const silkActive=tool==='brush'&&isSilkBlendActive(activePreset(brushLibrary).settings);
  const layer=activeLayer(doc),activeTool=allTools.find(t=>t.id===tool)!;
  const selectedVector=layer.operations.find(o=>o.kind==='vector'&&o.id===vectorId) as VectorLine|undefined;
  const displayStatus=documentDirty(doc,saved.current)&&!['Saving…','Save failed'].includes(status)?'Unsaved changes':status;
@@ -1212,8 +1224,8 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
     {layout.leftClosed?<div className="collapsed-tool-rail" role="toolbar" aria-label="Collapsed project and drawing tools">
       <IconButton label="Expand project and layers panel" onClick={()=>setLayout(old=>({...old,leftClosed:false}))}><PanelLeftOpen size={17}/></IconButton>
       <span className="rail-divider"/>
-      {toolRegistry.filter(t=>t.group==='draw'||t.id==='stroke-select').map(t=><IconButton key={t.id} label={t.name+' ('+t.key+')'} tooltip={t.name+' · '+(shortcuts[t.id as ShortcutCommand]?.toUpperCase()??t.key)} active={tool===t.id&&!(t.id==='brush'&&brushLibrary.brushId===SILK_BRUSH_ID)} onClick={()=>chooseTool(t.id)}><t.icon size={17}/></IconButton>)}
-      <IconButton label="Silk Blend (B B)" tooltip="Silk Blend · press B again to switch" active={tool==='brush'&&brushLibrary.brushId===SILK_BRUSH_ID} onClick={()=>chooseSilk(true)}><SilkBlendIcon size={17}/></IconButton>
+      {toolRegistry.filter(t=>t.group==='draw'||t.id==='stroke-select').map(t=><IconButton key={t.id} label={t.name+' ('+t.key+')'} tooltip={t.name+' · '+(shortcuts[t.id as ShortcutCommand]?.toUpperCase()??t.key)} active={tool===t.id} onClick={()=>chooseTool(t.id)}><t.icon size={17}/></IconButton>)}
+      <IconButton label="Silk Blend (B B)" tooltip="Silk Blend · press B again to switch" active={silkActive} onClick={()=>chooseSilk(true)}><SilkBlendIcon size={17}/></IconButton>
       <span className="rail-divider"/>
       <IconButton label="Open layers panel" onClick={()=>setLayout(old=>({...old,leftClosed:false}))}><Layers size={17}/></IconButton>
      </div>:<>
@@ -1307,8 +1319,8 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
     const items = toolRegistry.filter(t => t.group === group);
     return <Fragment key={group}>
       {group !== 'draw' && <span className="tool-group-divider"/>}
-      {items.map(t => <IconButton key={t.id} label={t.name+' ('+t.key+')'} tooltip={t.name+' · '+(shortcuts[t.id as ShortcutCommand]?.toUpperCase()??t.key)} active={tool===t.id&&!(t.id==='brush'&&brushLibrary.brushId===SILK_BRUSH_ID)} onClick={()=>chooseTool(t.id)}><t.icon size={16}/></IconButton>)}
-      {group==='draw'&&<IconButton label="Silk Blend (B B)" tooltip="Silk Blend · press B again to switch" active={tool==='brush'&&brushLibrary.brushId===SILK_BRUSH_ID} onClick={()=>chooseSilk(true)}><SilkBlendIcon size={16}/></IconButton>}
+      {items.map(t => <IconButton key={t.id} label={t.name+' ('+t.key+')'} tooltip={t.name+' · '+(shortcuts[t.id as ShortcutCommand]?.toUpperCase()??t.key)} active={tool===t.id} onClick={()=>chooseTool(t.id)}><t.icon size={16}/></IconButton>)}
+      {group==='draw'&&<IconButton label="Silk Blend (B B)" tooltip="Silk Blend · press B again to switch" active={silkActive} onClick={()=>chooseSilk(true)}><SilkBlendIcon size={16}/></IconButton>}
     </Fragment>;
   })}
 </div>
@@ -1410,7 +1422,7 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
       </div>
      </div>}
    </section>
-   <div className="wheel-overlay"><RadialToolbar shortcuts={shortcuts} onAction={wheelCallbacks.current.action} active={tool} onTool={stablePanelHandlers.current.choose} workspace={workbench} homeOpen={!layout.leftClosed&&!focusMode} onNotice={stablePanelHandlers.current.notice} silkActive={tool==='brush'&&brushLibrary.brushId===SILK_BRUSH_ID} onSilk={wheelCallbacks.current.silk}/></div>
+   <div className="wheel-overlay"><RadialToolbar shortcuts={shortcuts} onAction={wheelCallbacks.current.action} active={tool} onTool={stablePanelHandlers.current.choose} workspace={workbench} homeOpen={!layout.leftClosed&&!focusMode} onNotice={stablePanelHandlers.current.notice} silkActive={silkActive} onSilk={wheelCallbacks.current.silk}/></div>
   </div>
   <footer className="app-footer"><span><i/> LOCAL WORKSPACE<span className="footer-divider"/>All artwork stays on this device</span><span>{busy?'Processing fill':hasSelection?'Selection active':'Ready to draw'}<span className="footer-divider"/>{frameSize.width} × {frameSize.height} px<span className="footer-divider"/><CameraPercent camera={camera}/></span></footer>
   <input ref={fileInput} type="file" accept=".json,.solo.json" multiple hidden onChange={async e=>{const files=[...(e.target.files??[])];e.target.value='';for(const file of files)try{const imported=await importProject(file);const merged=mergeCustomBrushes(libraryIntent.current,imported.customBrushes);if(merged.added){setBrushLibrary(merged.library);notify(merged.added===1?'Added 1 custom brush from this backup.':`Added ${merged.added} custom brushes from this backup.`);}await openProject(imported);}catch(err){notify('Import failed: '+String(err));}}}/>

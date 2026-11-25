@@ -1,3 +1,4 @@
+import {BlendDabBatch,BlendPatchRaster,largeBlendSpacing,type DabBounds} from './blendDabBatch';
 /** v0.5.242 Blend mode v2: every brush family blends in its own style.
  *
  * In plain words:
@@ -32,7 +33,7 @@ import {stampExtent} from './stampBrush';
 
 type Ctx=CanvasRenderingContext2D;
 export const emptyBlendMask=new Uint8Array(TILE*TILE);
-export interface BlendMask{tile(tx:number,ty:number):Uint8Array}
+export interface BlendMask{tile(tx:number,ty:number):Uint8Array;prepare?(bounds:DabBounds):void}
 export type BlendSnapshot={data:Uint8ClampedArray;x:number;y:number;width:number;height:number};
 const clamp01=(v:number)=>v<0?0:v>1?1:v;
 const ease=(a:number,b:number,v:number)=>{const t=v<=a?0:v>=b?1:(v-a)/(b-a);return t*t*(3-2*t);};
@@ -94,6 +95,9 @@ export class BrushBlendGestureV2{
  private readonly watercolorProfile?:WaterBlendProfile;
  private readonly waterSpread:number;
  private readonly material:boolean;
+ private readonly batch?:BlendDabBatch;
+ private readonly patchRaster?:BlendPatchRaster;
+ private readonly fallTable?:Float32Array;
  private readonly crisp:boolean;
  private readonly pickupBase:number;
  private readonly dragLength:number;
@@ -101,7 +105,10 @@ export class BrushBlendGestureV2{
  private readonly shapeMainScale:number;
  dabs=0;
  constructor(private readonly s:Stroke,width:number,height:number,read:Ctx,private mask:BlendMask,private readonly sample:BlendSnapshot|undefined,carry:Float32Array|undefined,private readonly sampleAt:(src:BlendSnapshot,x:number,y:number,out:Float32Array,o:number)=>void,private readonly v3?:BlendV3Settings,private readonly v4=false,private readonly transformScale=1){
-  this.surface=new SilkSurface(width,height,read);
+  const fast=s.blendRasterVersion===1;
+  this.batch=fast?new BlendDabBatch():undefined;
+  this.patchRaster=fast?new BlendPatchRaster(s.size):undefined;
+  this.surface=new SilkSurface(width,height,read,fast?(s.size>200?4:2):1);
   const hex=/^#[\da-f]{6}$/i.test(s.color)?s.color:'#000000';
   const modeWet=this.v3?modeWetness[this.v3.mode]:1;
   this.p={amount:clamp01(s.bbAmount??.85),pickup:clamp01(s.bbPickup??.5),wet:clamp01(s.bbWetness??.4)*modeWet,mix:clamp01(s.bbMix??.6),flow:clamp01(s.bbFlow??.6),stretch:clamp01(s.bbStretch??.45),load:clamp01(s.bbPaintLoad??0),pressure:s.bbPressure!==false,protect:!!s.bbProtectAlpha,
@@ -122,6 +129,12 @@ export class BrushBlendGestureV2{
   const wet=this.p.wet,blurFamily=canBlurBlendStyle(this.style);
   const waterTip=(s.brushBlendVersion===5||v6&&!(s.brushTip==='water-wet'&&s.edgeDarkness===1))&&this.style==='water'&&!s.stampVersion?watercolorBlendTip(s.brushTip):undefined;
   this.watercolorProfile=waterTip?waterBlendProfiles[waterTip]:undefined;
+  if(fast){
+   const fall=this.watercolorProfile?.fall??this.prof.fall;
+   const power=1.65-(this.v3?.softness??0)*1.3;
+   this.fallTable=new Float32Array(4097);
+   for(let i=0;i<=4096;i++)this.fallTable[i]=blurFamily?fall(i/4096):Math.pow(Math.max(0,fall(i/4096)),power);
+  }
   this.waterSpread=wet*(this.watercolorProfile?.spread??1);
   this.material=v4&&!blurFamily;
   this.crisp=v4&&(this.style==='ink'||this.style==='marker');
@@ -169,23 +182,38 @@ export class BrushBlendGestureV2{
   return Math.max(1,s.size*.5*(s.pressure&&s.pressureWidth!==false?min+(1-min)*pr:1)*1.35+1.5);
  }
  private step(r:number,p:number){
+  const spacing=this.batch?largeBlendSpacing(this.s.size,this.p.spacing):this.p.spacing;
   if(this.stampRadius){
    const s=this.s,width=s.pressure&&s.pressureWidth!==false?widthResponse(pressureResponse(clamp01(p)**s.response,s.pressureCurve),s):1;
-   return Math.max(.4,s.size*width*this.shapeMainScale*this.p.spacing*this.transformScale);
+   return Math.max(.4,s.size*width*this.shapeMainScale*spacing*this.transformScale);
   }
-  return Math.max(.6,2*r*this.p.spacing);
+  return Math.max(.6,2*r*spacing);
  }
  advance(points:Point[]){
   if(!points.length)return;
   for(let i=this.count;i<points.length;i++)this.path.push(points[i]);this.count=points.length;
   const path=this.path;
-  if(this.next===0){const q=path[0],r=this.radius(q.p);const step=this.step(r,q.p);this.dab(q.x,q.y,q.p,r,step);this.carry=step;this.next=1;}
+  if(this.next===0){const q=path[0],r=this.radius(q.p);const step=this.step(r,q.p);this.queueDab(q.x,q.y,q.p,r,step);this.carry=step;this.next=1;}
   for(;this.next<path.length;this.next++){
    const a=path[this.next-1],b=path[this.next],dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);if(len<1e-9)continue;
    this.dirX=dx/len;this.dirY=dy/len;
-   while(this.carry<=len){const t=this.carry/len,x=a.x+dx*t,y=a.y+dy*t,p=a.p+(b.p-a.p)*t,r=this.radius(p),st=this.step(r,p);this.traveled+=st;this.dab(x,y,p,r,st);this.carry+=st;}
+   while(this.carry<=len){const t=this.carry/len,x=a.x+dx*t,y=a.y+dy*t,p=a.p+(b.p-a.p)*t,r=this.radius(p),st=this.step(r,p);this.traveled+=st;this.queueDab(x,y,p,r,st);this.carry+=st;}
    this.carry-=len;
   }
+  const endX=this.dirX,endY=this.dirY;
+  this.batch?.run((bounds,diameter)=>{
+   this.patchRaster!.ensure(Math.min(this.surface.width,diameter),Math.min(this.surface.height,diameter));
+   this.mask.prepare?.(bounds);
+   this.surface.prepare(bounds,this.water?t=>{if(this.mask.tile(t.x/TILE,t.y/TILE)!==emptyBlendMask)this.waterFields(t);}:undefined);
+  },(x,y,p,r,step,dx,dy,distance)=>{
+   this.dirX=dx;this.dirY=dy;this.traveled=distance;
+   this.surface.nextDab();this.dab(x,y,p,r,step);
+  });
+  this.dirX=endX;this.dirY=endY;
+ }
+ private queueDab(x:number,y:number,p:number,r:number,step:number){
+  if(this.batch)this.batch.add(x,y,p,r,step,this.dirX,this.dirY,this.traveled);
+  else this.dab(x,y,p,r,step);
  }
  /** Watercolor fields per tile (seeded, canvas coordinates): broad warped cloud + grain. */
  private readonly lattice=new Float32Array((TILE/4+1)*(TILE/4+1));
@@ -224,6 +252,18 @@ export class BrushBlendGestureV2{
    if(mw>0){mr/=mw;mg/=mw;mb/=mw;ma/=mw;for(let k=0;k<CELLS*4;k+=4){T[k]=T[k]*keep+mr*mean;T[k+1]=T[k+1]*keep+mg*mean;T[k+2]=T[k+2]*keep+mb*mean;T[k+3]=T[k+3]*keep+ma*mean;}}
   }
  }
+ private sampleReducedSnapshot(x:number,y:number,out:Float32Array,o:number){
+  const source=this.sample!,scale=this.s.size>200?4:2;
+  const startX=Math.floor(x/scale)*scale-source.x,startY=Math.floor(y/scale)*scale-source.y;
+  const endX=Math.min(source.width,startX+scale),endY=Math.min(source.height,startY+scale);
+  let r=0,g=0,b=0,a=0;
+  for(let j=Math.max(0,startY);j<endY;j++)for(let i=Math.max(0,startX);i<endX;i++){
+   const k=(j*source.width+i)*4,alpha=source.data[k+3],m=alpha/255;
+   r+=source.data[k]*m;g+=source.data[k+1]*m;b+=source.data[k+2]*m;a+=alpha;
+  }
+  const area=scale*scale;
+  out[o]=r/area;out[o+1]=g/area;out[o+2]=b/area;out[o+3]=a/area;
+ }
  private dab(x:number,y:number,p:number,r:number,step:number){
   const P=this.p,S=this.sampled,T=this.target,pr=this.s.pressure?clamp01(p):1,u=step/(.2*r),style=this.style,prof=this.prof;
   let stencilTx=-1,stencilTy=-1,stencil:Uint8Array|undefined;
@@ -233,10 +273,12 @@ export class BrushBlendGestureV2{
     if(tx!==stencilTx||ty!==stencilTy){stencil=this.mask.tile(tx,ty);stencilTx=tx;stencilTy=ty;}
     const stampAlpha=(stencil![(py-ty*TILE)*TILE+px-tx*TILE]??0)/255;
     if(stampAlpha<=0){S[o]=S[o+1]=S[o+2]=S[o+3]=0;continue;}
-    if(this.crisp||this.style==='pencil'&&this.v4){
+    if(this.batch&&this.sample)this.sampleReducedSnapshot(cx,cy,S,o);
+    else if(this.crisp||this.style==='pencil'&&this.v4){
      // Discrete texels keep a crisp contour. Graphite reads the original
      // pigment so a short pull cannot propagate through earlier dabs.
      if(this.sample)this.sampleAt(this.sample,px+.5,py+.5,S,o);
+     else if(this.batch)this.surface.sampleReduced(px+.5,py+.5,S,o,this.style==='pencil');
      else{
       const t=this.surface.tile(tx,ty)!,i=py-t.y,k=px-t.x;
       if(this.style==='pencil'){
@@ -286,6 +328,8 @@ export class BrushBlendGestureV2{
   const waterGrain=1.55*(waterProfile?.grain??1)*grainKeep;
   const tooth=waterProfile?.tooth?Math.min(1,grainKeep/.6):0;
   const coverage=.3+.45*(settings?1:pr)*(.5+.5*P.flow),covGain=(style==='air'?2.6:style==='water'?2.2:1)/255;
+  const patch=this.patchRaster?.prepare(T,left,top,right,bottom,x,y,inv,PATCH,this.crisp);
+  const reduced=patch?.pixels,shift=patch?.shift??0,stride=patch?.stride??0;
   for(let ty=Math.floor(top/TILE);ty*TILE<bottom;ty++)for(let tx=Math.floor(left/TILE);tx*TILE<right;tx++){
    const coverageMask=this.v4?this.mask.tile(tx,ty):undefined;
    if(coverageMask===emptyBlendMask)continue;
@@ -295,12 +339,15 @@ export class BrushBlendGestureV2{
    const wetField=t.wet;
    const x0=Math.max(left,t.x),x1=Math.min(right,t.x+t.w),y0=Math.max(top,t.y),y1=Math.min(bottom,t.y+t.h),f=t.f,changed=t.changed;let any=false;
    for(let py=y0;py<y1;py++){const dy=(py+.5-y)*inv,dy2=dy*dy;if(dy2>=1)continue;
+    const reducedRow=((py-top)>>shift)*stride;
+    const rowV=Math.max(0,Math.min(PATCH-1,(dy+1)*.5*PATCH-.5));
+    const rowIndex=this.crisp?Math.round(rowV):Math.min(PATCH-2,Math.floor(rowV));
     for(let px=x0;px<x1;px++){
      const dx=(px+.5-x)*inv,d2=dx*dx+dy2;if(d2>=1)continue;const c=(py-t.y)*TILE+px-t.x,cov=m[c];if(!cov)continue;
      let d=Math.sqrt(d2);
      if(water){d*=this.v3?1-wetFront*(.35+.65*t.cloud![c]):1+wetFront*t.cloud![c];if(d>=1)continue;if(wetField){const wc=ease(0,.75,1-d);if(wc>wetField[c])wetField[c]=wc;}}
      // the brush's own coverage, lifted so thin washes still blend fully
-     const familyFall=this.stampRadius?1:this.v3&&!blurFamily?Math.pow(Math.max(0,fall(d)),softEdge):fall(d);
+     const familyFall=this.stampRadius?1:this.fallTable?this.fallTable[(d*4096+.5)|0]:this.v3&&!blurFamily?Math.pow(Math.max(0,fall(d)),softEdge):fall(d);
      // v3 follows the real brush raster as its stamp. Keep its alpha and gaps
      // instead of lifting faint texels into a round, soft dab. Legacy strokes
      // retain the previous mask lift byte-for-byte.
@@ -322,11 +369,12 @@ export class BrushBlendGestureV2{
      }
      else if(this.v3&&(!this.v4||!this.material)&&this.v3.textureKeep>0){const grain=valueNoise(px*.24,py*.24,seed&1023);a*=1+(grain-.5)*.18*this.v3.textureKeep;}
      if(a<=1e-5)continue;if(a>1)a=1;
-     let cu=(dx+1)*.5*PATCH-.5,cv=(dy+1)*.5*PATCH-.5;cu=cu<0?0:cu>PATCH-1?PATCH-1:cu;cv=cv<0?0:cv>PATCH-1?PATCH-1:cv;
-     const iu=this.crisp?Math.round(cu):Math.min(PATCH-2,Math.floor(cu)),iv=this.crisp?Math.round(cv):Math.min(PATCH-2,Math.floor(cv));
-     const fu=this.crisp?0:cu-iu,fv=this.crisp?0:cv-iv,k00=(iv*PATCH+iu)*4,k10=this.crisp?k00:k00+4,k01=this.crisp?k00:k00+PATCH*4,k11=this.crisp?k00:k01+4;
+     const position=reducedRow+((px-left)>>shift)*4;
+     const cu=reduced?0:Math.max(0,Math.min(PATCH-1,(dx+1)*.5*PATCH-.5));
+     const iu=reduced?0:this.crisp?Math.round(cu):Math.min(PATCH-2,Math.floor(cu)),iv=rowIndex;
+     const fu=reduced||this.crisp?0:cu-iu,fv=this.crisp?0:rowV-iv,k00=(iv*PATCH+iu)*4,k10=this.crisp?k00:k00+4,k01=this.crisp?k00:k00+PATCH*4,k11=this.crisp?k00:k01+4;
      const w00=(1-fu)*(1-fv),w10=fu*(1-fv),w01=(1-fu)*fv,w11=fu*fv,o=c*4;
-     const ta=T[k00+3]*w00+T[k10+3]*w10+T[k01+3]*w01+T[k11+3]*w11;if(ta<.5)continue;
+     const ta=reduced?reduced[position+3]:T[k00+3]*w00+T[k10+3]*w10+T[k01+3]*w01+T[k11+3]*w11;if(ta<.5)continue;
      const pa=f[o+3];
      // Colour moves toward the carried colour; alpha never drops (no halos),
      // and paint may spread outward into empty paper (unless protected).
@@ -334,7 +382,7 @@ export class BrushBlendGestureV2{
      const na=protect?pa:pa+(Math.max(pa,ta)-pa)*spread;if(na<.5)continue;
      const inT=1/ta,inP=pa>=.5?1/pa:0;
      const edgeShade=this.v3&&(!this.v4||!water&&!this.crisp)?1-this.v3.edgeDarkness*.14*ease(.68,.99,d):1;
-     for(let ch=0;ch<3;ch++){const tc=(T[k00+ch]*w00+T[k10+ch]*w10+T[k01+ch]*w01+T[k11+ch]*w11)*inT,pc=pa>=.5?f[o+ch]*inP:tc;f[o+ch]=(pc+(tc-pc)*a)*na*edgeShade;}
+     for(let ch=0;ch<3;ch++){const tc=(reduced?reduced[position+ch]:T[k00+ch]*w00+T[k10+ch]*w10+T[k01+ch]*w01+T[k11+ch]*w11)*inT,pc=pa>=.5?f[o+ch]*inP:tc;f[o+ch]=(pc+(tc-pc)*a)*na*edgeShade;}
      f[o+3]=na;changed[c]=1;any=true;
     }
    }
@@ -362,12 +410,14 @@ export class BrushBlendGestureV2{
    target[k]=Math.round(r*m);target[k+1]=Math.round(g*m);target[k+2]=Math.round(b*m);target[k+3]=Math.round(a);
   }
  }
- flush(ctx:Ctx,all=false):RasterRegion|undefined{
+ flush(ctx:Ctx,all=false,previous?:RasterRegion):RasterRegion|undefined{
+  if(this.batch)return this.surface.flushBatch(ctx,all,false,(t,bytes)=>this.bytes(t,bytes),previous);
   let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const t of this.surface.tiles.values()){if(!(t.dirty||all&&t.touched))continue;const img=ctx.createImageData(t.w,t.h);this.bytes(t,img.data);ctx.putImageData(img,t.x,t.y);t.dirty=false;left=Math.min(left,t.x);top=Math.min(top,t.y);right=Math.max(right,t.x+t.w);bottom=Math.max(bottom,t.y+t.h);}
   return Number.isFinite(left)?{x:left,y:top,width:right-left,height:bottom-top}:undefined;
  }
  restore(ctx:Ctx):RasterRegion|undefined{
+  if(this.batch)return this.surface.flushBatch(ctx,true,true,()=>{});
   let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const t of this.surface.tiles.values()){if(!t.touched)continue;const img=ctx.createImageData(t.w,t.h);img.data.set(t.orig);ctx.putImageData(img,t.x,t.y);left=Math.min(left,t.x);top=Math.min(top,t.y);right=Math.max(right,t.x+t.w);bottom=Math.max(bottom,t.y+t.h);}
   return Number.isFinite(left)?{x:left,y:top,width:right-left,height:bottom-top}:undefined;

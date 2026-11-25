@@ -280,7 +280,8 @@ describe('Version 6 Blend strength and pressure',()=>{
   expect(delta({...pressure,bbPressureCurve:'soft'})).toBeGreaterThan(delta(pressure));
   expect(delta({...pressure,bbPressureCurve:'firm'})).toBeLessThan(delta(pressure));
   const styles=['auto','blur','wet','smudge','dry'] as const;
-  expect(new Set(styles.map(bbRenderStyle=>hash(render({...watercolor,bbRenderStyle},testMask)))).size).toBeGreaterThanOrEqual(4);
+  const textured=sample('color-texture',.1);
+  expect(new Set(styles.map(bbRenderStyle=>hash(render({...textured,bbRenderStyle},testMask)))).size).toBe(styles.length);
  });
  it('applies the minimum pressure floor on every curve',()=>{
   for(const curve of ['soft','linear','firm'] as const){

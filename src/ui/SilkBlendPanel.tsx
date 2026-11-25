@@ -2,7 +2,7 @@ import {memo} from 'react';
 import {ExactRange} from './ExactRange';
 import {silkModes,silkPresets,isSilkMode,type SilkMode} from '../core/silkBlend';
 import type {BrushSettings} from '../engine/StudioEngine';
-/** v0.5.238 Silk Blend controls, shown in the brush panel when Silk Blend is active. */
+/** v0.5.238 Silk Blend controls, shown inside Blend settings when Silk style is active. */
 export const SilkBlendPanel=memo(function SilkBlendPanel({settings:s,patch,reset}:{settings:BrushSettings;patch:(p:Partial<BrushSettings>)=>void;reset:()=>void}){
  const mode:SilkMode=isSilkMode(s.silkMode)?s.silkMode:'soft',info=silkModes.find(m=>m.id===mode)!;
  const pct=(v:number|undefined,fallback:number)=>Math.round((v??fallback)*100);
@@ -12,6 +12,8 @@ export const SilkBlendPanel=memo(function SilkBlendPanel({settings:s,patch,reset
   <label className="studio-select">Mode<select aria-label="Silk Blend mode" value={mode} onChange={e=>patch({silkMode:e.target.value as SilkMode})}>{silkModes.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
   <p className="hint silk-hint">{info.hint}</p>
   <div className="silk-presets" role="group" aria-label="Silk Blend presets">{silkPresets.map(p=><button key={p.id} type="button" className={active===p.id?'active':''} aria-pressed={active===p.id} onClick={()=>patch({...p.values})}>{p.name}</button>)}</div>
+  <ExactRange live name="Size" min={1} max={150} step={.1} value={s.size} unit=" px" set={size=>patch({size})}/>
+  <ExactRange live name="Opacity" value={pct(s.opacity,1)} unit="%" set={v=>patch({opacity:v/100})}/>
   <ExactRange live name="Blend Strength" value={pct(s.silkStrength,.55)} unit="%" set={v=>patch({silkStrength:v/100})}/>
   <ExactRange live name="Colour Pickup" value={pct(s.silkPickup,.7)} unit="%" set={v=>patch({silkPickup:v/100})}/>
   <ExactRange live name="Wetness" value={pct(s.silkWetness,.35)} unit="%" set={v=>patch({silkWetness:v/100})}/>

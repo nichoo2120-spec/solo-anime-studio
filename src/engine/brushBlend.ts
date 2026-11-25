@@ -1,3 +1,4 @@
+import type {DabBounds} from './blendDabBatch';
 /** v0.5.240 Blend mode for every paint brush.
  *
  * In plain words:
@@ -28,6 +29,34 @@ type Readable={getContext(kind:'2d',options?:unknown):unknown;width:number;heigh
 /** Lazily read alpha of the brush mask, in 64 px tiles. Each live update owns a reader for its current mask. */
 class MaskReader{
  private tiles=new Map<number,Uint8Array>();
+ private batchData?:ImageData;
+ private batchX=0;
+ private batchY=0;
+ invalidate(bounds?:RasterRegion){
+  if(!bounds){this.tiles.clear();return;}
+  const endX=bounds.x+bounds.width,endY=bounds.y+bounds.height;
+  for(let ty=Math.floor(bounds.y/TILE);ty*TILE<endY;ty++)for(let tx=Math.floor(bounds.x/TILE);tx*TILE<endX;tx++)this.tiles.delete(ty*65536+tx);
+ }
+ prepare(bounds:DabBounds){
+  const left=Math.max(0,Math.floor(bounds.x/TILE)),top=Math.max(0,Math.floor(bounds.y/TILE));
+  const right=Math.min(Math.ceil(this.width/TILE),Math.ceil((bounds.x+bounds.width)/TILE));
+  const bottom=Math.min(Math.ceil(this.height/TILE),Math.ceil((bounds.y+bounds.height)/TILE));
+  let startX=right,startY=bottom,endX=left,endY=top;
+  for(let ty=top;ty<bottom;ty++)for(let tx=left;tx<right;tx++){
+   if(this.tiles.has(ty*65536+tx))continue;
+   startX=Math.min(startX,tx);startY=Math.min(startY,ty);
+   endX=Math.max(endX,tx+1);endY=Math.max(endY,ty+1);
+  }
+  if(endX<=startX||endY<=startY)return;
+  const x=Math.max(0,startX*TILE-this.ox),y=Math.max(0,startY*TILE-this.oy);
+  const ex=Math.min(this.ctx.canvas.width,endX*TILE-this.ox);
+  const ey=Math.min(this.ctx.canvas.height,endY*TILE-this.oy);
+  if(ex>x&&ey>y){
+   this.batchX=x;this.batchY=y;this.batchData=this.ctx.getImageData(x,y,ex-x,ey-y);
+  }
+  for(let ty=startY;ty<endY;ty++)for(let tx=startX;tx<endX;tx++)this.tile(tx,ty);
+  this.batchData=undefined;
+ }
  constructor(private readonly ctx:Ctx,private readonly ox:number,private readonly oy:number,private readonly width:number,private readonly height:number){}
 
  tile(tx:number,ty:number){
@@ -36,9 +65,11 @@ class MaskReader{
    const sx=x-this.ox,sy=y-this.oy,cw=this.ctx.canvas.width,ch=this.ctx.canvas.height;
    const ix=Math.max(0,sx),iy=Math.max(0,sy),iw=Math.min(cw,sx+w)-ix,ih=Math.min(ch,sy+h)-iy;
    if(iw>0&&ih>0){
-    const d=this.ctx.getImageData(ix,iy,iw,ih).data;
+    const batch=this.batchData;
+    const d=batch?.data??this.ctx.getImageData(ix,iy,iw,ih).data;
+    const stride=batch?.width??iw,offset=batch?(iy-this.batchY)*stride+ix-this.batchX:0;
     for(let j=0;j<ih;j++)for(let i=0;i<iw;i++){
-     const alpha=d[(j*iw+i)*4+3];if(!alpha)continue;
+     const alpha=d[(offset+j*stride+i)*4+3];if(!alpha)continue;
      if(t===emptyBlendMask)t=new Uint8Array(TILE*TILE);
      t[(iy-sy+j)*TILE+ix-sx+i]=alpha;
     }
@@ -230,10 +261,10 @@ const union=(a:RasterRegion|undefined,b:RasterRegion|undefined)=>{if(!a)return b
 
 /** Canonical one-pass render: `ctx` holds the layer before the stroke, `mask`
  * holds the brush's own final stroke raster at (maskX, maskY). */
-export function renderBrushBlend(ctx:Ctx,mask:Readable,s:Stroke,maskX=0,maskY=0,read?:Ctx):RasterRegion|undefined{
+export function renderBrushBlend(ctx:Ctx,mask:Readable,s:Stroke,maskX=0,maskY=0,read?:Ctx,previous?:RasterRegion):RasterRegion|undefined{
  if(s.opacity<=0||!s.points.length)return undefined;
  const W=ctx.canvas.width,H=ctx.canvas.height,reader=new MaskReader(mask.getContext('2d') as Ctx,maskX,maskY,W,H);
- const g=gestureFor(s,W,H,read??ctx,reader);g.advance(blendPath(s));return g.flush(ctx,true);
+ const g=gestureFor(s,W,H,read??ctx,reader);g.advance(blendPath(s));return g.flush(ctx,true,previous);
 }
 
 /** Live (blend worker): incremental dabs over the growing brush mask. The final
@@ -244,19 +275,27 @@ function gestureFor(s:Stroke,W:number,H:number,read:Ctx,reader:MaskReader):AnyGe
  if(s.brushBlendVersion===3||isMaterialBrushBlendVersion(s.brushBlendVersion))return new BrushBlendGestureV3(s,W,H,read,reader,blendSampleFor(s),decodeCarry(s.bbCarry),sampleSnapshot,blendTransformScale(s));
  return s.brushBlendVersion===2?new BrushBlendGestureV2(s,W,H,read,reader,blendSampleFor(s),decodeCarry(s.bbCarry),sampleSnapshot):new BrushBlendGesture(s,W,H,read,reader,blendSampleFor(s));
 }
-let live:{id:string;target:unknown;gesture:AnyGesture}|undefined;
+let live:{id:string;target:unknown;gesture:AnyGesture;mask?:MaskReader;source?:Readable}|undefined;
 export function resetBrushBlend(){live=undefined;}
-export function applyBrushBlendLive(ctx:Ctx,mask:Readable,s:Stroke,base:Readable,final:boolean,livePath:Point[]):RasterRegion|undefined{
+export function applyBrushBlendLive(ctx:Ctx,mask:Readable,s:Stroke,base:Readable,final:boolean,livePath:Point[],maskDirty?:RasterRegion):RasterRegion|undefined{
  if(s.opacity<=0||!s.points.length)return undefined;
  const read=base.getContext('2d') as Ctx,W=ctx.canvas.width,H=ctx.canvas.height;
  if(final){
+  if(s.blendRasterVersion===1){
+   const previous=live&&live.id===s.id&&live.target===ctx.canvas?live.gesture.surface.batchBounds(true):undefined;
+   live=undefined;
+   return renderBrushBlend(ctx,mask,s,0,0,read,previous);
+  }
   const restored=live&&live.id===s.id&&live.target===ctx.canvas?live.gesture.restore(ctx):undefined;live=undefined;
   return union(restored,renderBrushBlend(ctx,mask,s,0,0,read));
  }
  let restored:RasterRegion|undefined;
  if(live&&(live.id!==s.id||live.target!==ctx.canvas||live.gesture.pointCount>livePath.length)){if(live.id===s.id&&live.target===ctx.canvas)restored=live.gesture.restore(ctx);live=undefined;}
- const reader=new MaskReader(mask.getContext('2d') as Ctx,0,0,W,H);
- if(!live)live={id:s.id,target:ctx.canvas,gesture:gestureFor(s,W,H,read,reader)};else live.gesture.setMask(reader);
+ const previous=s.blendRasterVersion===1&&live?.source===mask?live.mask:undefined;
+ const reader=previous??new MaskReader(mask.getContext('2d') as Ctx,0,0,W,H);
+ previous?.invalidate(maskDirty);
+ if(!live)live={id:s.id,target:ctx.canvas,gesture:gestureFor(s,W,H,read,reader),mask:reader,source:mask};
+ else{live.gesture.setMask(reader);live.mask=reader;live.source=mask;}
  live.gesture.advance(livePath);
  return union(restored,live.gesture.flush(ctx,!!restored));
 }

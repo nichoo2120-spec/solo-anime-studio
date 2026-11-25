@@ -1,3 +1,4 @@
+import {BlendDabBatch,BlendPatchRaster,largeBlendSpacing,type DabBounds} from './blendDabBatch';
 /** v0.5.238 Silk Blend renderer (new brush, written from scratch).
  *
  * How it works, in plain words:
@@ -18,27 +19,136 @@ import type {SilkMode} from '../core/silkBlend';
 import {paintNoise} from './paintingTips';
 
 export const TILE=64,PATCH=20,CELLS=PATCH*PATCH;
-export type Tile={x:number;y:number;w:number;h:number;f:Float32Array;orig:Uint8ClampedArray;changed:Uint8Array;dirty:boolean;touched:boolean;wet?:Float32Array;cloud?:Float32Array;grain?:Float32Array};
+export type Tile={x:number;y:number;w:number;h:number;f:Float32Array;orig:Uint8ClampedArray;changed:Uint8Array;dirty:boolean;touched:boolean;wet?:Float32Array;cloud?:Float32Array;grain?:Float32Array;pickup?:Float32Array;pickupEpoch?:Uint32Array;output?:Uint8ClampedArray};
 
 /** Lazily loaded premultiplied float copy of the source layer, 64 px tiles. */
 export class SilkSurface{
  readonly tiles=new Map<number,Tile>();
  private readonly cols:number;private readonly rows:number;
  private last?:Tile;private lastKey=-1;
- constructor(readonly width:number,readonly height:number,private readonly read:CanvasRenderingContext2D){this.cols=Math.ceil(width/TILE);this.rows=Math.ceil(height/TILE);}
+ private upload?:ImageData;
+
+ private epoch=0;
+ private tileSource?:ImageData;
+ private sourceX=0;
+ private sourceY=0;
+
+ constructor(readonly width:number,readonly height:number,private readonly read:CanvasRenderingContext2D,private readonly pickupScale=1){this.cols=Math.ceil(width/TILE);this.rows=Math.ceil(height/TILE);}
  tile(tx:number,ty:number):Tile|undefined{
   if(tx<0||ty<0||tx>=this.cols||ty>=this.rows)return undefined;
   const key=ty*this.cols+tx;if(key===this.lastKey)return this.last;
   let t=this.tiles.get(key);
   if(!t){
-   const x=tx*TILE,y=ty*TILE,w=Math.min(TILE,this.width-x),h=Math.min(TILE,this.height-y),data=this.read.getImageData(x,y,w,h).data,f=new Float32Array(TILE*TILE*4);
+   const x=tx*TILE,y=ty*TILE,w=Math.min(TILE,this.width-x),h=Math.min(TILE,this.height-y),f=new Float32Array(TILE*TILE*4);
+   const bulk=this.tileSource;
+   let data:Uint8ClampedArray;
+   if(bulk&&x>=this.sourceX&&y>=this.sourceY&&x+w<=this.sourceX+bulk.width&&y+h<=this.sourceY+bulk.height){
+    data=new Uint8ClampedArray(w*h*4);
+    for(let j=0;j<h;j++){
+     const from=((y-this.sourceY+j)*bulk.width+x-this.sourceX)*4;
+     data.set(bulk.data.subarray(from,from+w*4),j*w*4);
+    }
+   }else data=this.read.getImageData(x,y,w,h).data;
    for(let j=0;j<h;j++)for(let i=0;i<w;i++){const k=(j*w+i)*4,o=(j*TILE+i)*4,a=data[k+3],m=a/255;f[o]=data[k]*m;f[o+1]=data[k+1]*m;f[o+2]=data[k+2]*m;f[o+3]=a;}
-   t={x,y,w,h,f,orig:new Uint8ClampedArray(data),changed:new Uint8Array(TILE*TILE),dirty:false,touched:false};this.tiles.set(key,t);
+   t={x,y,w,h,f,orig:bulk?data:new Uint8ClampedArray(data),changed:new Uint8Array(TILE*TILE),dirty:false,touched:false};
+   if(this.pickupScale>1){
+    const cells=(TILE/this.pickupScale)**2;
+    t.output=new Uint8ClampedArray(w*h*4);
+    t.pickup=new Float32Array(cells*4);
+    t.pickupEpoch=new Uint32Array(cells);
+   }
+   this.tiles.set(key,t);
   }
   this.last=t;this.lastKey=key;return t;
  }
+ /** Seed any new tiles with one clipped read for the batch. Existing float
+  * tiles retain pigment deposited by earlier dabs. */
+ prepare(bounds:DabBounds,init?:(tile:Tile)=>void){
+  const x=Math.max(0,Math.floor(bounds.x/TILE)*TILE),y=Math.max(0,Math.floor(bounds.y/TILE)*TILE);
+  const right=Math.min(this.width,Math.ceil((bounds.x+bounds.width)/TILE)*TILE);
+  const bottom=Math.min(this.height,Math.ceil((bounds.y+bounds.height)/TILE)*TILE);
+  if(right<=x||bottom<=y)return;
+  let left=right,top=bottom,endX=x,endY=y;
+  for(let ty=y/TILE;ty*TILE<bottom;ty++)for(let tx=x/TILE;tx*TILE<right;tx++){
+   if(this.tiles.has(ty*this.cols+tx))continue;
+   left=Math.min(left,tx*TILE);top=Math.min(top,ty*TILE);
+   endX=Math.max(endX,Math.min(this.width,(tx+1)*TILE));endY=Math.max(endY,Math.min(this.height,(ty+1)*TILE));
+  }
+  if(endX>left&&endY>top){
+   this.sourceX=left;this.sourceY=top;this.tileSource=this.read.getImageData(left,top,endX-left,endY-top);
+   for(let ty=y/TILE;ty*TILE<bottom;ty++)for(let tx=x/TILE;tx*TILE<right;tx++)this.tile(tx,ty);
+   this.tileSource=undefined;
+  }
+  if(init)for(let ty=y/TILE;ty*TILE<bottom;ty++)for(let tx=x/TILE;tx*TILE<right;tx++)init(this.tile(tx,ty)!);
+ }
+ nextDab(){this.epoch++;}
+
+ /** Area-average the current premultiplied pigment into a lazy low-resolution
+  * tile. One dab can reuse the same reduced texel across adjacent samples. */
+ sampleReduced(x:number,y:number,out:Float32Array,o:number,original=false){
+  const scale=this.pickupScale,px=Math.floor(x/scale)*scale,py=Math.floor(y/scale)*scale;
+  out[o]=out[o+1]=out[o+2]=out[o+3]=0;
+  if(px<0||py<0||px>=this.width||py>=this.height)return;
+  const tile=this.tile(Math.floor(px/TILE),Math.floor(py/TILE))!;
+  const ix=px-tile.x,iy=py-tile.y,cell=iy/scale*(TILE/scale)+ix/scale;
+  const reduced=tile.pickup!,versions=tile.pickupEpoch!,at=cell*4;
+  const epoch=original?1:this.epoch;
+  if(versions[cell]!==epoch){
+   const endX=Math.min(tile.w,ix+scale),endY=Math.min(tile.h,iy+scale);
+   let r=0,g=0,b=0,a=0;
+   for(let j=iy;j<endY;j++)for(let i=ix;i<endX;i++){
+    if(original){
+     const k=(j*tile.w+i)*4,f=tile.orig,m=f[k+3]/255;
+     r+=f[k]*m;g+=f[k+1]*m;b+=f[k+2]*m;a+=f[k+3];
+    }else{
+     const k=(j*TILE+i)*4,f=tile.f;
+     r+=f[k];g+=f[k+1];b+=f[k+2];a+=f[k+3];
+    }
+   }
+   const area=(endX-ix)*(endY-iy);
+   reduced[at]=r/area;reduced[at+1]=g/area;reduced[at+2]=b/area;reduced[at+3]=a/area;
+   versions[cell]=epoch;
+  }
+  out[o]=reduced[at];out[o+1]=reduced[at+1];out[o+2]=reduced[at+2];out[o+3]=reduced[at+3];
+ }
+
+ /** One upload for the changed rectangle. Interior tiles may contain paint
+  * from earlier batches, so repack those from the retained float surface. */
+ batchBounds(all:boolean):RasterRegion|undefined{
+  let x=this.width,y=this.height,right=0,bottom=0;
+  for(const tile of this.tiles.values()){
+   if(!(tile.dirty||all&&tile.touched))continue;
+   x=Math.min(x,tile.x);y=Math.min(y,tile.y);
+   right=Math.max(right,tile.x+tile.w);bottom=Math.max(bottom,tile.y+tile.h);
+  }
+  if(right>x&&bottom>y)return {x,y,width:right-x,height:bottom-y};
+ }
+ flushBatch(ctx:CanvasRenderingContext2D,all:boolean,restore:boolean,bytes:(t:Tile,target:Uint8ClampedArray)=>void,previous?:RasterRegion):RasterRegion|undefined{
+  const box=union(this.batchBounds(all),previous);
+  if(!box)return undefined;
+  const {x,y,width,height}=box,right=x+width,bottom=y+height;
+  if(!this.upload||this.upload.width!==width||this.upload.height!==height)this.upload=ctx.createImageData(width,height);
+  const img=this.upload;
+  // A winding stroke can leave holes between dirty tiles on the final
+  // upload. Seed those from the same immutable source as the ordinary tiles.
+  this.prepare({x,y,width,height});
+  for(let ty=y/TILE;ty*TILE<bottom;ty++)for(let tx=x/TILE;tx*TILE<right;tx++){
+   const tile=this.tile(tx,ty)!;
+   const data=restore||!tile.touched?tile.orig:tile.output!;
+   if(tile.dirty&&!restore)bytes(tile,data);
+   for(let j=0;j<tile.h;j++){
+    const start=j*tile.w*4;
+    img.data.set(data.subarray(start,start+tile.w*4),((tile.y-y+j)*img.width+tile.x-x)*4);
+   }
+   tile.dirty=false;
+  }
+  ctx.putImageData(img,x,y,0,0,width,height);
+  return {x,y,width,height};
+ }
+
  /** Bilinear premultiplied sample at a canvas position (pixel centres at +.5). */
  sample(x:number,y:number,out:Float32Array,o:number){
+  if(this.pickupScale>1){this.sampleReduced(x,y,out,o);return;}
   const fx=x-.5,fy=y-.5,ix=Math.floor(fx),iy=Math.floor(fy),ax=fx-ix,ay=fy-iy;
   out[o]=out[o+1]=out[o+2]=out[o+3]=0;
   for(let q=0;q<4;q++){
@@ -104,6 +214,8 @@ const tuning=(mode:SilkMode,wet:number):ModeTuning=>{
 export class SilkGesture{
  private surface:SilkSurface;
  private reservoir?:Float32Array;
+ private readonly batch?:BlendDabBatch;
+ private readonly patchRaster?:BlendPatchRaster;
  private readonly sampled=new Float32Array(CELLS*4);
  private readonly target=new Float32Array(CELLS*4);
  private readonly scratch=new Float32Array(CELLS*4);
@@ -113,7 +225,10 @@ export class SilkGesture{
  private readonly mode:SilkMode;private tune:ModeTuning;private readonly seed:number;
  dabs=0;
  constructor(private readonly s:Stroke,width:number,height:number,read:CanvasRenderingContext2D){
-  this.surface=new SilkSurface(width,height,read);
+  const fast=s.blendRasterVersion===1;
+  this.batch=fast?new BlendDabBatch():undefined;
+  this.patchRaster=fast?new BlendPatchRaster(s.size):undefined;
+  this.surface=new SilkSurface(width,height,read,fast?(s.size>200?4:2):1);
   this.mode=s.silkMode??'soft';this.tune=tuning(this.mode,clamp01(s.silkWetness??.35));this.seed=strokeSeed(s.id);
   if(s.silkBlendVersion===2&&this.mode==='wet'){
    // v0.5.239 watercolor Wet. Saved v1 Wet strokes keep the v0.5.238 path above.
@@ -155,22 +270,34 @@ export class SilkGesture{
   const s=this.s,pr=s.pressure?clamp01(p):1,min=s.minSize??.2;
   return Math.max(.75,s.size*.5*(s.pressure&&s.pressureWidth!==false?min+(1-min)*pr:1));
  }
- private step(r:number){return Math.max(.6,2*r*Math.max(.02,Math.min(.5,this.s.tipSpacing??.08)));}
+ private step(r:number){
+  const spacing=Math.max(.02,Math.min(.5,this.s.tipSpacing??.08));
+  return Math.max(.6,2*r*(this.batch?largeBlendSpacing(this.s.size,spacing):spacing));
+ }
  /** Process every not-yet-processed dab along `points`. */
  advance(raw:Point[]){
   if(!raw.length)return;
   this.follow(raw);const points=this.path;
-  if(this.next===0){const p=points[0];const r=this.radius(p.p);this.dab(p.x,p.y,p.p,r,this.step(r));this.carry=this.step(r);this.next=1;}
+  if(this.next===0){const p=points[0];const r=this.radius(p.p);this.queueDab(p.x,p.y,p.p,r,this.step(r));this.carry=this.step(r);this.next=1;}
   for(;this.next<points.length;this.next++){
    const a=points[this.next-1],b=points[this.next],dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);
    if(len<1e-9)continue;
    this.dirX=dx/len;this.dirY=dy/len;
    while(this.carry<=len){
     const t=this.carry/len,x=a.x+dx*t,y=a.y+dy*t,p=a.p+(b.p-a.p)*t,r=this.radius(p),st=this.step(r);
-    this.traveled+=st;this.dab(x,y,p,r,st);this.carry+=st;
+    this.traveled+=st;this.queueDab(x,y,p,r,st);this.carry+=st;
    }
    this.carry-=len;
   }
+  const endX=this.dirX,endY=this.dirY;
+  this.batch?.run((bounds,diameter)=>{
+   this.patchRaster!.ensure(Math.min(this.surface.width,diameter),Math.min(this.surface.height,diameter));
+   this.surface.prepare(bounds,this.water?t=>this.waterFields(t):undefined);
+  },(x,y,p,r,step,dx,dy,distance)=>{
+   this.dirX=dx;this.dirY=dy;this.traveled=distance;
+   this.surface.nextDab();this.dab(x,y,p,r,step);
+  });
+  this.dirX=endX;this.dirY=endY;
   for(let i=this.processed.length/3;i<raw.length;i++){const p=raw[i];this.processed.push(p.x,p.y,p.p);}
  }
  /**
@@ -188,6 +315,10 @@ export class SilkGesture{
    const a=soft>1e-6?1-Math.exp(-moved/soft):1;this.gx+=(this.fx-this.gx)*a;this.gy+=(this.fy-this.gy)*a;
    this.path.push({...p,x:this.gx,y:this.gy});
   }
+ }
+ private queueDab(x:number,y:number,p:number,r:number,step:number){
+  if(this.batch)this.batch.add(x,y,p,r,step,this.dirX,this.dirY,this.traveled);
+  else this.dab(x,y,p,r,step);
  }
  private dab(x:number,y:number,p:number,r:number,step:number){
   const s=this.s,tune=this.tune,S=this.sampled,T=this.target,pr=s.pressure?clamp01(p):1;
@@ -213,9 +344,16 @@ export class SilkGesture{
   if(this.mode==='smudge')strength*=Math.exp(-this.traveled/(2*r*(4+14*clamp01(s.silkWetness??.35))));
   const alpha=1-Math.pow(1-Math.min(.95,strength*.32),u);
   if(alpha<=1e-5){this.dabs++;return;}
+  if(this.batch)this.depositBatch(x,y,r,alpha,pr,T);
+  else this.depositLegacy(x,y,r,alpha,pr,T);
+  this.dabs++;
+ }
+ // Keep the exact v1/v2 deposit loop for strokes saved without the raster flag.
+ private depositLegacy(x:number,y:number,r:number,alpha:number,pr:number,T:Float32Array){
+  const s=this.s,tune=this.tune;
   const tex=clamp01(s.silkTexture??0),dry=this.mode==='dry',seed=this.seed,coverage=.22+.48*pr,dirX=this.dirX,dirY=this.dirY;
   const left=Math.max(0,Math.floor(x-r)),top=Math.max(0,Math.floor(y-r)),right=Math.min(this.surface.width,Math.ceil(x+r)),bottom=Math.min(this.surface.height,Math.ceil(y+r));
-  if(right<=left||bottom<=top){this.dabs++;return;}
+  if(right<=left||bottom<=top)return;
   const inv=1/r,falloff=tune.falloff,water=this.water,wetFront=.45*clamp01(s.silkWetness??.35);
   for(let ty=Math.floor(top/TILE);ty*TILE<bottom;ty++)for(let tx=Math.floor(left/TILE);tx*TILE<right;tx++){
    const t=this.surface.tile(tx,ty);if(!t)continue;
@@ -247,7 +385,45 @@ export class SilkGesture{
    }
    if(any){t.dirty=true;t.touched=true;}
   }
-  this.dabs++;
+ }
+ private depositBatch(x:number,y:number,r:number,alpha:number,pr:number,T:Float32Array){
+  const s=this.s,tune=this.tune;
+  const tex=clamp01(s.silkTexture??0),dry=this.mode==='dry',seed=this.seed,coverage=.22+.48*pr,dirX=this.dirX,dirY=this.dirY;
+  const left=Math.max(0,Math.floor(x-r)),top=Math.max(0,Math.floor(y-r)),right=Math.min(this.surface.width,Math.ceil(x+r)),bottom=Math.min(this.surface.height,Math.ceil(y+r));
+  if(right<=left||bottom<=top)return;
+  const inv=1/r,falloff=tune.falloff,water=this.water,wetFront=.45*clamp01(s.silkWetness??.35);
+  const patch=this.patchRaster!.prepare(T,left,top,right,bottom,x,y,inv,PATCH,false);
+  const reduced=patch.pixels,shift=patch.shift,stride=patch.stride;
+  for(let ty=Math.floor(top/TILE);ty*TILE<bottom;ty++)for(let tx=Math.floor(left/TILE);tx*TILE<right;tx++){
+   const t=this.surface.tile(tx,ty);if(!t)continue;
+   if(water)this.waterFields(t);
+   const x0=Math.max(left,t.x),x1=Math.min(right,t.x+t.w),y0=Math.max(top,t.y),y1=Math.min(bottom,t.y+t.h),f=t.f,changed=t.changed;let any=false;
+   for(let py=y0;py<y1;py++){const dy=(py+.5-y)*inv,dy2=dy*dy;if(dy2>=1)continue;
+    const reducedRow=((py-top)>>shift)*stride;
+    for(let px=x0;px<x1;px++){
+     const dx=(px+.5-x)*inv,d2=dx*dx+dy2;if(d2>=1)continue;
+     let a:number;
+     if(water){
+      // Irregular, soft wet front: the broad pigment cloud pulls the edge in
+      // unevenly, so the blend blooms like wet paint instead of a round stamp.
+      const c=(py-t.y)*TILE+px-t.x,edge=Math.sqrt(d2)*(1+wetFront*t.cloud![c]);if(edge>=1)continue;
+      const cov=ease(0,.75,1-edge);if(cov>t.wet![c])t.wet![c]=cov;
+      a=alpha*falloff(edge);changed[c]=1;any=true;
+     }else a=alpha*falloff(Math.sqrt(d2));
+     if(tex>0){
+      const grain=valueNoise(px*.55,py*.55,seed&255)*.6+valueNoise(px*.17,py*.17,(seed>>8)&255)*.4;
+      if(dry){const across=dx*-dirY+dy*dirX,bristle=noise1(across*15+((seed>>16)&63),seed&1023),m=grain*.45+bristle*.55,th=1-coverage,c=clamp01((m-th+.09)/.18);a*=1-tex*(1-c*c*(3-2*c));}
+      else a*=1-tex*.6*(1-grain);
+     }
+     if(a<=1e-5)continue;
+     const position=reducedRow+((px-left)>>shift)*4;
+     const o=((py-t.y)*TILE+px-t.x)*4;
+     for(let c=0;c<4;c++)f[o+c]+=(reduced[position+c]-f[o+c])*a;
+     changed[o>>2]=1;any=true;
+    }
+   }
+   if(any){t.dirty=true;t.touched=true;}
+  }
  }
  /** Watercolor Wet target: wider wet bleed (several soft passes), then colours
   * mix as transparent pigment (averaged optical density), so red and blue melt
@@ -289,6 +465,7 @@ export class SilkGesture{
  private readonly density=new Float32Array(CELLS*4);private readonly hpass=new Float32Array(CELLS*4);
  /** Write tiles to `ctx`. `all` rewrites every tile this stroke ever touched. */
  flush(ctx:CanvasRenderingContext2D,all=false):RasterRegion|undefined{
+  if(this.batch)return this.surface.flushBatch(ctx,all,false,(t,bytes)=>this.surface.bytes(t,bytes,this.water));
   let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const t of this.surface.tiles.values()){
    if(!(t.dirty||all&&t.touched))continue;
@@ -299,6 +476,7 @@ export class SilkGesture{
  }
  /** Put the original pixels back (used when the path changed under us). */
  restore(ctx:CanvasRenderingContext2D):RasterRegion|undefined{
+  if(this.batch)return this.surface.flushBatch(ctx,true,true,()=>{});
   let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const t of this.surface.tiles.values()){if(!t.touched)continue;const img=ctx.createImageData(t.w,t.h);img.data.set(t.orig);ctx.putImageData(img,t.x,t.y);left=Math.min(left,t.x);top=Math.min(top,t.y);right=Math.max(right,t.x+t.w);bottom=Math.max(bottom,t.y+t.h);}
   return Number.isFinite(left)?{x:left,y:top,width:right-left,height:bottom-top}:undefined;
