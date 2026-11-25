@@ -1,7 +1,7 @@
 import {blendPath,blendTransformScale,encodeCarry,registerBlendSample,sampleFromCanvas,setLiveBlendSample,type BlendSampleSource} from './brushBlend';
 import type {SilkBlendControls} from '../core/silkBlend';
 import {brushBlendV4Reach} from './brushBlendStyles';
-import {isBrushBlendVersion,type BrushBlendSettings} from '../core/brushBlend';
+import {isBrushBlendVersion,isMaterialBrushBlendVersion,type BrushBlendSettings} from '../core/brushBlend';
 import type {BrushShapeSettings} from '../core/brushShape';
 /** Pen azimuth (degrees, -180..180) and altitude (0..90). */
 function penTilt(e:PointerEvent):{az:number;alt:number}|undefined{const ev=e as PointerEvent&{azimuthAngle?:number;altitudeAngle?:number};if(typeof ev.azimuthAngle==='number'&&typeof ev.altitudeAngle==='number'){let az=ev.azimuthAngle*180/Math.PI;if(az>180)az-=360;return {az:Math.round(az*10)/10,alt:Math.round(Math.max(0,Math.min(90,ev.altitudeAngle*180/Math.PI))*10)/10};}if(!e.tiltX&&!e.tiltY)return undefined;const tx=e.tiltX*Math.PI/180,ty=e.tiltY*Math.PI/180,az=Math.atan2(Math.tan(ty),Math.tan(tx))*180/Math.PI,alt=90-Math.min(90,Math.hypot(e.tiltX,e.tiltY));return {az:Math.round(az*10)/10,alt:Math.round(alt*10)/10};}
@@ -204,7 +204,7 @@ export class StudioEngine {
   const last=stroke.points[stroke.points.length-1],target=this.strokeTarget;
   if(last&&target)this.lastBlendEnd={layer:target.layer,x:last.x,y:last.y,r:Math.max(1,stroke.size*.5)};
   if(stroke.bbSample!=='all'||!page||!stroke.points.length)return stroke;
-  const path=blendPath(stroke),pad=Math.ceil((stroke.brushBlendVersion===4?brushBlendV4Reach(stroke)*blendTransformScale(stroke):stroke.size*.75)+8);let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
+  const path=blendPath(stroke),pad=Math.ceil((isMaterialBrushBlendVersion(stroke.brushBlendVersion)?brushBlendV4Reach(stroke)*blendTransformScale(stroke):stroke.size*.75)+8);let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const p of path){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);}
   // Mirrored copies replay elsewhere on the page, so they keep the whole page.
   if(this.strokeMirror){left=pad;top=pad;right=page.width-pad;bottom=page.height-pad;}

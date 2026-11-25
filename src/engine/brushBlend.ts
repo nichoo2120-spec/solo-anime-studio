@@ -12,6 +12,7 @@
  *   written. Reload renders one pass over the final brush mask; the blend worker
  *   uses the same function for its final result, so live final == reload.
  */
+import {isMaterialBrushBlendVersion} from '../core/brushBlend';
 import type {Point,Stroke} from '../core/model';
 import type {RasterRegion} from './liveRaster';
 import {SilkSurface,TILE,PATCH,CELLS,type Tile} from './silkBlend';
@@ -204,7 +205,7 @@ export class BrushBlendGesture{
 
 /** Match how the paint renderer positions affine masks, including saved copies. */
 function blendTransform(s:Stroke){
- return s.brushBlendVersion===4&&!s.perspective&&(s.stampVersion!==1||s.rasterTransformVersion===1)?s.transform:undefined;
+ return isMaterialBrushBlendVersion(s.brushBlendVersion)&&!s.perspective&&(s.stampVersion!==1||s.rasterTransformVersion===1)?s.transform:undefined;
 }
 export function blendTransformScale(s:Stroke){
  const matrix=blendTransform(s);if(!matrix)return 1;
@@ -214,7 +215,7 @@ export function blendTransformScale(s:Stroke){
 
 /** The dab path used for the canonical (final / reload) result. */
 export function blendPath(s:Stroke):Point[]{
- if(s.brushBlendVersion===4&&(s.transform||s.perspective)){
+ if(isMaterialBrushBlendVersion(s.brushBlendVersion)&&(s.transform||s.perspective)){
   const geometry=s.perspective?projectiveInkGeometry(s):finalGeometry(s);
   const path=paintSamples(geometry,.25).points;
   const matrix=blendTransform(s);if(!matrix)return path;
@@ -240,7 +241,7 @@ export function renderBrushBlend(ctx:Ctx,mask:Readable,s:Stroke,maskX=0,maskY=0,
 /** v1 strokes keep the frozen v0.5.240 recipe; v2 strokes blend in their family style. */
 type AnyGesture=BrushBlendGesture|BrushBlendGestureV2|BrushBlendGestureV3;
 function gestureFor(s:Stroke,W:number,H:number,read:Ctx,reader:MaskReader):AnyGesture{
- if(s.brushBlendVersion===3||s.brushBlendVersion===4)return new BrushBlendGestureV3(s,W,H,read,reader,blendSampleFor(s),decodeCarry(s.bbCarry),sampleSnapshot,blendTransformScale(s));
+ if(s.brushBlendVersion===3||isMaterialBrushBlendVersion(s.brushBlendVersion))return new BrushBlendGestureV3(s,W,H,read,reader,blendSampleFor(s),decodeCarry(s.bbCarry),sampleSnapshot,blendTransformScale(s));
  return s.brushBlendVersion===2?new BrushBlendGestureV2(s,W,H,read,reader,blendSampleFor(s),decodeCarry(s.bbCarry),sampleSnapshot):new BrushBlendGesture(s,W,H,read,reader,blendSampleFor(s));
 }
 let live:{id:string;target:unknown;gesture:AnyGesture}|undefined;

@@ -20,7 +20,7 @@ const points:Point[]=Array.from({length:72},(_,i)=>{const t=i/71;return {x:24+t*
 function scene(){const c=surface(W,H);for(let y=22;y<106;y++)for(let x=0;x<W;x++)c.data.set(x<W/2?[228,42,53,255]:[34,76,220,255],(y*W+x)*4);return c;}
 function mask(){const c=surface(W,H);for(let y=0;y<H;y++)for(let x=0;x<W;x++){for(const p of points)if(Math.hypot(x-p.x,y-p.y)<19){c.data[(y*W+x)*4+3]=255;break;}}return c;}
 const hash=(d:Uint8ClampedArray)=>{let h=2166136261;for(let i=0;i<d.length;i++){h^=d[i];h=Math.imul(h,16777619);}return h>>>0;};
-function stroke(id='soft-paint',settings:Record<string,unknown>={},version:1|2|3|4=3):Stroke{
+function stroke(id='soft-paint',settings:Record<string,unknown>={},version:1|2|3|4|5=3):Stroke{
  const preset=stockPresets.find(p=>p.id===id)!;const controls={...preset.settings,bbEnabled:true,...settings},metadata={...brushStrokeMetadata(controls)} as Record<string,unknown>;
  metadata.brushBlendVersion=version;
  if(version<3){for(const key of ['bbMode','bbColorCarry','bbSoftness','bbTextureKeep','bbSmoothing','bbEdgeDarkness'])delete metadata[key];if(version===1)delete metadata.bbStyle;metadata.brushBlendVersion=version;}
@@ -197,5 +197,43 @@ describe('Blend stroke v4',()=>{
    if(Math.abs(Math.floor(i/4/W)-64)>27&&expected[i]!==base.data[i])outer++;
   }
   expect(outer).toBeGreaterThan(100);
+ });
+});
+
+
+describe('Watercolor Blend v5',()=>{
+ it('versions only the new unshaped watercolor feel and keeps saved v4 pixels identical',()=>{
+  const ids=['water-smooth','water-wet','water-rough','water-flat','water-edge'];
+  const metadata=ids.map(id=>brushStrokeMetadata({...stockPresets.find(p=>p.id===id)!.settings,bbEnabled:true}));
+  expect(metadata.map(s=>s.brushBlendVersion)).toEqual([5,5,5,5,4]);
+  expect(ids.map(id=>hash(render(stroke(id,{},4))))).toEqual([2316611864,1919703141,3050506906,3210628171,2682126738]);
+  const shaped=stockPresets.find(p=>p.id==='water-flat')!.settings;
+  expect(brushStrokeMetadata({...shaped,bbEnabled:true,tsEnabled:true}).brushBlendVersion).toBe(4);
+  const p=newProject();
+  activeLayer(p).operations=ids.slice(0,4).map(id=>stroke(id,{},5));
+  expect(()=>validateProject(JSON.parse(JSON.stringify(p)))).not.toThrow();
+  activeLayer(p).operations=[stroke('soft-paint',{},5)];
+  expect(()=>validateProject(JSON.parse(JSON.stringify(p)))).toThrow();
+ });
+ it('gives rough a broken deposit and flat a firm edge under the same settings',()=>{
+  const m=surface(W,H);for(let i=3;i<m.data.length;i+=4)m.data[i]=255;
+  const options={bbAmount:1,bbFlow:1,bbMix:.25,bbStretch:1,bbSoftness:.55,bbWetness:.5};
+  const path=[{x:75,y:64,p:1},{x:207,y:64,p:1}];
+  const draw=(id:string)=>render({...stroke(id,options,5),id:'water-feel',pressure:false,points:path},m);
+  const before=scene().data;
+  const [smooth,rough,flat]=['water-smooth','water-rough','water-flat'].map(draw);
+  const change=(pixels:Uint8ClampedArray,x:number,y:number)=>Math.abs(pixels[(y*W+x)*4]-before[(y*W+x)*4]);
+  const band=(pixels:Uint8ClampedArray,y:number)=>{
+   let sum=0;for(let x=135;x<157;x++)sum+=change(pixels,x,y);return sum;
+  };
+  expect(band(smooth,64)).toBeGreaterThan(0);
+  expect(band(flat,80)/band(flat,64)).toBeGreaterThan(band(smooth,80)/band(smooth,64)+.12);
+  let gaps=0,painted=0;
+  for(let y=55;y<74;y++)for(let x=135;x<157;x++){
+   if(change(rough,x,y)<2&&change(smooth,x,y)>12)gaps++;
+   if(change(rough,x,y)>12)painted++;
+  }
+  expect(gaps).toBeGreaterThan(10);
+  expect(painted).toBeGreaterThan(10);
  });
 });

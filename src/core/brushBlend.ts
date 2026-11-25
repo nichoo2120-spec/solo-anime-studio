@@ -12,8 +12,12 @@ export const isBlendMode=(v:unknown):v is BlendMode=>typeof v==='string'&&(blend
 export const blendStyles:readonly BlendStyle[]=['water','dry','pencil','ink','air','oil','marker','texture','soft'];
 export const blendStyleNames:Record<BlendStyle,string>={water:'Watercolor',dry:'Dry brush',pencil:'Pencil',ink:'Ink',air:'Airbrush',oil:'Oil paint',marker:'Marker',texture:'Textured',soft:'Soft paint'};
 export const isBlendStyle=(v:unknown):v is BlendStyle=>typeof v==='string'&&(blendStyles as readonly string[]).includes(v);
-export type BrushBlendVersion=1|2|3|4;
-export const isBrushBlendVersion=(v:unknown):v is BrushBlendVersion=>v===1||v===2||v===3||v===4;
+export type BrushBlendVersion=1|2|3|4|5;
+export const isMaterialBrushBlendVersion=(v:unknown):v is 4|5=>v===4||v===5;
+export const isBrushBlendVersion=(v:unknown):v is BrushBlendVersion=>v===1||v===2||v===3||isMaterialBrushBlendVersion(v);
+export function watercolorBlendTip(tip:unknown){
+ return tip==='water-smooth'||tip==='water-wet'||tip==='water-rough'||tip==='water-flat'?tip:undefined;
+}
 export const canBlurBlendStyle=(style:BlendStyle)=>style==='air'||style==='soft';
 
 type BlendTip={brushKind?:string;brushTip?:string;textureStrength?:number;tsEnabled?:boolean;dbEnabled?:boolean;dbTip?:string;mixTipA?:string;mixTipB?:string;mixBlend?:number};
@@ -118,7 +122,11 @@ const clamp01=(v:unknown,fallback:number)=>typeof v==='number'&&Number.isFinite(
  * Paint mode strokes stay byte-identical to v0.5.239. */
 export function brushBlendMetadata(s:BrushBlendSettings&Shape):BrushBlendControls{
  if(!s.bbEnabled||!canBrushBlend(s))return {};
- const defaults=blendDefaultsFor(s),out:BrushBlendControls={brushBlendVersion:4,bbStyle:blendStyleFor(s),bbMode:isBlendMode(s.bbMode)?s.bbMode:defaults.bbMode};
+ const defaults=blendDefaultsFor(s),style=blendStyleFor(s),tip=watercolorBlendTip(s.brushTip);
+ const shaped=s.tsEnabled||s.dbEnabled&&s.dbTip;
+ const edgePreset=tip==='water-wet'&&s.edgeDarkness===1;
+ const version=style==='water'&&tip&&!shaped&&!edgePreset?5:4;
+ const out:BrushBlendControls={brushBlendVersion:version,bbStyle:style,bbMode:isBlendMode(s.bbMode)?s.bbMode:defaults.bbMode};
  for(const [key] of blendLimits)out[key]=clamp01(s[key],defaults[key]);
  out.bbSample=isBlendSample(s.bbSample)?s.bbSample:'layer';
  for(const key of blendFlags)out[key]=typeof s[key]==='boolean'?s[key]:blendDefaults[key];
@@ -140,6 +148,7 @@ export function validBrushBlendStroke(o:Record<string,unknown>){
  if(!present)return true;
  if(!isBrushBlendVersion(o.brushBlendVersion)||o.tool!=='brush')return false;
  if(o.brushBlendVersion===1?o.bbStyle!==undefined:!isBlendStyle(o.bbStyle))return false;
+ if(o.brushBlendVersion===5&&(o.bbStyle!=='water'||!watercolorBlendTip(o.brushTip)||o.stampVersion===1))return false;
  for(const [key] of blendLimits){const v=o[key];if(v!==undefined&&(typeof v!=='number'||!Number.isFinite(v)||v<0||v>1))return false;}
  const hasDynamics=o.brushBlendVersion>=3;
  if(hasDynamics?!isBlendMode(o.bbMode):o.bbMode!==undefined)return false;
