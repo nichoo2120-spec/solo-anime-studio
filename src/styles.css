@@ -731,6 +731,10 @@
 .brush-blend-panel{padding:2px 0}
 .brush-blend-controls{border:0;margin:0;padding:0;min-width:0}
 .brush-blend-controls:disabled{opacity:.45}
+.brush-blend-preview{display:block;width:100%;height:44px;margin:7px 0 10px;border:1px solid #30464d;border-radius:5px;background:#101c22;image-rendering:auto}
+.brush-blend-panel>.silk-presets{grid-template-columns:repeat(4,minmax(0,1fr));margin:7px 0}
+.brush-blend-extras{margin:8px 0}.brush-blend-extras>summary{font-size:10px;color:#a8c1c7;cursor:pointer;margin:4px 0 8px}
+.brush-blend-actions{justify-content:flex-start;flex-wrap:wrap;gap:5px}.brush-blend-actions>button{padding:5px 7px}
 /* v0.5.241 Tip shape, Dual brush, My brushes */
 .stamp-preview{display:block;width:100%;max-width:320px;height:auto;aspect-ratio:320/92;margin:6px 0 10px;border:1px solid #2c4048;border-radius:7px;background:#0f191e}
 .brush-shape-panel,.my-brushes-panel{padding:2px 0}

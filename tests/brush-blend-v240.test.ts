@@ -3,7 +3,7 @@ import {stockPresets,newBrushLibrary,restoreBrushLibrary,updatePreset,activePres
 import {brushStrokeMetadata} from '../src/core/paintTips';
 import {newProject,activeLayer,validateProject,appendOperation,type Stroke,type Point} from '../src/core/model';
 import {DocumentStore} from '../src/core/history';
-import {blendDefaults,blendPresets,brushBlendMetadata,canBrushBlend} from '../src/core/brushBlend';
+import {blendDefaultsFor,blendPresets,brushBlendMetadata,canBrushBlend} from '../src/core/brushBlend';
 import {renderBrushBlend,applyBrushBlendLive,resetBrushBlend,decodeCarry} from '../src/engine/brushBlend';
 import {initialShortcuts,normalizeShortcuts,commandLabels} from '../src/core/shortcuts';
 
@@ -27,7 +27,7 @@ function stroke(points:Point[],blend:Record<string,unknown>={},patch:Partial<Str
  const settings={...paint.settings,bbEnabled:true,...blend};
  const {bbEnabled:_e,...plain}=settings;
  // v0.5.240 strokes (brushBlendVersion 1): the frozen v1 recipe is tested here; v2 lives in brush-blend-v242.test.ts.
- const {bbStyle:_st,...meta}=brushStrokeMetadata(settings) as Record<string,unknown>;
+ const {bbStyle:_st,...meta}=brushStrokeMetadata(settings) as Record<string,unknown>;for(const key of ['bbMode','bbColorCarry','bbSoftness','bbTextureKeep','bbSmoothing','bbEdgeDarkness'])delete meta[key];
  return {...plain,...meta,brushBlendVersion:1,id:'bb',kind:'stroke',tool:'brush',color:'#00ff00',size:40,opacity:1,pressure:true,response:1,points,...patch} as Stroke;
 }
 const line=(x0:number,x1:number,y:number,n=60)=>Array.from({length:n},(_,i)=>{const t=i/(n-1);return {x:x0+(x1-x0)*t,y,p:.4+.6*Math.sin(t*Math.PI)};});
@@ -44,7 +44,7 @@ describe('Paint / Blend switch v0.5.240',()=>{
   for(const p of stockPresets){const m=brushStrokeMetadata(p.settings) as Record<string,unknown>;expect(Object.keys(m).filter(k=>k.startsWith('bb')||k==='brushBlendVersion'),p.id).toEqual([]);
    const off=brushStrokeMetadata({...p.settings,bbEnabled:false,bbAmount:.2,bbSample:'all'});expect(JSON.stringify(off),p.id).toBe(JSON.stringify(m));}
   expect(brushBlendMetadata({brushKind:'paint'})).toEqual({});
-  expect(brushStrokeMetadata({...paint.settings,bbEnabled:true})).toMatchObject({brushBlendVersion:2,bbStyle:'soft',...blendDefaults});
+  expect(brushStrokeMetadata({...paint.settings,bbEnabled:true})).toMatchObject({brushBlendVersion:4,bbStyle:'soft',...blendDefaultsFor(paint.settings)});
  });
  it('Blend mode adds no brush colour and blends the colours already there',()=>{
   const s=stroke(line(120,320,100)),c=run(s),before=scene().data;let changed=0,green=0;
@@ -60,7 +60,7 @@ describe('Paint / Blend switch v0.5.240',()=>{
  it('every setting changes the result, and presets set documented values',()=>{
   const pts=line(120,320,100),ref=hash(run(stroke(pts)).data);
   for(const [k,v] of [['bbAmount',.3],['bbPickup',1],['bbWetness',1],['bbMix',0],['bbFlow',.2],['bbStretch',0],['bbPaintLoad',.5],['bbPressure',false]] as const)expect(hash(run(stroke(pts,{[k]:v})).data),k).not.toBe(ref);
-  expect(blendPresets.map(p=>p.name)).toEqual(['Soft blend','Smudge','Wet mix']);
+  expect(blendPresets.map(p=>p.name)).toEqual(['Soft blend','Wet blend','Dry blend','Smudge blend']);
   expect(hash(run(stroke(pts,{bbAmount:0})).data)).toBe(hash(scene().data));
  });
  it('Protect transparency never adds alpha to empty pixels',()=>{

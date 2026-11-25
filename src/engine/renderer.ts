@@ -1,3 +1,4 @@
+import {isBrushBlendVersion} from '../core/brushBlend';
 import {drawStampStroke} from './stampBrush';
 import {decodeBlendSample,hasBlendSample} from './brushBlend';
 import {resetPigmentMix} from './pigmentMix';
@@ -141,7 +142,7 @@ export class LayerRenderer {
  private historyPatch(layer:Layer,op:Layer['operations'][number],index:number,width:number,height:number){const d=this.deltaLookup.get(op);return d&&d.id===layer.id&&d.width===width&&d.height===height&&d.prefix.length===index&&d.prefix.every((o,i)=>o===layer.operations[i])?d:undefined;}
  async prepare(project:Project){
   // v0.5.240 Blend mode "All layers": decode each stroke's saved page sample.
-  const blendSamples=project.layers.flatMap(l=>l.operations).filter((o):o is Stroke=>o.kind==='stroke'&&(o.brushBlendVersion===1||o.brushBlendVersion===2)&&!!o.bbSamplePng&&!!o.bbSampleRect&&!hasBlendSample(o.bbSamplePng));
+  const blendSamples=project.layers.flatMap(l=>l.operations).filter((o):o is Stroke=>o.kind==='stroke'&&isBrushBlendVersion(o.brushBlendVersion)&&!!o.bbSamplePng&&!!o.bbSampleRect&&!hasBlendSample(o.bbSamplePng));
   if(blendSamples.length)await Promise.all(blendSamples.map(o=>decodeBlendSample(o.bbSamplePng!,o.bbSampleRect!).catch(()=>undefined)));
   const images=project.layers.flatMap(l=>l.operations).filter(o=>o.kind==='fill'||o.kind==='image');
   await Promise.all(images.map(async o=>{

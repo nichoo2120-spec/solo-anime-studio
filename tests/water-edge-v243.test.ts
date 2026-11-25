@@ -27,7 +27,8 @@ const line=(x0:number,x1:number,y:number,n=60)=>Array.from({length:n},(_,i)=>{co
 function mask(points:Point[],r=26){const m=surface(W,H);for(let y=0;y<H;y++)for(let x=0;x<W;x++){for(const p of points)if(Math.hypot(x-p.x,y-p.y)<r){m.data[(y*W+x)*4+3]=255;break;}}return m;}
 function make(id:string,extra:Record<string,unknown>={},patch:Partial<Stroke>={}):Stroke{
  const p=stockPresets.find(p=>p.id===id)!;const settings={...p.settings,...extra};const {bbEnabled:_b,...plain}=settings as Record<string,unknown>;
- return {...plain,...brushStrokeMetadata(settings as never),id:'edge-'+id,kind:'stroke',tool:'brush',color:'#00ff00',size:60,opacity:1,pressure:true,response:1,points:line(40,380,100),...patch} as Stroke;
+ const metadata=brushStrokeMetadata(settings as never);
+ return {...plain,...metadata,id:'edge-'+id,kind:'stroke',tool:'brush',color:'#00ff00',size:60,opacity:1,pressure:true,response:1,points:line(40,380,100),...patch} as Stroke;
 }
 /** Mean luminance change per row across the stroke (columns 80..340):
  * edge = darkest row in the outer band, centre = middle rows, light = brightest row at/just outside the border. */
@@ -39,7 +40,7 @@ describe('water edge v0.5.243',()=>{
  it('new strokes of every normal watercolor brush, Silk Wet and Blend watercolor save Edge darkness 0; only Watercolor Edge keeps it',()=>{
   const water=stockPresets.filter(p=>isNewWatercolorTip(p.settings.brushTip));
   expect(water.map(p=>p.id)).toEqual(['water-smooth','water-rough','water-wet','water-flat','water-gradient','water-edge']);
-  for(const p of water){const s=make(p.id),b=make(p.id,{bbEnabled:true});const want=p.id==='water-edge'?1:0;expect(s.edgeDarkness,p.id).toBe(want);expect(b.edgeDarkness,p.id+' blend').toBe(want);expect(b.brushBlendVersion).toBe(2);}
+  for(const p of water){const s=make(p.id),b=make(p.id,{bbEnabled:true});const want=p.id==='water-edge'?1:0;expect(s.edgeDarkness,p.id).toBe(want);expect(b.edgeDarkness,p.id+' blend').toBe(want);expect(b.brushBlendVersion).toBe(4);expect(b.bbEdgeDarkness).toBe(want);}
   expect(stockPresets.find(p=>p.id==='water-edge')!.name).toBe('Watercolor Edge');
   expect(make('silk-blend',silkWet).edgeDarkness).toBe(0);
   expect(make('silk-blend',{silkMode:'soft'}).edgeDarkness).toBeUndefined();
@@ -61,13 +62,14 @@ describe('water edge v0.5.243',()=>{
  for(const id of ['water-wet','water-rough','water-flat'])it(id+' in Blend mode: no dark border and no lighter rim; v0.5.242 strokes unchanged',()=>{
   const s=make(id,{bbEnabled:true}),m=mask(s.points);
   const c=flat(),before=c.data.slice();renderBrushBlend(c.ctx,m.canvas,s);const r=rim(before,c.data);expect(r.edge).toBeGreaterThan(-1.5);expect(r.light).toBeLessThan(1.5);
-  const legacy={...s,edgeDarkness:undefined},o=flat(),ob=o.data.slice();renderBrushBlend(o.ctx,m.canvas,legacy);expect(rim(ob,o.data).edge).toBeLessThan(-3);
+  const {bbMode:_mode,bbColorCarry:_carry,bbSoftness:_softness,bbTextureKeep:_texture,bbSmoothing:_smoothing,bbEdgeDarkness:_edge,...rest}=s;
+  const legacy:Stroke={...rest,brushBlendVersion:2,edgeDarkness:undefined},o=flat(),ob=o.data.slice();renderBrushBlend(o.ctx,m.canvas,legacy);expect(rim(ob,o.data).edge).toBeLessThan(-3);
   const one=flat();renderBrushBlend(one.ctx,m.canvas,{...legacy,edgeDarkness:1});expect(hash(one.data)).toBe(hash(o.data));
  });
  it('Watercolor Edge in Blend mode keeps the darker wet edge, and Edge darkness 0 removes it',()=>{
   const s=make('water-edge',{bbEnabled:true}),m=mask(s.points);
   const c=flat(),b=c.data.slice();renderBrushBlend(c.ctx,m.canvas,s);const strong=rim(b,c.data).edge;
-  const z=flat(),zb=z.data.slice();renderBrushBlend(z.ctx,m.canvas,{...s,edgeDarkness:0});const none=rim(zb,z.data).edge;
+  const z=flat(),zb=z.data.slice();renderBrushBlend(z.ctx,m.canvas,{...s,bbEdgeDarkness:0});const none=rim(zb,z.data).edge;
   expect(strong).toBeLessThan(-3);expect(none).toBeGreaterThan(-1.5);
  });
 });
