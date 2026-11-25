@@ -30,10 +30,13 @@ test('a 500-stroke Ink session stays responsive and keeps exact undo pixels',asy
   };
   for(let i=-5;i<500;i++){
    const current:number[]=[];
+   // Measure each frame of strokes 1 and 500. With only eight samples,
+   // their p95 would be the maximum and include a single scheduler stall.
+   const sampleEvery=i===0||i===499?1:4;
    pointer('pointerdown',i+5,0);
    for(let j=1;j<=32;j++){
     pointer('pointermove',i+5,j);
-    if(j%4===0){const started=performance.now();engine.render();current.push(performance.now()-started);}
+    if(j%sampleEvery===0){const started=performance.now();engine.render();current.push(performance.now()-started);}
    }
    const started=performance.now();pointer('pointerup',i+5,32);engine.render();const up=performance.now()-started;
    if(i<0)continue;
