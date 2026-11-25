@@ -1,6 +1,6 @@
 import {expect,test} from '@playwright/test';
 
-test('New Blend strokes keep the real custom brush mask and matches worker final pixels',async({page})=>{
+test('New Blend strokes keep the real custom brush mask and match worker final pixels',async({page})=>{
  await page.goto('/');
  const result=await page.evaluate(async()=>{
   const {stockPresets}=await import('/src/core/brushes.ts');
@@ -221,13 +221,53 @@ test('pen-down captures Blend settings independently of ordinary Paint pressure'
   send('pointerdown',230,.1);send('pointerup',260,0);
   engine.setInput('brush',{...watercolor,pressureOpacity:true});
   send('pointerdown',270,.1);send('pointerup',310,0);
-  return activeLayer(store.getSnapshot()).operations.map((s:{brushBlendVersion?:number;bbStrength?:number;bbPressure?:boolean;bbPressureCurve?:string;pressureFlow?:boolean;pressureOpacity?:boolean;pressureWidth?:boolean})=>[
-   s.brushBlendVersion??null,s.bbStrength??null,s.bbPressure??null,s.bbPressureCurve??null,s.pressureFlow,s.pressureOpacity,s.pressureWidth,
+  return activeLayer(store.getSnapshot()).operations.map((s:{brushBlendVersion?:number;bbStrength?:number;bbPressure?:boolean;bbPressureCurve?:string;pressureFlow?:boolean;pressureOpacity?:boolean;pressureWidth?:boolean;minSize?:number})=>[
+   s.brushBlendVersion??null,s.bbStrength??null,s.bbPressure??null,s.bbPressureCurve??null,s.pressureFlow,s.pressureOpacity,s.pressureWidth,s.minSize,
   ]);
  });
  expect(result).toEqual([
-  [6,1,false,'linear',false,false,true],
-  [6,1.6,true,'firm',false,false,true],
-  [null,null,null,null,true,true,true],
+  [6,1,false,'linear',false,false,true,expect.closeTo(.865,5)],
+  [6,1.6,true,'firm',false,false,true,expect.closeTo(.865,5)],
+  [null,null,null,null,true,true,true,.1],
  ]);
+});
+
+test('real stock brush masks keep light-pressure blending strong across families',async({page})=>{
+ await page.goto('/');
+ const result=await page.evaluate(async()=>{
+  const bp='/src/core/brushes.ts',mp='/src/core/paintTips.ts',cp='/src/core/brushBlend.ts',rp='/src/engine/renderer.ts',ep='/src/engine/brushBlend.ts';
+  const {stockPresets}=await import(bp),{brushStrokeMetadata}=await import(mp),{prepareBlendMaskPressure}=await import(cp);
+  const {drawStroke}=await import(rp),{renderBrushBlend}=await import(ep);
+  const setup=()=>{
+   const canvas=document.createElement('canvas');
+   canvas.width=420;canvas.height=200;
+   return canvas.getContext('2d',{willReadFrequently:true})!;
+  };
+  const mask=setup(),out=setup();
+  return ['water-smooth','water-wet','water-rough','water-flat','dry-paint','paint','hb','g-pen','marker','color-air'].map(id=>{
+   const settings=stockPresets.find((p:{id:string})=>p.id===id).settings;
+   const strengths=[.1,.5,1].map(p=>{
+    const stroke={
+     ...settings,...brushStrokeMetadata({...settings,bbEnabled:true}),
+     id:'pressure-swatch',kind:'stroke',tool:'brush',pressure:true,size:85,
+     points:[{x:65,y:100,p,v:.65},{x:345,y:100,p,v:.65}],
+    };
+    prepareBlendMaskPressure(stroke);
+    out.fillStyle='#f23535';out.fillRect(0,0,210,200);
+    out.fillStyle='#154aea';out.fillRect(210,0,210,200);
+    mask.clearRect(0,0,420,200);
+    drawStroke(mask,stroke);renderBrushBlend(out,mask.canvas,stroke);
+    const coverage=mask.getImageData(210,0,30,200).data,pixels=out.getImageData(210,0,30,200).data;
+    let area=0,delta=0;
+    for(let i=0;i<pixels.length;i+=4){area+=coverage[i+3]/255;delta+=Math.abs(pixels[i]-21);}
+    return delta/Math.max(1,area);
+   });
+   return {id,strengths};
+  });
+ });
+ for(const {id,strengths:[light,medium,full]} of result){
+  expect(full,id).toBeGreaterThan(1);
+  expect(light,id).toBeGreaterThanOrEqual(.7*full);
+  expect(medium,id).toBeGreaterThanOrEqual(.7*full);
+ }
 });

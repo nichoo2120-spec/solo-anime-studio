@@ -1,3 +1,5 @@
+import type {Stroke} from './model';
+
 /** v0.5.240 Paint/Blend switch for every paint brush (settings + stroke metadata).
  * In Blend mode a brush adds no colour: it blends the colours already on the
  * layer, shaped by that brush's own tip, texture, grain, pressure and spacing.
@@ -154,6 +156,18 @@ export function brushBlendMetadata(s:BrushBlendSettings&Shape):BrushBlendControl
  if(!s.bbEnabled||!canBrushBlend(s))return {};
  const settings=brushBlendSettingsFor(s);
  return {...settings,brushBlendVersion:6,bbStyle:blendStyleFor(s)};
+}
+/** Freeze the pressure channels used by the paint-shaped mask at pen-down.
+ * An unshaped Blend nib stays close to its selected size at light pressure.
+ * Shaped stamps keep their authored pressure envelope and secondary tip. */
+export function prepareBlendMaskPressure(stroke:Stroke){
+ if(stroke.brushBlendVersion!==6)return;
+ stroke.pressureOpacity=false;
+ stroke.pressureFlow=false;
+ if(stroke.stampVersion!==1&&stroke.pressure&&stroke.pressureWidth!==false){
+  const min=stroke.minSize??.06,max=Math.max(min,stroke.maxSize??1);
+  stroke.minSize=max-(max-min)*.15;
+ }
 }
 /** Keeps only valid saved blend settings on a brush. */
 export function sanitizeBrushBlend(p:Partial<BrushBlendSettings>,result:BrushBlendSettings&Shape,fallback:BrushBlendSettings){
