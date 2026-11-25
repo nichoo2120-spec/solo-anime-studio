@@ -5,6 +5,7 @@ import {brushStrokeMetadata} from '../core/paintTips';
 import {drawModernStroke} from '../engine/brushRaster';
 import {compositePaintStroke} from '../engine/paintCompositing';
 import {Pickup} from '../engine/mixing';
+import {isSilkBlendActive} from '../core/silkBlend';
 import {useSurfaceSize} from './useSurfaceSize';
 type PreviewOptions={settings:BrushSettings;section:string;eraser?:boolean;width:number;height:number;dpr:number};
 /** The same brush raster and layer compositing used by the drawing canvas. */
@@ -17,14 +18,15 @@ export function renderBrushPreview(c:HTMLCanvasElement,mask:HTMLCanvasElement,{s
  // One natural gesture in every section. Never add periodic hand jitter to
  // demonstrate smoothing: it invents a rope-like stroke the artist did not draw.
  const points=Array.from({length:180},(_,i)=>{const t=i/179;return {x:(12+t*(width-24))*scale,y:(height*.5-Math.sin(t*Math.PI*2)*height*.15)*scale,p:.06+Math.sin(t*Math.PI)*.94,v:.2+.8*Math.sin(t*Math.PI*2)**2};});
- const mix=!eraser&&!!settings.nativeMixEnabled,pickup=!eraser&&!mix&&!!(settings.mixColors||settings.watercolorMode==='wet'),blender=settings.brushTip==='color-blender'||settings.brushKind==='silk-blend';
+ const silk=!eraser&&isSilkBlendActive(settings);
+ const mix=!eraser&&!silk&&!!settings.nativeMixEnabled,pickup=!eraser&&!silk&&!mix&&!!(settings.mixColors||settings.watercolorMode==='wet'),blender=settings.brushTip==='color-blender'||silk;
  const s:Stroke={...settings,...brushStrokeMetadata(settings),size,captureZoom:1/scale,inkProfileLength:settings.inkProfileLength===undefined?undefined:settings.inkProfileLength*scale,inkFlowLength:settings.inkFlowLength===undefined?undefined:settings.inkFlowLength*scale,inkGrainScale:(settings.inkGrainScale??1)*scale,inkImageScale:(settings.inkImageScale??1)*scale,kind:'stroke',id:'preview',tool:eraser?'eraser':'brush',points,color:mix?settings.color:'#d9e2e5',pressure:settings.pressure,
   nativeMixVersion:mix?3:undefined,nativeMixPickupVersion:mix?3:undefined,nativeMixAmount:mix?settings.mixAmount??.58:undefined,nativeMixRadius:mix?Math.max(.02,Math.min(1,(settings.mixPickupLen??1)/2)):undefined,nativeMixPaintLoad:mix?settings.mixPaintLoad??0:undefined};
  // Mixing and erasing need existing paint to act on; a blank thumbnail hides
  // their controls. Keep this sample local and independent of the artist's scene.
  if(mix||pickup||eraser||blender){const colors=['#53828f','#ba8b74','#7f829f'];for(let i=0;i<3;i++){ctx.fillStyle=colors[i];ctx.fillRect((10+i*(width-20)/3)*scale,6*scale,(width-20)/3*scale,(height-12)*scale);}}
  if(pickup){s.mixStops=[];s.mixVersion=2;new Pickup(c,settings.mixAmount??.55).update(s);}
- drawModernStroke(mc,s);
+ if(!s.silkBlendVersion)drawModernStroke(mc,s);
  if(blender&&!mix&&!eraser){
   // Blender's live compositor retains a gesture for its target surface. Each
   // thumbnail is a fresh gesture over the sample paint, never an append to it.

@@ -1,9 +1,10 @@
 import {describe,it,expect} from 'vitest';
-import {stockPresets,newBrushLibrary,restoreBrushLibrary,updatePreset,activePreset} from '../src/core/brushes';
+import {stockPresets,newBrushLibrary,restoreBrushLibrary,updatePreset,activePreset,createCustomBrush,mergeCustomBrushes} from '../src/core/brushes';
+import {compositePaintStroke} from '../src/engine/paintCompositing';
 import {brushStrokeMetadata} from '../src/core/paintTips';
 import {newProject,activeLayer,validateProject,appendOperation,type Stroke,type Point} from '../src/core/model';
 import {DocumentStore} from '../src/core/history';
-import {silkPresets,silkModes,silkStrokeMetadata,type SilkMode} from '../src/core/silkBlend';
+import {silkPresets,silkModes,silkStrokeMetadata,isSilkBlendActive,type SilkMode} from '../src/core/silkBlend';
 import {renderSilkStroke,applySilkBlend,resetSilkBlend,SilkGesture} from '../src/engine/silkBlend';
 
 /** Minimal byte-exact 2D context: enough for the Silk renderer's tile I/O. */
@@ -30,7 +31,8 @@ function scene(kind:'split'|'edge'|'stripes'='split'){
 }
 const silk=stockPresets.find(p=>p.id==='silk-blend')!;
 function stroke(mode:SilkMode,points:Point[],patch:Partial<Stroke>={}):Stroke{
- const settings={...silk.settings,silkMode:mode,silkTexture:mode==='dry'?.65:0};
+ const {bbEnabled:_enabled,bbRenderStyle:_style,...legacy}=silk.settings;
+ const settings={...legacy,silkMode:mode,silkTexture:mode==='dry'?.65:0};
  return {...settings,...brushStrokeMetadata(settings),id:'silk-'+mode,kind:'stroke',tool:'brush',color:'#00ff00',size:60,opacity:1,pressure:true,response:1,points,...patch} as Stroke;
 }
 const line=(x0:number,x1:number,y:number,n=60,p=(t:number)=>.4+.6*Math.sin(t*Math.PI))=>Array.from({length:n},(_,i)=>{const t=i/(n-1);return {x:x0+(x1-x0)*t,y,p:p(t)};});
@@ -108,7 +110,7 @@ describe('Silk Blend v0.5.238',()=>{
   const bad=JSON.parse(JSON.stringify(lib));bad.presets.find((p:{id:string})=>p.id==='silk-blend').settings={...bad.presets.find((p:{id:string})=>p.id==='silk-blend').settings,silkMode:'lava',silkStrength:7,silkPickup:-2,silkWetness:'x'};
   expect(activePreset(restoreBrushLibrary(bad)).settings).toMatchObject({silkMode:'soft',silkStrength:1,silkPickup:0,silkWetness:.35});
   const other=restoreBrushLibrary(JSON.parse(JSON.stringify({...lib,presets:lib.presets.map(p=>p.id==='hb'?{...p,settings:{...p.settings,silkMode:'dry',silkStrength:.5}}:p)})));
-  expect(other.presets.find(p=>p.id==='hb')!.settings.silkMode).toBeUndefined();
+  expect(other.presets.find(p=>p.id==='hb')!.settings).toMatchObject({silkMode:'dry',silkStrength:.5});
  });
  it('presets and Reset return the documented values',()=>{
   let lib=newBrushLibrary();
@@ -141,4 +143,50 @@ describe('Silk Blend v0.5.238',()=>{
   for(const n of [3,10,40,41,80,120])applySilkBlend(live.ctx,undefined,{...full,points:full.points.slice(0,n)},0,0,undefined,base.canvas);
   expect(hash(live.data)).toBe(hash(smooth.data));
  });
+});
+
+it.each(['soft','wet','smudge','dry'] as const)('Silk style uses the same %s pixels as the original brush',mode=>{
+ const settings={...silk.settings,brushKind:'g-pen',bbEnabled:true,bbRenderStyle:'silk' as const,tsEnabled:true,
+  silkMode:mode,silkTexture:mode==='dry'?.65:0};
+ const old=stroke(mode,line(95,320,100));
+ const next:Stroke={...old,brushKind:'g-pen',...brushStrokeMetadata(settings)};
+ expect(next).toMatchObject({silkBlendVersion:2,silkMode:mode});
+ expect(next.brushBlendVersion).toBeUndefined();
+ expect(next.stampVersion).toBeUndefined();
+ const a=scene(),b=scene();
+ renderSilkStroke(a.ctx,old);
+ compositePaintStroke(b.ctx,b.canvas,next);
+ expect(a.data).toEqual(b.data);
+});
+
+it('migrates legacy Silk settings and project brushes without rewriting saved strokes',()=>{
+ const legacyLibrary=newBrushLibrary();
+ const {bbEnabled:_enabled,bbRenderStyle:_style,...legacy}=silk.settings;
+ const legacyPresets=legacyLibrary.presets.map(p=>p.id==='silk-blend'?{...p,defaults:legacy,settings:{...legacy,silkMode:'wet'}}:p);
+ const back=restoreBrushLibrary(JSON.parse(JSON.stringify({...legacyLibrary,brushId:'silk-blend',presets:legacyPresets})));
+ expect(activePreset(back).settings).toMatchObject({bbEnabled:true,bbRenderStyle:'silk',silkMode:'wet'});
+ const project=newProject();
+ project.customBrushes=[{...silk,id:'old-silk-import',name:'Legacy Silk',custom:true,defaults:legacy,settings:legacy}];
+ activeLayer(project).operations=[stroke('wet',line(10,90,40,10),{silkBlendVersion:1}),stroke('dry',line(10,90,80,10))];
+ const bytes=JSON.stringify(project.layers),loaded=validateProject(JSON.parse(JSON.stringify(project)));
+ const merged=mergeCustomBrushes(legacyLibrary,loaded.customBrushes);
+ expect(JSON.stringify(loaded.layers)).toBe(bytes);
+ expect(merged.library.presets.find(p=>p.id==='old-silk-import')?.settings).toMatchObject({bbEnabled:true,bbRenderStyle:'silk'});
+});
+
+it('keeps Silk settings per brush, through Paint and other styles, and in My brushes',()=>{
+ const lib=newBrushLibrary(),brush=activePreset(lib);
+ const selected={...brush.settings,bbEnabled:true,bbRenderStyle:'silk' as const,silkMode:'dry' as const,silkTexture:.89,silkStrength:.6};
+ const saved=createCustomBrush(lib,'My Silk pencil',brush,selected);
+ const id=saved.brushId;
+ const off=updatePreset(saved,id,{...activePreset(saved).settings,bbRenderStyle:'auto'});
+ const back=restoreBrushLibrary(JSON.parse(JSON.stringify(off)));
+ const custom=activePreset(back);
+ expect(custom.defaults).toMatchObject(selected);
+ expect(custom.settings).toMatchObject({bbRenderStyle:'auto',silkMode:'dry',silkTexture:.89,silkStrength:.6});
+ const silkAgain=updatePreset(back,id,{...custom.settings,bbRenderStyle:'silk'});
+ expect(isSilkBlendActive(activePreset(silkAgain).settings)).toBe(true);
+ const paint={...activePreset(silkAgain).settings,bbEnabled:false};
+ expect(brushStrokeMetadata(paint).silkBlendVersion).toBeUndefined();
+ expect(back.presets.find(p=>p.id==='hb')?.settings.silkStrength).toBeUndefined();
 });

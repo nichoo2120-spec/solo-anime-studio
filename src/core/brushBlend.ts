@@ -1,4 +1,5 @@
 import type {Stroke} from './model';
+import {isSilkBlendActive,isSilkBrush} from './silkBlend';
 
 /** v0.5.240 Paint/Blend switch for every paint brush (settings + stroke metadata).
  * In Blend mode a brush adds no colour: it blends the colours already on the
@@ -17,7 +18,7 @@ export const isBlendStyle=(v:unknown):v is BlendStyle=>typeof v==='string'&&(ble
 export type BrushBlendVersion=1|2|3|4|5|6;
 export const blendPressureCurves=['soft','linear','firm'] as const;
 export type BlendPressureCurve=(typeof blendPressureCurves)[number];
-export const blendRenderStyles={auto:'Auto (brush family)',blur:'Soft blur',wet:'Wet',smudge:'Smudge',dry:'Dry'} as const;
+export const blendRenderStyles={auto:'Auto (brush family)',silk:'Silk',blur:'Soft blur',wet:'Wet',smudge:'Smudge',dry:'Dry'} as const;
 export type BlendRenderStyle=keyof typeof blendRenderStyles;
 const isBlendPressureCurve=(v:unknown):v is BlendPressureCurve=>v==='soft'||v==='linear'||v==='firm';
 const isBlendRenderStyle=(v:unknown):v is BlendRenderStyle=>typeof v==='string'&&Object.hasOwn(blendRenderStyles,v);
@@ -128,6 +129,7 @@ export function blendDefaultsFor(s:BlendTip&{stabilization?:number;edgeDarkness?
 }
 export function brushBlendSettingsFor(s:Partial<BrushBlendSettings>&BlendTip&{stabilization?:number;edgeDarkness?:number}):typeof blendDefaults{
  const base=blendDefaultsFor(s),out={...base};
+ if(isSilkBrush(s))out.bbRenderStyle='silk';
  for(const [key,min,max] of blendLimits)out[key]=bounded(s[key],base[key],min,max);
  if(isBlendMode(s.bbMode))out.bbMode=s.bbMode;
  if(isBlendSample(s.bbSample))out.bbSample=s.bbSample;
@@ -146,14 +148,14 @@ export const blendPresets:{id:BlendPresetId;name:string;values:Partial<BrushBlen
  {id:'blend-smudge',name:'Smudge blend',values:{bbMode:'smudge',bbAmount:1,bbPickup:.2,bbWetness:.15,bbMix:.15,bbFlow:.75,bbStretch:.75,bbColorCarry:.88,bbSoftness:.3,bbTextureKeep:.2}},
 ];
 type Shape=BlendTip&{stabilization?:number;edgeDarkness?:number};
-/** Every paint brush can blend, except brushes that are already blenders. */
-export const canBrushBlend=(s:Shape|undefined)=>!!s&&s.brushKind!=='silk-blend'&&s.brushTip!=='color-blender';
+/** Erasers use their own controls. A paint brush can select any Blend style. */
+export const canBrushBlend=(s:Shape|undefined)=>!!s&&!s.brushKind?.startsWith('eraser-');
 export const isBlendSample=(v:unknown):v is BlendSample=>v==='layer'||v==='all';
 const bounded=(v:unknown,fallback:number,min:number,max:number)=>typeof v==='number'&&Number.isFinite(v)?Math.max(min,Math.min(max,v)):fallback;
 /** Stroke metadata. Only brushes with Blend switched on get these fields, so
  * Paint mode strokes stay byte-identical to v0.5.239. */
 export function brushBlendMetadata(s:BrushBlendSettings&Shape):BrushBlendControls{
- if(!s.bbEnabled||!canBrushBlend(s))return {};
+ if(!s.bbEnabled||!canBrushBlend(s)||isSilkBlendActive(s))return {};
  const settings=brushBlendSettingsFor(s);
  return {...settings,brushBlendVersion:6,bbStyle:blendStyleFor(s)};
 }
@@ -178,6 +180,7 @@ export function sanitizeBrushBlend(p:Partial<BrushBlendSettings>,result:BrushBle
  if(isBlendMode(p.bbMode))result.bbMode=p.bbMode;else if(fallback.bbMode===undefined)delete result.bbMode;
  if(isBlendPressureCurve(p.bbPressureCurve))result.bbPressureCurve=p.bbPressureCurve;else if(fallback.bbPressureCurve===undefined)delete result.bbPressureCurve;
  if(isBlendRenderStyle(p.bbRenderStyle))result.bbRenderStyle=p.bbRenderStyle;else if(fallback.bbRenderStyle===undefined)delete result.bbRenderStyle;
+ if(isSilkBrush(result)){result.bbEnabled??=true;result.bbRenderStyle??='silk';}
  if(isBlendSample(p.bbSample))result.bbSample=p.bbSample;else if(fallback.bbSample===undefined)delete result.bbSample;
  for(const key of blendFlags){if(typeof p[key]==='boolean')result[key]=p[key];else if(fallback[key]===undefined)delete result[key];}
 }
@@ -190,7 +193,7 @@ export function validBrushBlendStroke(o:Record<string,unknown>){
  if(o.brushBlendVersion===5&&(o.bbStyle!=='water'||!watercolorBlendTip(o.brushTip)||o.stampVersion===1))return false;
  for(const [key,min,max] of blendLimits){const v=o[key];if(v!==undefined&&(typeof v!=='number'||!Number.isFinite(v)||v<min||v>max))return false;}
  if(o.brushBlendVersion===6){
-  if(!isBlendPressureCurve(o.bbPressureCurve)||!isBlendRenderStyle(o.bbRenderStyle)||typeof o.bbStrength!=='number'||typeof o.bbMinPressure!=='number')return false;
+  if(!isBlendPressureCurve(o.bbPressureCurve)||!isBlendRenderStyle(o.bbRenderStyle)||o.bbRenderStyle==='silk'||typeof o.bbStrength!=='number'||typeof o.bbMinPressure!=='number')return false;
  }else if(o.bbPressureCurve!==undefined||o.bbRenderStyle!==undefined||o.bbStrength!==undefined||o.bbMinPressure!==undefined)return false;
  const hasDynamics=o.brushBlendVersion>=3;
  if(hasDynamics?!isBlendMode(o.bbMode):o.bbMode!==undefined)return false;

@@ -35,14 +35,15 @@ const hash=(d:Uint8ClampedArray)=>{let h=2166136261;for(let i=0;i<d.length;i++){
 const run=(s:Stroke,grain=false)=>{const c=scene(),m=mask(s.points,26,grain);renderBrushBlend(c.ctx,m.canvas,s);return c;};
 
 describe('Paint / Blend switch v0.5.240',()=>{
- it('every paint brush can blend; blenders and erasers do not get the switch',()=>{
+ it('paint brushes and blender presets can switch styles, while erasers stay separate',()=>{
   const can=stockPresets.filter(p=>p.category!=='Eraser'&&canBrushBlend(p.settings)).map(p=>p.id);
   expect(can).toContain('hb');expect(can).toContain('g-pen');expect(can).toContain('paint');expect(can).toContain('water-wet');expect(can).toContain('color-air');
-  expect(can).not.toContain('silk-blend');expect(can).not.toContain('color-blender');expect(can).not.toContain('wet-mix');
+  expect(can).toContain('silk-blend');expect(can).toContain('color-blender');
+  expect(canBrushBlend(stockPresets.find(p=>p.id==='eraser-hard')!.settings)).toBe(false);expect(can).toContain('wet-mix');
  });
  it('Paint mode strokes carry no new fields, so old and Paint drawings stay byte-identical',()=>{
   for(const p of stockPresets){const m=brushStrokeMetadata(p.settings) as Record<string,unknown>;expect(Object.keys(m).filter(k=>k.startsWith('bb')||k==='brushBlendVersion'),p.id).toEqual([]);
-   const off=brushStrokeMetadata({...p.settings,bbEnabled:false,bbAmount:.2,bbSample:'all'});expect(JSON.stringify(off),p.id).toBe(JSON.stringify(m));}
+   const off=brushStrokeMetadata({...p.settings,bbEnabled:false,bbAmount:.2,bbSample:'all'});if(p.id==='silk-blend')expect(off.silkBlendVersion).toBeUndefined();else expect(JSON.stringify(off),p.id).toBe(JSON.stringify(m));}
   expect(brushBlendMetadata({brushKind:'paint'})).toEqual({});
   expect(brushStrokeMetadata({...paint.settings,bbEnabled:true})).toMatchObject({brushBlendVersion:6,bbStyle:'soft',...blendDefaultsFor(paint.settings)});
  });
@@ -89,7 +90,7 @@ describe('Paint / Blend switch v0.5.240',()=>{
   expect(activePreset(restoreBrushLibrary(bad)).settings).toMatchObject({bbAmount:1,bbPickup:0});
   expect(activePreset(restoreBrushLibrary(bad)).settings.bbSample).not.toBe('moon');
   const silk=restoreBrushLibrary(JSON.parse(JSON.stringify({...lib,presets:lib.presets.map(p=>p.id==='silk-blend'?{...p,settings:{...p.settings,bbEnabled:true}}:p)})));
-  expect(silk.presets.find(p=>p.id==='silk-blend')!.settings.bbEnabled).toBeUndefined();
+  expect(silk.presets.find(p=>p.id==='silk-blend')!.settings).toMatchObject({bbEnabled:true,bbRenderStyle:'silk'});
  });
  it('saves Blend strokes in projects and rejects broken Blend data',()=>{
   const p=newProject(),s=stroke(line(10,90,40,10),{bbSample:'all'},{bbSamplePng:'data:image/png;base64,AAAA',bbSampleRect:{x:0,y:0,width:10,height:10},bbCarry:'AAAA'});activeLayer(p).operations=[s];

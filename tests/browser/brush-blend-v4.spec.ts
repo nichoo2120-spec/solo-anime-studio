@@ -271,3 +271,104 @@ test('real stock brush masks keep light-pressure blending strong across families
   expect(medium,id).toBeGreaterThanOrEqual(.7*full);
  }
 });
+
+test('Silk toolbar and B B activate the current brush in the shared Blend settings',async({page})=>{
+ await page.goto('/');
+ await page.getByLabel('Drawing canvas',{exact:true}).waitFor();
+ const preset=page.getByLabel('Brush preset',{exact:true});
+ const silk=page.getByRole('button',{name:'Silk Blend (B B)',exact:true}).first();
+ const toggle=page.getByRole('group',{name:'Paint or Blend'}).first();
+ const id=await preset.inputValue();
+ await silk.click();
+ await expect(silk).toHaveAttribute('aria-pressed','true');
+ await expect(preset).toHaveValue(id);
+ await expect(toggle.getByRole('button',{name:'Blend',exact:true})).toHaveAttribute('aria-pressed','true');
+ await page.keyboard.press('j');
+ await expect(toggle.getByRole('button',{name:'Paint',exact:true})).toHaveAttribute('aria-pressed','true');
+ await page.keyboard.press('e');
+ await page.keyboard.press('b');
+ await page.keyboard.press('b');
+ await expect(silk).toHaveAttribute('aria-pressed','true');
+ await expect(preset).toHaveValue(id);
+ await expect(page.getByRole('group',{name:'Silk Blend settings',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Brush Settings',exact:true}).click();
+ const panel=page.getByRole('region',{name:'Brush Settings'});
+ await panel.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Blend',exact:true}).click();
+ const controls=panel.getByRole('group',{name:'Silk Blend settings',exact:true});
+ const style=panel.getByRole('combobox',{name:'Blend style',exact:true});
+ await expect(style).toHaveValue('silk');
+ await expect(style.locator('option')).toHaveText(['Auto (brush family)','Silk','Soft blur','Wet','Smudge','Dry']);
+ await expect(controls.getByRole('slider')).toHaveCount(8);
+ const mode=controls.getByRole('combobox',{name:'Silk Blend mode'});
+ await expect(mode.locator('option')).toHaveText(['Soft','Wet','Smudge','Dry']);
+ for(const name of ['Silk Soft','Silk Wet','Silk Dry'])await expect(controls.getByRole('button',{name,exact:true})).toBeVisible();
+ await controls.getByRole('button',{name:'Silk Dry',exact:true}).click();
+ await expect(mode).toHaveValue('dry');
+ await expect(controls.getByRole('slider',{name:'Blend Strength',exact:true})).toHaveValue('75');
+ await style.selectOption('auto');
+ await expect(controls).toBeHidden();
+ await style.selectOption('silk');
+ await expect(mode).toHaveValue('dry');
+ await panel.getByRole('combobox',{name:'Settings brush preset'}).selectOption('silk-blend');
+ await expect(style).toHaveValue('silk');
+});
+
+test('Silk fallback previews update and its watercolor strokes undo and redo byte-identically',async({page})=>{
+ await page.goto('/');
+ const result=await page.evaluate(async()=>{
+  const mp='/src/core/model.ts',hp='/src/core/history.ts',ep='/src/engine/StudioEngine.ts',bp='/src/core/brushes.ts',rp='/src/engine/renderer.ts';
+  const {newProject,activeLayer}=await import(mp);
+  const {DocumentStore}=await import(hp),{StudioEngine}=await import(ep),{stockPresets}=await import(bp),{LayerRenderer}=await import(rp);
+  const project=newProject('Silk history',480,320);
+  const paint=(x:number,color:string)=>({
+   id:color,kind:'stroke',tool:'brush',size:150,pressure:false,response:1,opacity:1,color,
+   points:[{x,y:20,p:1},{x,y:300,p:1}],
+  });
+  activeLayer(project).operations=[paint(165,'#eb3131'),paint(315,'#145adc')];
+  const store=new DocumentStore(project),canvas=document.createElement('canvas');
+  canvas.style.cssText='position:fixed;inset:0;width:480px;height:320px';
+  document.body.append(canvas);
+  let captured=false;
+  canvas.setPointerCapture=()=>{captured=true;};
+  canvas.hasPointerCapture=()=>captured;
+  canvas.releasePointerCapture=()=>{captured=false;};
+  const engine=new StudioEngine(canvas,store,()=>{});
+  engine.blendWorker.available=()=>false;
+  engine.blendWorker.preview=()=>undefined;
+  const frame=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+  await frame();
+  engine.setView({x:0,y:0,zoom:1,rotation:0});
+  const capture=()=>{
+   const snapshot=store.getSnapshot(),r=new LayerRenderer();
+   const layer=r.get(activeLayer(snapshot),snapshot);
+   return layer.getContext('2d').getImageData(0,0,480,320).data;
+  };
+  const diff=(a:Uint8ClampedArray,b:Uint8ClampedArray)=>a.reduce((n,v,i)=>n+(v===b[i]?0:1),0);
+  const before=capture();
+  const watercolor=stockPresets.find((p:{id:string})=>p.id==='water-flat').settings;
+  engine.setInput('brush',{...watercolor,bbEnabled:true,bbRenderStyle:'silk',silkMode:'smudge',nativeMixEnabled:true,size:80});
+  const send=(type:string,x:number)=>canvas.dispatchEvent(new PointerEvent(type,{pointerId:4,isPrimary:true,button:0,pointerType:'pen',clientX:x,clientY:150,pressure:.6}));
+  const preview=()=>engine.previewSurface.getContext('2d').getImageData(0,0,480,320).data;
+  send('pointerdown',100);
+  send('pointermove',170);
+  await frame();
+  const beginning=preview();
+  send('pointermove',240);
+  send('pointermove',315);
+  await frame();
+  const liveChanged=diff(beginning,preview());
+  send('pointerup',380);
+  const operation=activeLayer(store.getSnapshot()).operations.at(-1);
+  const after=capture();
+  engine.historyNavigation('undo');
+  const undone=capture();
+  engine.historyNavigation('redo');
+  const redone=capture();
+  engine.dispose();canvas.remove();
+  return {version:operation.silkBlendVersion,style:operation.silkMode,otherVersion:operation.brushBlendVersion??null,mix:operation.nativeMixVersion??null,
+   liveChanged,changed:diff(before,after),undo:diff(before,undone),redo:diff(after,redone)};
+ });
+ expect(result).toMatchObject({version:2,style:'smudge',otherVersion:null,mix:null,undo:0,redo:0});
+ expect(result.changed).toBeGreaterThan(100);
+ expect(result.liveChanged).toBeGreaterThan(100);
+});

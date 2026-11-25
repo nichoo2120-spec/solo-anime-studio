@@ -1,3 +1,5 @@
+import type {BrushBlendSettings} from './brushBlend';
+
 /** v0.5.238 Silk Blend: a brand-new blending brush (not the removed Mix brush).
  * Settings and stroke metadata only. The renderer lives in engine/silkBlend.ts. */
 export type SilkMode='soft'|'wet'|'smudge'|'dry';
@@ -21,17 +23,20 @@ export const silkPresets:{id:SilkPresetId;name:string;values:{silkMode:SilkMode;
  {id:'silk-dry',name:'Silk Dry',values:{silkMode:'dry',silkStrength:.75,silkPickup:.5,silkWetness:.2,silkTexture:.65,opacity:1,tipSpacing:.06,stabilization:.08}},
 ];
 export const isSilkBrush=(s:{brushKind?:string}|undefined)=>s?.brushKind===SILK_BRUSH_KIND;
+type SilkStyleSettings=Pick<BrushBlendSettings,'bbEnabled'|'bbRenderStyle'>&{brushKind?:string};
+export const isSilkBlendActive=(s:SilkStyleSettings)=>(
+ (s.bbEnabled??isSilkBrush(s))&&(s.bbRenderStyle??(isSilkBrush(s)?'silk':'auto'))==='silk'
+);
 const clamp01=(v:unknown,fallback:number)=>typeof v==='number'&&Number.isFinite(v)?Math.max(0,Math.min(1,v)):fallback;
-/** Stroke metadata. Only Silk Blend brushes get any of these fields, so every
- * other brush keeps byte-identical strokes and pixels. */
-export function silkStrokeMetadata(s:SilkBlendControls&{brushKind?:string}):SilkBlendControls{
- if(!isSilkBrush(s))return {};
+/** Silk still serializes the original engine descriptor for replay. */
+export function silkStrokeMetadata(s:SilkBlendControls&SilkStyleSettings):SilkBlendControls{
+ if(!isSilkBlendActive(s))return {};
  return {silkBlendVersion:2,silkMode:isSilkMode(s.silkMode)?s.silkMode:'soft',silkStrength:clamp01(s.silkStrength,.55),silkPickup:clamp01(s.silkPickup,.7),silkWetness:clamp01(s.silkWetness,.35),silkTexture:clamp01(s.silkTexture,0),...(s.silkMode==='wet'?{edgeDarkness:0}:{})};
 }
-/** Keeps only valid saved Silk settings. Non-Silk brushes never receive them. */
-export function sanitizeSilk(p:Partial<SilkBlendControls>,result:SilkBlendControls&{brushKind?:string},fallback:SilkBlendControls&{brushKind?:string}){
- if(!isSilkBrush(result)&&!isSilkBrush(fallback)){for(const key of ['silkMode','silkStrength','silkPickup','silkWetness','silkTexture'] as const)delete result[key];delete result.silkBlendVersion;return;}
- result.silkMode=isSilkMode(p.silkMode)?p.silkMode:isSilkMode(fallback.silkMode)?fallback.silkMode:'soft';
- for(const [key] of silkLimits)result[key]=clamp01(p[key],fallback[key]??.5);
+/** Keep a brush's Silk controls when the artist switches to another style. */
+export function sanitizeSilk(p:Partial<SilkBlendControls>,result:SilkBlendControls&SilkStyleSettings,fallback:SilkBlendControls){
  delete result.silkBlendVersion;
+ if(result.bbRenderStyle!=='silk'&&!isSilkBrush(result)&&p.silkMode===undefined&&!silkLimits.some(([key])=>p[key]!==undefined))return;
+ result.silkMode=isSilkMode(p.silkMode)?p.silkMode:isSilkMode(fallback.silkMode)?fallback.silkMode:'soft';
+ for(const [key] of silkLimits)result[key]=clamp01(p[key],fallback[key]??silkPresets[0].values[key]);
 }
