@@ -1,4 +1,4 @@
-import {BlendDabBatch,BlendPatchColumns,largeBlendSpacing,type DabBounds} from './blendDabBatch';
+import {BlendDabBatch,BlendPatchRaster,largeBlendSpacing,type DabBounds} from './blendDabBatch';
 /** v0.5.238 Silk Blend renderer (new brush, written from scratch).
  *
  * How it works, in plain words:
@@ -215,7 +215,7 @@ export class SilkGesture{
  private surface:SilkSurface;
  private reservoir?:Float32Array;
  private readonly batch?:BlendDabBatch;
- private readonly columns?:BlendPatchColumns;
+ private readonly patchRaster?:BlendPatchRaster;
  private readonly sampled=new Float32Array(CELLS*4);
  private readonly target=new Float32Array(CELLS*4);
  private readonly scratch=new Float32Array(CELLS*4);
@@ -227,7 +227,7 @@ export class SilkGesture{
  constructor(private readonly s:Stroke,width:number,height:number,read:CanvasRenderingContext2D){
   const fast=s.blendRasterVersion===1;
   this.batch=fast?new BlendDabBatch():undefined;
-  this.columns=fast?new BlendPatchColumns():undefined;
+  this.patchRaster=fast?new BlendPatchRaster(s.size):undefined;
   this.surface=new SilkSurface(width,height,read,fast?(s.size>200?4:2):1);
   this.mode=s.silkMode??'soft';this.tune=tuning(this.mode,clamp01(s.silkWetness??.35));this.seed=strokeSeed(s.id);
   if(s.silkBlendVersion===2&&this.mode==='wet'){
@@ -290,8 +290,8 @@ export class SilkGesture{
    this.carry-=len;
   }
   const endX=this.dirX,endY=this.dirY;
-  this.batch?.run(bounds=>{
-   this.columns!.ensure(Math.min(this.surface.width,Math.ceil(bounds.width)+2));
+  this.batch?.run((bounds,diameter)=>{
+   this.patchRaster!.ensure(Math.min(this.surface.width,diameter),Math.min(this.surface.height,diameter));
    this.surface.prepare(bounds,this.water?t=>this.waterFields(t):undefined);
   },(x,y,p,r,step,dx,dy,distance)=>{
    this.dirX=dx;this.dirY=dy;this.traveled=distance;
@@ -348,13 +348,14 @@ export class SilkGesture{
   const left=Math.max(0,Math.floor(x-r)),top=Math.max(0,Math.floor(y-r)),right=Math.min(this.surface.width,Math.ceil(x+r)),bottom=Math.min(this.surface.height,Math.ceil(y+r));
   if(right<=left||bottom<=top){this.dabs++;return;}
   const inv=1/r,falloff=tune.falloff,water=this.water,wetFront=.45*clamp01(s.silkWetness??.35);
-  const columns=this.columns?.prepare(left,right,x,inv,PATCH,false);
-  const indices=columns?.indices,fractions=columns?.fractions;
+  const patch=this.patchRaster?.prepare(T,left,top,right,bottom,x,y,inv,PATCH,false);
+  const reduced=patch?.pixels,shift=patch?.shift??0,stride=patch?.stride??0;
   for(let ty=Math.floor(top/TILE);ty*TILE<bottom;ty++)for(let tx=Math.floor(left/TILE);tx*TILE<right;tx++){
    const t=this.surface.tile(tx,ty);if(!t)continue;
    if(water)this.waterFields(t);
    const x0=Math.max(left,t.x),x1=Math.min(right,t.x+t.w),y0=Math.max(top,t.y),y1=Math.min(bottom,t.y+t.h),f=t.f,changed=t.changed;let any=false;
    for(let py=y0;py<y1;py++){const dy=(py+.5-y)*inv,dy2=dy*dy;if(dy2>=1)continue;
+    const reducedRow=((py-top)>>shift)*stride;
     const rowV=Math.max(0,Math.min(PATCH-1,(dy+1)*.5*PATCH-.5));
     const rowIndex=false?Math.round(rowV):Math.min(PATCH-2,Math.floor(rowV));
     for(let px=x0;px<x1;px++){
@@ -373,11 +374,12 @@ export class SilkGesture{
       else a*=1-tex*.6*(1-grain);
      }
      if(a<=1e-5)continue;
-     const cu=indices?0:Math.max(0,Math.min(PATCH-1,(dx+1)*.5*PATCH-.5));
-     const iu=indices?indices[px-left]:Math.min(PATCH-2,Math.floor(cu)),iv=rowIndex;
-     const fu=fractions?fractions[px-left]:cu-iu,fv=rowV-iv,k00=(iv*PATCH+iu)*4,k10=k00+4,k01=k00+PATCH*4,k11=k01+4;
+     const position=reducedRow+((px-left)>>shift)*4;
+     const cu=reduced?0:Math.max(0,Math.min(PATCH-1,(dx+1)*.5*PATCH-.5));
+     const iu=reduced?0:Math.min(PATCH-2,Math.floor(cu)),iv=rowIndex;
+     const fu=reduced?0:cu-iu,fv=rowV-iv,k00=(iv*PATCH+iu)*4,k10=k00+4,k01=k00+PATCH*4,k11=k01+4;
      const w00=(1-fu)*(1-fv),w10=fu*(1-fv),w01=(1-fu)*fv,w11=fu*fv,o=((py-t.y)*TILE+px-t.x)*4;
-     for(let c=0;c<4;c++){const target=T[k00+c]*w00+T[k10+c]*w10+T[k01+c]*w01+T[k11+c]*w11;f[o+c]+=(target-f[o+c])*a;}
+     for(let c=0;c<4;c++){const target=reduced?reduced[position+c]:T[k00+c]*w00+T[k10+c]*w10+T[k01+c]*w01+T[k11+c]*w11;f[o+c]+=(target-f[o+c])*a;}
      changed[o>>2]=1;any=true;
     }
    }
