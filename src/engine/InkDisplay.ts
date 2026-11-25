@@ -1,3 +1,4 @@
+import {fillInkPaths,hasInkEdgeEffect} from './inkEdge';
 import {HistoryTiles} from './HistoryTiles';
 import type {ArtworkOrigin,Layer,Stroke,Project} from '../core/model';
 import {nativePixelsDiffer} from './nativePixelDelta';
@@ -27,10 +28,10 @@ type Pending={token:number;layer:string;key:Key;operations:Layer['operations'];b
 type ViewPending={token:number;layer:string;key:Key;base?:Key;timer:ReturnType<typeof setTimeout>};
 // Distance-anchored width profiles retain their shape at display resolution;
 // routing them through a page bitmap made high-DPI and enlarged views pixelated.
-export const displayCleanInk=(s:Stroke&ArtworkOrigin)=>!s.stampVersion&&!s.brushBlendVersion&&!s.silkBlendVersion&&!s.widthPointVersion&&!s.inShot&&!s.inPreviousStage&&!s.nativeMixVersion&&!s.mixStops&&!s.paintTipVersion&&!s.textureStrength&&!(s.inkTipVersion===1&&s.inkImage&&(s.inkImageAmount??1)>0)&&!(s.pressure&&s.pressureOpacity)&&(
+export const displayCleanInk=(s:Stroke&ArtworkOrigin)=>!s.stampVersion&&!s.brushBlendVersion&&!s.silkBlendVersion&&!s.widthPointVersion&&!s.inShot&&!s.inPreviousStage&&!s.nativeMixVersion&&!s.mixStops&&!s.paintTipVersion&&(s.inkEdgeVersion===1||!s.textureStrength)&&!(s.pressure&&s.pressureOpacity)&&(s.inkEdgeVersion===1||!(s.inkTipVersion===1&&s.inkImage&&(s.inkImageAmount??1)>0)&&(
  !!s.engineVersion&&['studio-ink','contour-flow','technical','eraser-hard','g-pen','mapping','brush-pen'].includes(s.brushKind??'technical')||s.flatNibVersion===1
-);
-const native=(s:Stroke)=>!s.inkProfileVersion&&!s.inkTipVersion&&!s.pressureOpacity&&!s.taperStart&&!s.taperEnd&&!(s.pressure&&s.pressureWidth!==false)&&!s.velocityTaper&&['technical','eraser-hard'].includes(s.brushKind??'technical');
+));
+const native=(s:Stroke)=>!hasInkEdgeEffect(s)&&!s.inkProfileVersion&&!s.inkTipVersion&&!s.pressureOpacity&&!s.taperStart&&!s.taperEnd&&!(s.pressure&&s.pressureWidth!==false)&&!s.velocityTaper&&['technical','eraser-hard'].includes(s.brushKind??'technical');
 const clean=displayCleanInk;
 
 /** Clean ink uses the same display-resolution renderer at every zoom and stroke
@@ -184,7 +185,7 @@ export class InkDisplay{
    if(!paths){paths=[];if(s.perspective&&preservesFlowContour(s))drawProjectiveFlowInk(ctx,s,g,quality,paths);else if(s.flatNibVersion===1)drawFlatInk(ctx,s,g,undefined,quality,paths);else drawSolidInkV10(ctx,s,g,undefined,quality,paths);
     if(this.prepared.get(s)===p){this.pathBatches-=p.paths?.items.length??0;p.paths=undefined;if(paths.length<=2048){p.paths={scale:quality,items:paths};this.pathBatches+=paths.length;}this.trim();}
    }
-   ctx.fillStyle=s.color;for(const path of paths)ctx.fill(path);
+   fillInkPaths(ctx,s,g,paths,!!s.perspective&&preservesFlowContour(s));
   }
   ctx.restore();
  }
@@ -360,7 +361,7 @@ export class InkDisplay{
   const scale=Math.hypot(m.a,m.b);
    for(const s of strokes){
     if(s.opacity===0)continue;
-    if(!native(s)&&s.flatNibVersion!==1&&!s.transform&&!s.perspective&&(s===live||this.solidLive.matches(s))){const direct=s.tool==='brush'&&s.opacity===1,picture=this.solidLive.paint(s,s===live&&geometry?geometry:finalGeometry(s),m,w,h,direct?out.canvas:undefined,direct?{}:undefined);this.rememberLivePaths(s,this.solidLive.lastPaths,s===live);out.resetTransform();out.globalAlpha=s.opacity;out.globalCompositeOperation=s.tool==='eraser'?'destination-out':'source-over';if(direct)out.clearRect(0,0,w,h);out.drawImage(picture,0,0);continue;}
+    if(!native(s)&&!hasInkEdgeEffect(s)&&s.flatNibVersion!==1&&!s.transform&&!s.perspective&&(s===live||this.solidLive.matches(s))){const direct=s.tool==='brush'&&s.opacity===1,picture=this.solidLive.paint(s,s===live&&geometry?geometry:finalGeometry(s),m,w,h,direct?out.canvas:undefined,direct?{}:undefined);this.rememberLivePaths(s,this.solidLive.lastPaths,s===live);out.resetTransform();out.globalAlpha=s.opacity;out.globalCompositeOperation=s.tool==='eraser'?'destination-out':'source-over';if(direct)out.clearRect(0,0,w,h);out.drawImage(picture,0,0);continue;}
     if(s.flatNibVersion===1&&!s.transform&&!s.perspective&&(s===live||this.flatLive.matches(s))){const picture=this.flatLive.paint(s,s===live&&geometry?geometry:finalGeometry(s),m,w,h);if(s!==live&&this.flatLive.lastPaths){const prepared=this.prepare(s),paths=this.flatLive.lastPaths;if(this.prepared.get(s)===prepared&&paths.items.length<=2048){this.pathBatches-=prepared.paths?.items.length??0;prepared.paths=paths;this.pathBatches+=paths.items.length;this.trim();}}out.resetTransform();out.globalAlpha=s.opacity;out.globalCompositeOperation=s.tool==='eraser'?'destination-out':'source-over';out.drawImage(picture,0,0);continue;}
     const prepared=this.prepare(s,s===live?geometry:undefined,s!==live),rect=this.screenBounds(s,prepared.bounds,m,w,h);if(!rect)continue;
     // Opaque paint is associative source-over. A native stroke is one Canvas
@@ -425,14 +426,14 @@ export class InkDisplay{
   while(this.layers.size>8||this.layers.size>1&&bytes>64*1024*1024){const oldest=this.layers.keys().next().value!,entry=this.layers.get(oldest)!;bytes-=entry.surface.width*entry.surface.height*4;entry.surface.width=entry.surface.height=0;this.layers.delete(oldest);}
   let picture=this.surface!;
   if(live){
-   const direct=!native(live)&&live.flatNibVersion!==1&&!live.transform&&!live.perspective&&live.tool==='brush'&&live.opacity===1;
+   const direct=!native(live)&&!hasInkEdgeEffect(live)&&live.flatNibVersion!==1&&!live.transform&&!live.perspective&&live.tool==='brush'&&live.opacity===1;
    if(direct){this.flatLive.clear();picture=this.solidLive.paint(live,geometry??finalGeometry(live),m,w,h,this.surface,this.key);this.liveKey=undefined;}
    else{
    const previous=this.liveKey;
    if(!previous||previous.base!==this.key||previous.stroke!==live||previous.geometry!==geometry){
     const preview=this.preview??=document.createElement('canvas');if(preview.width!==w)preview.width=w;if(preview.height!==h)preview.height=h;
     const pc=preview.getContext('2d')!;pc.resetTransform();pc.globalAlpha=1;pc.globalCompositeOperation='source-over';
-    if(!native(live)&&!live.transform&&!live.perspective){
+    if(!native(live)&&!hasInkEdgeEffect(live)&&!live.transform&&!live.perspective){
      const raster=live.flatNibVersion===1?this.flatLive:this.solidLive;if(live.flatNibVersion===1)this.solidLive.clear();else this.flatLive.clear();
      const picture=raster.paint(live,geometry??finalGeometry(live),m,w,h),rect=previous&&previous.base===this.key&&previous.stroke===live?raster.lastRegion:undefined;
      const x=rect?.x??0,y=rect?.y??0,W=rect?.w??w,H=rect?.h??h;

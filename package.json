@@ -1,7 +1,7 @@
 {
   "name": "solo-anime-studio",
   "private": true,
-  "version": "0.5.247",
+  "version": "0.5.248",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -32,6 +32,7 @@
     "electron-updater": "^6.8.11"
   },
   "devDependencies": {
+    "@napi-rs/canvas": "1.2.1",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.0",

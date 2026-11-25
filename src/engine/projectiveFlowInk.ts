@@ -1,3 +1,4 @@
+import {fillInkPaths,hasInkEdgeEffect} from './inkEdge';
 import type {Stroke} from '../core/model';
 import {projectPoint,type H} from './perspectiveWarp';
 import {drawSolidInkV10} from './solidInkV10';
@@ -29,5 +30,8 @@ function projectedPath(h:H,tolerance:number){
 }
 export function drawProjectiveFlowInk(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnType<typeof strokeGeometry>,scale=1,paths?:Path2D[]):boolean{
  if(!s.perspective||!preservesFlowContour(s))return false;
- return drawSolidInkV10(ctx,s,g,undefined,Math.max(1,scale),paths,undefined,()=>projectedPath(s.perspective!,Math.max(.005,.1/Math.max(1,scale))));
+ const collector=paths??(hasInkEdgeEffect(s)?[]:undefined);
+ const drawn=drawSolidInkV10(ctx,s,g,undefined,Math.max(1,scale),collector,undefined,()=>projectedPath(s.perspective!,Math.max(.005,.1/Math.max(1,scale))));
+ if(drawn&&collector&&!paths)fillInkPaths(ctx,s,g,collector,true);
+ return drawn;
 }

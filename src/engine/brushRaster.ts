@@ -13,7 +13,7 @@ import {strokeGeometry,flattenCubic,pressureResponse,taperFactor} from './stroke
 import {finalGeometry} from './geometryCache';
 import {widthResponse,opacityResponse} from './pressureChannels';
 import {drawFlatInk} from './flatInk';
-import {drawSolidInkV10} from './solidInkV10';
+import {drawInkWithEdges,drawSolidInkV10} from './solidInkV10';
 import type {RasterRegion} from './liveRaster';
 import {drawDryMediaV9,isDryMediaV9} from './dryMediaV9';
 import {drawPaintStroke} from './paintRaster';
@@ -33,6 +33,7 @@ export function drawModernStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phas
 function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|'final'='final',geometry?:ReturnType<typeof strokeGeometry>,region?:RasterRegion,pass?:PaintPass,origin?:{x:number;y:number}){
  const roundInk=stroke.brushKind==='studio-ink'||stroke.brushKind==='contour-flow'||stroke.inkProfileVersion===1;
  const resolved=geometry??(phase==='final'?finalGeometry(stroke):strokeGeometry(stroke,phase));
+ if(stroke.inkEdgeVersion===1&&drawInkWithEdges(ctx,stroke,resolved,region))return;
  if(stroke.dryBristleVersion===3){drawDryBristleV3(ctx,stroke,resolved,region,pass);return;}
  if(stroke.dryBristleVersion===2){drawDryBristleV2(ctx,stroke,resolved,region,pass);return;}
  if(stroke.dryBristleVersion===1){drawDryBristle(ctx,stroke,resolved,region,pass);return;}
