@@ -344,20 +344,62 @@ export class SilkGesture{
   if(this.mode==='smudge')strength*=Math.exp(-this.traveled/(2*r*(4+14*clamp01(s.silkWetness??.35))));
   const alpha=1-Math.pow(1-Math.min(.95,strength*.32),u);
   if(alpha<=1e-5){this.dabs++;return;}
+  if(this.batch)this.depositBatch(x,y,r,alpha,pr,T);
+  else this.depositLegacy(x,y,r,alpha,pr,T);
+  this.dabs++;
+ }
+ // Keep the exact v1/v2 deposit loop for strokes saved without the raster flag.
+ private depositLegacy(x:number,y:number,r:number,alpha:number,pr:number,T:Float32Array){
+  const s=this.s,tune=this.tune;
   const tex=clamp01(s.silkTexture??0),dry=this.mode==='dry',seed=this.seed,coverage=.22+.48*pr,dirX=this.dirX,dirY=this.dirY;
   const left=Math.max(0,Math.floor(x-r)),top=Math.max(0,Math.floor(y-r)),right=Math.min(this.surface.width,Math.ceil(x+r)),bottom=Math.min(this.surface.height,Math.ceil(y+r));
-  if(right<=left||bottom<=top){this.dabs++;return;}
+  if(right<=left||bottom<=top)return;
   const inv=1/r,falloff=tune.falloff,water=this.water,wetFront=.45*clamp01(s.silkWetness??.35);
-  const patch=this.patchRaster?.prepare(T,left,top,right,bottom,x,y,inv,PATCH,false);
-  const reduced=patch?.pixels,shift=patch?.shift??0,stride=patch?.stride??0;
+  for(let ty=Math.floor(top/TILE);ty*TILE<bottom;ty++)for(let tx=Math.floor(left/TILE);tx*TILE<right;tx++){
+   const t=this.surface.tile(tx,ty);if(!t)continue;
+   if(water)this.waterFields(t);
+   const x0=Math.max(left,t.x),x1=Math.min(right,t.x+t.w),y0=Math.max(top,t.y),y1=Math.min(bottom,t.y+t.h),f=t.f,changed=t.changed;let any=false;
+   for(let py=y0;py<y1;py++){const dy=(py+.5-y)*inv,dy2=dy*dy;if(dy2>=1)continue;
+    for(let px=x0;px<x1;px++){
+     const dx=(px+.5-x)*inv,d2=dx*dx+dy2;if(d2>=1)continue;
+     let a:number;
+     if(water){
+      // Irregular, soft wet front: the broad pigment cloud pulls the edge in
+      // unevenly, so the blend blooms like wet paint instead of a round stamp.
+      const c=(py-t.y)*TILE+px-t.x,edge=Math.sqrt(d2)*(1+wetFront*t.cloud![c]);if(edge>=1)continue;
+      const cov=ease(0,.75,1-edge);if(cov>t.wet![c])t.wet![c]=cov;
+      a=alpha*falloff(edge);changed[c]=1;any=true;
+     }else a=alpha*falloff(Math.sqrt(d2));
+     if(tex>0){
+      const grain=valueNoise(px*.55,py*.55,seed&255)*.6+valueNoise(px*.17,py*.17,(seed>>8)&255)*.4;
+      if(dry){const across=dx*-dirY+dy*dirX,bristle=noise1(across*15+((seed>>16)&63),seed&1023),m=grain*.45+bristle*.55,th=1-coverage,c=clamp01((m-th+.09)/.18);a*=1-tex*(1-c*c*(3-2*c));}
+      else a*=1-tex*.6*(1-grain);
+     }
+     if(a<=1e-5)continue;
+     let cu=(dx+1)*.5*PATCH-.5,cv=(dy+1)*.5*PATCH-.5;cu=cu<0?0:cu>PATCH-1?PATCH-1:cu;cv=cv<0?0:cv>PATCH-1?PATCH-1:cv;
+     const iu=Math.min(PATCH-2,Math.floor(cu)),iv=Math.min(PATCH-2,Math.floor(cv)),fu=cu-iu,fv=cv-iv,k00=(iv*PATCH+iu)*4,k10=k00+4,k01=k00+PATCH*4,k11=k01+4;
+     const w00=(1-fu)*(1-fv),w10=fu*(1-fv),w01=(1-fu)*fv,w11=fu*fv,o=((py-t.y)*TILE+px-t.x)*4;
+     for(let c=0;c<4;c++){const target=T[k00+c]*w00+T[k10+c]*w10+T[k01+c]*w01+T[k11+c]*w11;f[o+c]+=(target-f[o+c])*a;}
+     changed[o>>2]=1;any=true;
+    }
+   }
+   if(any){t.dirty=true;t.touched=true;}
+  }
+ }
+ private depositBatch(x:number,y:number,r:number,alpha:number,pr:number,T:Float32Array){
+  const s=this.s,tune=this.tune;
+  const tex=clamp01(s.silkTexture??0),dry=this.mode==='dry',seed=this.seed,coverage=.22+.48*pr,dirX=this.dirX,dirY=this.dirY;
+  const left=Math.max(0,Math.floor(x-r)),top=Math.max(0,Math.floor(y-r)),right=Math.min(this.surface.width,Math.ceil(x+r)),bottom=Math.min(this.surface.height,Math.ceil(y+r));
+  if(right<=left||bottom<=top)return;
+  const inv=1/r,falloff=tune.falloff,water=this.water,wetFront=.45*clamp01(s.silkWetness??.35);
+  const patch=this.patchRaster!.prepare(T,left,top,right,bottom,x,y,inv,PATCH,false);
+  const reduced=patch.pixels,shift=patch.shift,stride=patch.stride;
   for(let ty=Math.floor(top/TILE);ty*TILE<bottom;ty++)for(let tx=Math.floor(left/TILE);tx*TILE<right;tx++){
    const t=this.surface.tile(tx,ty);if(!t)continue;
    if(water)this.waterFields(t);
    const x0=Math.max(left,t.x),x1=Math.min(right,t.x+t.w),y0=Math.max(top,t.y),y1=Math.min(bottom,t.y+t.h),f=t.f,changed=t.changed;let any=false;
    for(let py=y0;py<y1;py++){const dy=(py+.5-y)*inv,dy2=dy*dy;if(dy2>=1)continue;
     const reducedRow=((py-top)>>shift)*stride;
-    const rowV=Math.max(0,Math.min(PATCH-1,(dy+1)*.5*PATCH-.5));
-    const rowIndex=false?Math.round(rowV):Math.min(PATCH-2,Math.floor(rowV));
     for(let px=x0;px<x1;px++){
      const dx=(px+.5-x)*inv,d2=dx*dx+dy2;if(d2>=1)continue;
      let a:number;
@@ -375,17 +417,13 @@ export class SilkGesture{
      }
      if(a<=1e-5)continue;
      const position=reducedRow+((px-left)>>shift)*4;
-     const cu=reduced?0:Math.max(0,Math.min(PATCH-1,(dx+1)*.5*PATCH-.5));
-     const iu=reduced?0:Math.min(PATCH-2,Math.floor(cu)),iv=rowIndex;
-     const fu=reduced?0:cu-iu,fv=rowV-iv,k00=(iv*PATCH+iu)*4,k10=k00+4,k01=k00+PATCH*4,k11=k01+4;
-     const w00=(1-fu)*(1-fv),w10=fu*(1-fv),w01=(1-fu)*fv,w11=fu*fv,o=((py-t.y)*TILE+px-t.x)*4;
-     for(let c=0;c<4;c++){const target=reduced?reduced[position+c]:T[k00+c]*w00+T[k10+c]*w10+T[k01+c]*w01+T[k11+c]*w11;f[o+c]+=(target-f[o+c])*a;}
+     const o=((py-t.y)*TILE+px-t.x)*4;
+     for(let c=0;c<4;c++)f[o+c]+=(reduced[position+c]-f[o+c])*a;
      changed[o>>2]=1;any=true;
     }
    }
    if(any){t.dirty=true;t.touched=true;}
   }
-  this.dabs++;
  }
  /** Watercolor Wet target: wider wet bleed (several soft passes), then colours
   * mix as transparent pigment (averaged optical density), so red and blue melt
