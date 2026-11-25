@@ -1,6 +1,6 @@
 import {expect,test} from '@playwright/test';
 
-test('v4 keeps the real custom brush mask and matches worker final pixels',async({page})=>{
+test('New Blend strokes keep the real custom brush mask and matches worker final pixels',async({page})=>{
  await page.goto('/');
  const result=await page.evaluate(async()=>{
   const {stockPresets}=await import('/src/core/brushes.ts');
@@ -70,7 +70,7 @@ test('v4 keeps the real custom brush mask and matches worker final pixels',async
   }finally{worker.dispose();}
   return result;
  });
- expect(result).toMatchObject({version:4,style:'texture',outside:0,parity:0});
+ expect(result).toMatchObject({version:6,style:'texture',outside:0,parity:0});
  expect(result.changed).toBeGreaterThan(100);
  expect(result.outer).toBeGreaterThan(0);
  for(const count of result.variations)expect(count).toBeGreaterThan(0);
@@ -139,7 +139,7 @@ test('watercolor presets keep distinct feel with their real masks and worker rep
   return {rows,turnedSpan:turned.span,workerDiff};
  });
  for(const row of result.rows){
-  expect(row.version,row.id).toBe(5);
+  expect(row.version,row.id).toBe(6);
   expect(row.outside,row.id).toBe(0);
   expect(row.changed,row.id).toBeGreaterThan(100);
  }
@@ -148,4 +148,86 @@ test('watercolor presets keep distinct feel with their real masks and worker rep
  expect(wet.changed).toBeGreaterThan(rough.changed);
  expect(flat.span).toBeGreaterThan(result.turnedSpan+8);
  expect(result.workerDiff).toBe(0);
+});
+
+test('Blend Settings previews strength presets, saves per brush and resets',async({page})=>{
+ await page.goto('/');
+ await page.getByLabel('Drawing canvas',{exact:true}).waitFor();
+ await page.getByLabel('Brush category',{exact:true}).selectOption('Paint');
+ await page.getByLabel('Brush family',{exact:true}).selectOption('all');
+ await page.getByLabel('Brush preset',{exact:true}).selectOption('water-flat');
+ await page.getByRole('group',{name:'Paint or Blend'}).first().getByRole('button',{name:'Blend',exact:true}).click();
+ await page.getByRole('button',{name:'Brush Settings',exact:true}).click();
+ await page.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Blend',exact:true}).click();
+ const panel=page.getByRole('region',{name:'Brush Settings'});
+ const preview=panel.getByRole('img',{name:'Live preview of two colours blending with the current settings'});
+ const pixels=()=>preview.evaluate((c:HTMLCanvasElement)=>c.toDataURL());
+ const strength=panel.getByRole('slider',{name:'Blend strength',exact:true});
+ const minimum=panel.getByRole('slider',{name:'Minimum blend at light pressure',exact:true});
+ const pressure=panel.getByRole('checkbox',{name:'Pressure changes blend',exact:true});
+ const curve=panel.getByRole('combobox',{name:'Blend pressure curve',exact:true});
+ const style=panel.getByRole('combobox',{name:'Blend style',exact:true});
+ await expect(strength).toHaveValue('100');
+ await expect(strength).toHaveAttribute('max','200');
+ await expect(minimum).toHaveValue('70');
+ await expect(pressure).not.toBeChecked();
+ await expect(style).toHaveValue('auto');
+ await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+ const normal=await pixels();
+ await panel.getByRole('button',{name:'Light blend',exact:true}).click();
+ await expect(strength).toHaveValue('50');
+ await expect.poll(pixels).not.toBe(normal);
+ await panel.getByRole('button',{name:'Strong blend',exact:true}).click();
+ await expect(strength).toHaveValue('160');
+ await panel.getByRole('button',{name:'Normal blend',exact:true}).click();
+ await expect(strength).toHaveValue('100');
+ await expect.poll(pixels).toBe(normal);
+ await pressure.check();
+ await curve.selectOption('firm');
+ await style.selectOption('dry');
+ await expect.poll(pixels).not.toBe(normal);
+ await panel.getByRole('button',{name:'Reset Blend settings',exact:true}).click();
+ await expect(pressure).not.toBeChecked();
+ await expect(curve).toHaveValue('linear');
+ await expect(style).toHaveValue('auto');
+ await expect.poll(pixels).toBe(normal);
+});
+
+test('pen-down captures Blend settings independently of ordinary Paint pressure',async({page})=>{
+ await page.goto('/');
+ const result=await page.evaluate(async()=>{
+  const mp='/src/core/model.ts',hp='/src/core/history.ts',ep='/src/engine/StudioEngine.ts',bp='/src/core/brushes.ts';
+  const {newProject,activeLayer}=await import(mp);
+  const {DocumentStore}=await import(hp),{StudioEngine}=await import(ep),{stockPresets}=await import(bp);
+  const canvas=document.createElement('canvas');
+  canvas.style.cssText='position:fixed;inset:0;width:480px;height:320px';
+  document.body.append(canvas);
+  let captured=false;
+  canvas.setPointerCapture=()=>{captured=true;};
+  canvas.hasPointerCapture=()=>captured;
+  canvas.releasePointerCapture=()=>{captured=false;};
+  const store=new DocumentStore(newProject('Pen pressure',480,320));
+  const engine=new StudioEngine(canvas,store,()=>{});
+  await new Promise(requestAnimationFrame);
+  engine.setView({x:0,y:0,zoom:1,rotation:0});
+  const watercolor=stockPresets.find((p:{id:string})=>p.id==='water-flat').settings;
+  const send=(type:string,x:number,pressure:number)=>{
+   canvas.dispatchEvent(new PointerEvent(type,{pointerId:4,isPrimary:true,button:0,pointerType:'pen',clientX:x,clientY:150,pressure}));
+  };
+  engine.setInput('brush',{...watercolor,pressureOpacity:true,bbEnabled:true});
+  send('pointerdown',160,.1);
+  engine.setInput('brush',{...watercolor,pressureOpacity:true,bbEnabled:true,bbStrength:1.6,bbPressure:true,bbPressureCurve:'firm'});
+  send('pointermove',190,.5);send('pointerup',210,0);
+  send('pointerdown',230,.1);send('pointerup',260,0);
+  engine.setInput('brush',{...watercolor,pressureOpacity:true});
+  send('pointerdown',270,.1);send('pointerup',310,0);
+  return activeLayer(store.getSnapshot()).operations.map((s:{brushBlendVersion?:number;bbStrength?:number;bbPressure?:boolean;bbPressureCurve?:string;pressureFlow?:boolean;pressureOpacity?:boolean;pressureWidth?:boolean})=>[
+   s.brushBlendVersion??null,s.bbStrength??null,s.bbPressure??null,s.bbPressureCurve??null,s.pressureFlow,s.pressureOpacity,s.pressureWidth,
+  ]);
+ });
+ expect(result).toEqual([
+  [6,1,false,'linear',false,false,true],
+  [6,1.6,true,'firm',false,false,true],
+  [null,null,null,null,true,true,true],
+ ]);
 });

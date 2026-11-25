@@ -195,6 +195,10 @@ export class StudioEngine {
   if(!isBrushBlendVersion(s.brushBlendVersion))return;
   if(s.tool!=='brush'){for(const k of Object.keys(s))if(k==='brushBlendVersion'||k.startsWith('bb'))delete (s as Record<string,unknown>)[k];return;}
   s.nativeMixVersion=undefined;s.nativeMixPickupVersion=undefined;s.nativeMixAmount=undefined;s.nativeMixPaintLoad=undefined;s.nativeMixRadius=undefined;
+  if(s.brushBlendVersion===6){
+   s.pressureOpacity=false;
+   s.pressureFlow=false;
+  }
   if(s.brushBlendVersion>=3)s.stabilization=Math.max(s.stabilization??0,s.bbSmoothing??0);
   if(s.bbClean===false&&this.lastBlendEnd&&this.lastBlendEnd.layer===layer.id&&layer.operations.length){const e=this.lastBlendEnd;try{s.bbCarry=encodeCarry(this.renderer.get(layer,doc),e.x,e.y,e.r);}catch{/* no carry */}}
   if(s.bbSample==='all'){const page=this.renderer.composite(doc,{includeReferences:false});const sample=sampleFromCanvas(page,{x:0,y:0,width:page.width,height:page.height});this.blendPageSample=sample;this.blendWorker.blendSample=sample;setLiveBlendSample(sample);}

@@ -27,7 +27,7 @@ export type StampDab={x:number;y:number;rx:number;ry:number;angle:number;level:n
 /** The largest half-extent of a stamp relative to the brush size (bounds padding). */
 export function stampExtent(s:Stroke){
  const sx=s.tsScaleX??1,sy=(s.tsScaleY??1)*(s.tsRoundness??1),main=Math.max(sx,sy)*.75;
- if(s.brushBlendVersion===4){
+ if(s.brushBlendVersion===4||s.brushBlendVersion===6){
   const tilt=s.tsTilt?2.5:1;
   const dual=s.dbTip?(s.dbScale??.45)*.75+(s.dbScatter??0)*1.04:0;
   return Math.max(Math.max(sx*tilt,sy)*.75,dual,.6);

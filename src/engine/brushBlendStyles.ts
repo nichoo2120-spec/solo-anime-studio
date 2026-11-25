@@ -22,7 +22,7 @@
  *   the worker's live result, the final result and a reload are identical.
  */
 import type {Point,Stroke} from '../core/model';
-import {canBlurBlendStyle,isMaterialBrushBlendVersion,watercolorBlendTip,type BlendMode,type BlendStyle} from '../core/brushBlend';
+import {blendPressureFactor,effectiveBlendStyle,canBlurBlendStyle,isMaterialBrushBlendVersion,watercolorBlendTip,type BlendMode,type BlendStyle,type BlendPressureCurve} from '../core/brushBlend';
 import type {RasterRegion} from './liveRaster';
 import {SilkSurface,TILE,PATCH,CELLS,type Tile} from './silkBlend';
 import {paintNoise} from './paintingTips';
@@ -90,6 +90,7 @@ export class BrushBlendGestureV2{
  private readonly p:{amount:number;pickup:number;wet:number;mix:number;flow:number;stretch:number;load:number;pressure:boolean;protect:boolean;color:[number,number,number];spacing:number};
  private readonly water?:WaterFinish;private readonly blurPasses:number;private readonly mean:number;private readonly cloudSize:number;private readonly wetFront:number;
  private readonly path:Point[]=[];
+ private readonly strengthSettings?:{multiplier:number;minimum:number;curve:BlendPressureCurve;deposit:number};
  private readonly watercolorProfile?:WaterBlendProfile;
  private readonly waterSpread:number;
  private readonly material:boolean;
@@ -105,9 +106,21 @@ export class BrushBlendGestureV2{
   const modeWet=this.v3?modeWetness[this.v3.mode]:1;
   this.p={amount:clamp01(s.bbAmount??.85),pickup:clamp01(s.bbPickup??.5),wet:clamp01(s.bbWetness??.4)*modeWet,mix:clamp01(s.bbMix??.6),flow:clamp01(s.bbFlow??.6),stretch:clamp01(s.bbStretch??.45),load:clamp01(s.bbPaintLoad??0),pressure:s.bbPressure!==false,protect:!!s.bbProtectAlpha,
    color:[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)],spacing:Math.max(.03,Math.min(.5,s.tipSpacing??.08))};
-  this.style=s.bbStyle??'soft';this.prof=blendProfiles[this.style];this.seed=strokeSeed(s.id);
+  const v6=s.brushBlendVersion===6;
+  this.style=v6?effectiveBlendStyle(s.bbStyle??'soft',s.bbRenderStyle):s.bbStyle??'soft';
+  this.prof=blendProfiles[this.style];this.seed=strokeSeed(s.id);
+  if(v6){
+   // The paint raster already carries paint flow and tip coverage. Normalize
+   // the separate blend controls around their default values.
+   const mix=this.p.mix;
+   const deposit=canBlurBlendStyle(this.style)?1:(1-mix*(1-this.p.load))/.4;
+   this.strengthSettings={multiplier:s.bbStrength??1,minimum:s.bbMinPressure??.7,curve:s.bbPressureCurve??'linear',
+    deposit:(this.p.flow/.6)*deposit};
+   this.p.amount*=clamp01(s.opacity);
+   this.p.pressure=s.bbPressure===true;
+  }
   const wet=this.p.wet,blurFamily=canBlurBlendStyle(this.style);
-  const waterTip=s.brushBlendVersion===5&&this.style==='water'&&!s.stampVersion?watercolorBlendTip(s.brushTip):undefined;
+  const waterTip=(s.brushBlendVersion===5||v6&&!(s.brushTip==='water-wet'&&s.edgeDarkness===1))&&this.style==='water'&&!s.stampVersion?watercolorBlendTip(s.brushTip):undefined;
   this.watercolorProfile=waterTip?waterBlendProfiles[waterTip]:undefined;
   this.waterSpread=wet*(this.watercolorProfile?.spread??1);
   this.material=v4&&!blurFamily;
@@ -134,7 +147,7 @@ export class BrushBlendGestureV2{
    this.mean=clamp01(this.prof.mean+(1-this.prof.mean)*wet*(this.style==='dry'?.1:this.style==='ink'?.15:.35));
   }
   this.cloudSize=Math.max(12,s.size*.35);this.wetFront=.45*this.waterSpread;
-  if(this.style==='water'){const str=clamp01(.35+.6*this.p.flow)*clamp01(s.opacity),rough=s.brushTip==='water-rough'||s.brushTip==='water-flat';
+  if(this.style==='water'){const str=clamp01(.35+.6*this.p.flow)*(v6?1:clamp01(s.opacity)),rough=s.brushTip==='water-rough'||s.brushTip==='water-flat';
    const edgeDarkness=this.v3?.edgeDarkness??(s.edgeDarkness??1);
    this.water={pool:str*(.35+.65*wet)*.3*edgeDarkness,cloud:(.05+.1*wet)*(.4+.6*str),grain:(rough?.2:.11)*(this.v3?.textureKeep??1),edgeAlpha:str*(.12+.18*wet)*edgeDarkness};}
   this.reservoir=carry??(v4?new Float32Array(CELLS*4):undefined);
@@ -235,7 +248,7 @@ export class BrushBlendGestureV2{
       }
      }
     }else if(this.sample)this.sampleAt(this.sample,cx,cy,S,o);else this.surface.sample(cx,cy,S,o);
-    S[o]*=stampAlpha;S[o+1]*=stampAlpha;S[o+2]*=stampAlpha;S[o+3]*=stampAlpha;
+    if(!this.strengthSettings){S[o]*=stampAlpha;S[o+1]*=stampAlpha;S[o+2]*=stampAlpha;S[o+3]*=stampAlpha;}
    }else if(this.sample)this.sampleAt(this.sample,cx,cy,S,o);else this.surface.sample(cx,cy,S,o);
   }}
   // Do not treat empty mask cells as pigment. All stored RGB is premultiplied.
@@ -253,17 +266,26 @@ export class BrushBlendGestureV2{
    this.build();
   }
   if(P.load>0){const L=P.load,keep=1-L,[cr,cg,cb]=P.color;for(let k=0;k<CELLS*4;k+=4){T[k]=T[k]*keep+cr*L;T[k+1]=T[k+1]*keep+cg*L;T[k+2]=T[k+2]*keep+cb*L;T[k+3]=T[k+3]*keep+255*L;}}
-  let strength=clamp01(this.s.opacity)*P.flow*(P.pressure&&this.s.pressure?.3+.7*pr:1)*prof.gain;
-  if(P.stretch<1)strength*=Math.exp(-this.traveled/(2*r*this.dragLength));
-  if(this.material)strength*=1-P.mix*(1-P.load);
-  const alpha=1-Math.pow(1-Math.min(.95,strength*.4),u);
+  const settings=this.strengthSettings;
+  let alpha:number;
+  if(settings){
+   const pressure=P.pressure?blendPressureFactor(pr,settings.minimum,settings.curve):1;
+   const drag=P.stretch<1?Math.exp(-this.traveled/(2*r*this.dragLength)):1;
+   // Keep buildup stable across dab spacings, and leave room above 100%.
+   alpha=1-Math.pow(1-Math.min(.95,settings.deposit*drag*.4),u*settings.multiplier*pressure);
+  }else{
+   let strength=clamp01(this.s.opacity)*P.flow*(P.pressure&&this.s.pressure?.3+.7*pr:1)*prof.gain;
+   if(P.stretch<1)strength*=Math.exp(-this.traveled/(2*r*this.dragLength));
+   if(this.material)strength*=1-P.mix*(1-P.load);
+   alpha=1-Math.pow(1-Math.min(.95,strength*.4),u);
+  }
   this.dabs++;if(alpha<=1e-5)return;
   const left=Math.max(0,Math.floor(x-r)),top=Math.max(0,Math.floor(y-r)),right=Math.min(this.surface.width,Math.ceil(x+r)),bottom=Math.min(this.surface.height,Math.ceil(y+r));if(right<=left||bottom<=top)return;
   const inv=1/r,protect=P.protect||this.crisp&&!this.sample&&P.load===0,fall=this.watercolorProfile?.fall??prof.fall,seed=this.seed,dirX=this.dirX,dirY=this.dirY,water=!!this.water,wetFront=this.wetFront,softness=this.v3?.softness??0,softEdge=1.65-softness*1.3,blurFamily=canBlurBlendStyle(style);
   const waterProfile=this.watercolorProfile,grainKeep=this.v3?.textureKeep??0;
   const waterGrain=1.55*(waterProfile?.grain??1)*grainKeep;
   const tooth=waterProfile?.tooth?Math.min(1,grainKeep/.6):0;
-  const coverage=.3+.45*pr*(.5+.5*P.flow),covGain=(style==='air'?2.6:style==='water'?2.2:1)/255;
+  const coverage=.3+.45*(settings?1:pr)*(.5+.5*P.flow),covGain=(style==='air'?2.6:style==='water'?2.2:1)/255;
   for(let ty=Math.floor(top/TILE);ty*TILE<bottom;ty++)for(let tx=Math.floor(left/TILE);tx*TILE<right;tx++){
    const coverageMask=this.v4?this.mask.tile(tx,ty):undefined;
    if(coverageMask===emptyBlendMask)continue;

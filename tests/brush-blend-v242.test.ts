@@ -24,8 +24,8 @@ function mask(points:Point[],r=26,grain=false){const m=surface(W,H);for(let y=0;
 
 const line=(x0:number,x1:number,y:number,n=70)=>Array.from({length:n},(_,i)=>{const t=i/(n-1);return {x:x0+(x1-x0)*t,y:y+40*Math.sin(t*Math.PI*2),p:.4+.6*Math.sin(t*Math.PI)};});
 function stroke(id:string,blend:Record<string,unknown>={},patch:Partial<Stroke>={}):Stroke{
- const preset=stockPresets.find(p=>p.id===id)!;const settings={...preset.settings,bbEnabled:true,...blend};const {bbEnabled:_e,...plain}=settings;
- const metadata={...brushStrokeMetadata(settings)} as Record<string,unknown>;for(const key of ['bbMode','bbColorCarry','bbSoftness','bbTextureKeep','bbSmoothing','bbEdgeDarkness'])delete metadata[key];metadata.brushBlendVersion=2;
+ const preset=stockPresets.find(p=>p.id===id)!;const settings={...preset.settings,bbEnabled:true,bbPressure:true,...blend};const {bbEnabled:_e,...plain}=settings;
+ const metadata={...brushStrokeMetadata(settings)} as Record<string,unknown>;for(const key of ['bbMode','bbColorCarry','bbSoftness','bbTextureKeep','bbSmoothing','bbEdgeDarkness','bbStrength','bbMinPressure','bbPressureCurve','bbRenderStyle'])delete metadata[key];metadata.brushBlendVersion=2;
  return {...plain,...metadata,id:'v2-'+id,kind:'stroke',tool:'brush',color:'#00ff00',size:40,opacity:1,pressure:true,response:1,points:line(40,380,100),...patch} as Stroke;
 }
 const expected:Record<string,string>={'water-smooth':'water','water-rough':'water','water-wet':'water','water-flat':'water','water-gradient':'water','dry':'dry','dry-ink-bristle':'dry','dry-paint':'dry',hb:'pencil','2b':'pencil',mechanical:'pencil',blue:'pencil','g-pen':'ink',mapping:'ink',technical:'ink','brush-pen':'ink','studio-ink':'ink','contour-flow':'ink','color-air':'air',paint:'oil',flat:'oil','color-solid':'oil',marker:'marker','color-texture':'texture','color-soft':'soft','soft-paint':'soft'};
