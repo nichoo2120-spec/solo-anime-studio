@@ -40,7 +40,7 @@ describe('water edge v0.5.243',()=>{
  it('new strokes of every normal watercolor brush, Silk Wet and Blend watercolor save Edge darkness 0; only Watercolor Edge keeps it',()=>{
   const water=stockPresets.filter(p=>isNewWatercolorTip(p.settings.brushTip));
   expect(water.map(p=>p.id)).toEqual(['water-smooth','water-rough','water-wet','water-flat','water-gradient','water-edge']);
-  for(const p of water){const s=make(p.id),b=make(p.id,{bbEnabled:true});const want=p.id==='water-edge'?1:0;expect(s.edgeDarkness,p.id).toBe(want);expect(b.edgeDarkness,p.id+' blend').toBe(want);expect(b.brushBlendVersion).toBe(4);expect(b.bbEdgeDarkness).toBe(want);}
+  for(const p of water){const s=make(p.id),b=make(p.id,{bbEnabled:true});const want=p.id==='water-edge'?1:0;expect(s.edgeDarkness,p.id).toBe(want);expect(b.edgeDarkness,p.id+' blend').toBe(want);expect(b.brushBlendVersion).toBe(6);expect(b.bbEdgeDarkness).toBe(want);}
   expect(stockPresets.find(p=>p.id==='water-edge')!.name).toBe('Watercolor Edge');
   expect(make('silk-blend',silkWet).edgeDarkness).toBe(0);
   expect(make('silk-blend',{silkMode:'soft'}).edgeDarkness).toBeUndefined();
@@ -62,8 +62,8 @@ describe('water edge v0.5.243',()=>{
  for(const id of ['water-wet','water-rough','water-flat'])it(id+' in Blend mode: no dark border and no lighter rim; v0.5.242 strokes unchanged',()=>{
   const s=make(id,{bbEnabled:true}),m=mask(s.points);
   const c=flat(),before=c.data.slice();renderBrushBlend(c.ctx,m.canvas,s);const r=rim(before,c.data);expect(r.edge).toBeGreaterThan(-1.5);expect(r.light).toBeLessThan(1.5);
-  const {bbMode:_mode,bbColorCarry:_carry,bbSoftness:_softness,bbTextureKeep:_texture,bbSmoothing:_smoothing,bbEdgeDarkness:_edge,...rest}=s;
-  const legacy:Stroke={...rest,brushBlendVersion:2,edgeDarkness:undefined},o=flat(),ob=o.data.slice();renderBrushBlend(o.ctx,m.canvas,legacy);expect(rim(ob,o.data).edge).toBeLessThan(-3);
+  const {bbMode:_mode,bbColorCarry:_carry,bbSoftness:_softness,bbTextureKeep:_texture,bbSmoothing:_smoothing,bbEdgeDarkness:_edge,bbStrength:_strength,bbMinPressure:_min,bbPressureCurve:_curve,bbRenderStyle:_style,...rest}=s;
+  const legacy:Stroke={...rest,brushBlendVersion:2,bbPressure:true,edgeDarkness:undefined},o=flat(),ob=o.data.slice();renderBrushBlend(o.ctx,m.canvas,legacy);expect(rim(ob,o.data).edge).toBeLessThan(-3);
   const one=flat();renderBrushBlend(one.ctx,m.canvas,{...legacy,edgeDarkness:1});expect(hash(one.data)).toBe(hash(o.data));
  });
  it('Watercolor Edge in Blend mode keeps the darker wet edge, and Edge darkness 0 removes it',()=>{

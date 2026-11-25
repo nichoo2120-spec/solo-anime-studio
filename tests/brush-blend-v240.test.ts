@@ -24,10 +24,10 @@ function scene(){const s=surface(W,H);for(let y=30;y<170;y++)for(let x=0;x<W;x++
 function mask(points:Point[],r=26,grain=false){const m=surface(W,H);for(let y=0;y<H;y++)for(let x=0;x<W;x++){let a=0;for(const p of points){const d=Math.hypot(x-p.x,y-p.y);if(d<r){a=255;break;}}if(a&&grain&&x%3===0)a=90;if(a)m.data[(y*W+x)*4+3]=a;}return m;}
 const paint=stockPresets.find(p=>p.id==='soft-paint')!;
 function stroke(points:Point[],blend:Record<string,unknown>={},patch:Partial<Stroke>={}):Stroke{
- const settings={...paint.settings,bbEnabled:true,...blend};
+ const settings={...paint.settings,bbEnabled:true,bbPressure:true,...blend};
  const {bbEnabled:_e,...plain}=settings;
  // v0.5.240 strokes (brushBlendVersion 1): the frozen v1 recipe is tested here; v2 lives in brush-blend-v242.test.ts.
- const {bbStyle:_st,...meta}=brushStrokeMetadata(settings) as Record<string,unknown>;for(const key of ['bbMode','bbColorCarry','bbSoftness','bbTextureKeep','bbSmoothing','bbEdgeDarkness'])delete meta[key];
+ const {bbStyle:_st,...meta}=brushStrokeMetadata(settings) as Record<string,unknown>;for(const key of ['bbMode','bbColorCarry','bbSoftness','bbTextureKeep','bbSmoothing','bbEdgeDarkness','bbStrength','bbMinPressure','bbPressureCurve','bbRenderStyle'])delete meta[key];
  return {...plain,...meta,brushBlendVersion:1,id:'bb',kind:'stroke',tool:'brush',color:'#00ff00',size:40,opacity:1,pressure:true,response:1,points,...patch} as Stroke;
 }
 const line=(x0:number,x1:number,y:number,n=60)=>Array.from({length:n},(_,i)=>{const t=i/(n-1);return {x:x0+(x1-x0)*t,y,p:.4+.6*Math.sin(t*Math.PI)};});
@@ -44,7 +44,7 @@ describe('Paint / Blend switch v0.5.240',()=>{
   for(const p of stockPresets){const m=brushStrokeMetadata(p.settings) as Record<string,unknown>;expect(Object.keys(m).filter(k=>k.startsWith('bb')||k==='brushBlendVersion'),p.id).toEqual([]);
    const off=brushStrokeMetadata({...p.settings,bbEnabled:false,bbAmount:.2,bbSample:'all'});expect(JSON.stringify(off),p.id).toBe(JSON.stringify(m));}
   expect(brushBlendMetadata({brushKind:'paint'})).toEqual({});
-  expect(brushStrokeMetadata({...paint.settings,bbEnabled:true})).toMatchObject({brushBlendVersion:4,bbStyle:'soft',...blendDefaultsFor(paint.settings)});
+  expect(brushStrokeMetadata({...paint.settings,bbEnabled:true})).toMatchObject({brushBlendVersion:6,bbStyle:'soft',...blendDefaultsFor(paint.settings)});
  });
  it('Blend mode adds no brush colour and blends the colours already there',()=>{
   const s=stroke(line(120,320,100)),c=run(s),before=scene().data;let changed=0,green=0;
