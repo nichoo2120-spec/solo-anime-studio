@@ -17,6 +17,7 @@ export class DrawingPerformanceOverlay{
   const panel=document.createElement('output');
   panel.className='drawing-performance-overlay';
   panel.setAttribute('aria-label','Drawing performance');
+  panel.setAttribute('aria-live','off');
   this.host.append(panel);
   this.panel=panel;this.started=performance.now();this.frames=0;this.renderMs=0;
   this.publish(0);

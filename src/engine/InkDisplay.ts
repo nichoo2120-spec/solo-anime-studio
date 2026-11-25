@@ -466,8 +466,8 @@ export class InkDisplay{
    const out=preview.getContext('2d')!,{x,y,width,height}=dirty;
    out.resetTransform();out.globalAlpha=1;out.globalCompositeOperation='source-over';
    out.clearRect(x,y,width,height);out.drawImage(picture,x,y,width,height,x,y,width,height);
-   out.save();out.beginPath();out.rect(x,y,width,height);out.clip();out.setTransform(m);
-   this.draw(out,live,this.prepare(live,geometry,false),scale);out.restore();
+   out.setTransform(m);
+   this.draw(out,live,this.prepare(live,geometry,false),scale);
    this.liveKey=undefined;this.lastLive=undefined;
    picture=preview;
   }else if(live){
