@@ -37,7 +37,7 @@ export class OnionSkinOverlay {
   if(!layers.some(l=>l.operations.length))return;
   const original=renderer.cachedComposite({...project,layers},overrides);if(!original)return;
   const ratio=Math.min(1,1024/original.width),w=Math.max(1,Math.round(original.width*ratio)),h=Math.max(1,Math.round(original.height*ratio));
-  for(const [kind,color]of [['previous','#e87986'],['next','#53bdde']] as const){const canvas=makeCanvas(w,h),ctx=context(canvas);ctx.drawImage(original,0,0,w,h);ctx.globalCompositeOperation='source-in';ctx.fillStyle=color;ctx.fillRect(0,0,w,h);this.ghosts.set(frame.id+':'+kind+':'+color,{frame,signature:this.signature,canvas});}
+  for(const [kind,color]of [['previous','#e87986'],['next','#53bdde']] as const){const canvas=makeCanvas(w,h),ctx=context(canvas);ctx.drawImage(original,0,0,w,h);ctx.globalCompositeOperation='source-in';ctx.fillStyle=color;ctx.fillRect(0,0,w,h);this.keepGhost(frame.id+':'+kind+':'+color,{frame,signature:this.signature,canvas});}
   this.staleFrames.delete(frame.id);original.width=original.height=0;this.paint();
  }
  /** Avoid rerasterizing or repainting large pinned guides after ordinary pen commits.
@@ -52,7 +52,7 @@ export class OnionSkinOverlay {
  }
  setSettings(settings:OnionSettings){
   const rebuild=this.settings.currentLayerOnly!==settings.currentLayerOnly;
-  this.settings=settings;if(rebuild){this.ghosts.clear();this.signature='';}
+  this.settings=settings;if(rebuild){this.clearGhosts();this.signature='';}
   this.update(this.project);this.paint();
  }
  setView(view:View,width:number,height:number,dpr:number){
@@ -77,7 +77,7 @@ export class OnionSkinOverlay {
   if(signature===this.signature&&lastNeighbors.length===this.neighbors.length&&
     this.neighbors.every((n,i)=>n.frame===lastNeighbors[i].frame&&n.kind===lastNeighbors[i].kind&&n.opacity===lastNeighbors[i].opacity&&n.color===lastNeighbors[i].color&&n.dx===lastNeighbors[i].dx&&n.dy===lastNeighbors[i].dy&&n.scale===lastNeighbors[i].scale&&n.angle===lastNeighbors[i].angle))return;
   const sameSignature=signature===this.signature;
-  if(!sameSignature){this.signature=signature;this.ghosts.clear();}
+  if(!sameSignature){this.signature=signature;this.clearGhosts();}
   if(sameSignature&&lastNeighbors.length===this.neighbors.length&&this.neighbors.every((n,i)=>n.frame===lastNeighbors[i].frame&&n.kind===lastNeighbors[i].kind&&n.color===lastNeighbors[i].color)){this.paint();this.schedule();return;}
   this.generation++;
   this.previewWorker.cancel();this.cancelTask();
@@ -87,25 +87,33 @@ export class OnionSkinOverlay {
   const validFrames=new Set(frames);for(const id of this.staleFrames)if(!frames.some(f=>f.id===id))this.staleFrames.delete(id);
   const inactive:string[]=[];
   for(const [id,ghost] of this.ghosts){
-   if(!validFrames.has(ghost.frame))this.ghosts.delete(id);
+   if(!validFrames.has(ghost.frame))this.dropGhost(id);
    else if(!ids.has(id))inactive.push(id);
   }
-  for(const id of inactive.slice(0,Math.max(0,inactive.length-4)))this.ghosts.delete(id);
+  for(const id of inactive.slice(0,Math.max(0,inactive.length-4)))this.dropGhost(id);
   this.paint();this.schedule();
+ }
+ private dropGhost(key:string){
+  const ghost=this.ghosts.get(key);
+  if(ghost){ghost.canvas.width=ghost.canvas.height=0;this.ghosts.delete(key);}
+ }
+ private clearGhosts(){for(const key of this.ghosts.keys())this.dropGhost(key);}
+ private keepGhost(key:string,ghost:{frame:Guide['frame'];signature:string;canvas:HTMLCanvasElement}){
+  this.dropGhost(key);this.ghosts.set(key,ghost);
  }
  private key(n:Guide){return `${n.frame.id}:${n.kind}:${n.color??'original'}`;}
  private cancelTask(){if(this.task!==undefined){if(this.taskKind==='idle'&&'cancelIdleCallback' in window)window.cancelIdleCallback(this.task);else clearTimeout(this.task);this.task=undefined;this.taskKind=undefined;}}
  private schedule(){if(this.disposed||this.task!==undefined||this.busyGeneration===this.generation||!this.neighbors.some(n=>(this.ghosts.get(this.key(n))?.frame!==n.frame||this.staleFrames.has(n.frame.id))))return;
   const generation=this.generation;
   const render=()=>{this.task=undefined;this.taskKind=undefined;if(this.disposed||generation!==this.generation)return;
-   if(this.isDrawing()&&!this.previewWorker.available){
+   if(this.isDrawing()){
     // Never queue another idle callback immediately during an active pen stroke.
     // A pending Light Table ghost waits quietly until a short pause in drawing.
     this.taskKind='timeout';this.task=window.setTimeout(render,100);return;
    }
    void this.prepareOne(generation);
   };
-  if(this.isDrawing()&&!this.previewWorker.available){this.taskKind='timeout';this.task=window.setTimeout(render,100);}
+  if(this.isDrawing()){this.taskKind='timeout';this.task=window.setTimeout(render,100);}
   else if(this.previewWorker.available){this.taskKind='timeout';this.task=window.setTimeout(render,0);}
   else if('requestIdleCallback' in window){this.taskKind='idle';this.task=window.requestIdleCallback(render,{timeout:300});}
   else{this.taskKind='timeout';this.task=setTimeout(render,32) as unknown as number;}
@@ -119,10 +127,10 @@ export class OnionSkinOverlay {
   // renderer cannot evict the active drawing engine's layer caches.
   const snapshot={...project,animation:undefined,layers:scoped.map(l=>({...l,operations:neighbor.frame.drawings[l.id]??[]}))};
   if(!snapshot.layers.some(l=>l.operations.length)){
-   if(!this.disposed&&generation===this.generation){this.staleFrames.delete(neighbor.frame.id);this.ghosts.set(this.key(neighbor),{frame:neighbor.frame,signature:this.signature,canvas:makeCanvas(1,1)});}
+   if(!this.disposed&&generation===this.generation){this.staleFrames.delete(neighbor.frame.id);this.keepGhost(this.key(neighbor),{frame:neighbor.frame,signature:this.signature,canvas:makeCanvas(1,1)});}
   }else if(this.previewWorker.available){
-   try{const bitmap=await this.previewWorker.render(snapshot,neighbor.kind==='pin'?undefined:1024,neighbor.color);if(this.disposed||generation!==this.generation){bitmap.close();return;}const canvas=makeCanvas(bitmap.width,bitmap.height);context(canvas).drawImage(bitmap,0,0);bitmap.close();this.staleFrames.delete(neighbor.frame.id);this.ghosts.set(this.key(neighbor),{frame:neighbor.frame,signature:this.signature,canvas});}
-   catch(error){if(!this.disposed&&generation===this.generation){console.warn('Onion skin preview unavailable:',error);this.staleFrames.delete(neighbor.frame.id);this.ghosts.set(this.key(neighbor),{frame:neighbor.frame,signature:this.signature,canvas:makeCanvas(1,1)});}}
+   try{const bitmap=await this.previewWorker.render(snapshot,neighbor.kind==='pin'?undefined:1024,neighbor.color);if(this.disposed||generation!==this.generation){bitmap.close();return;}const canvas=makeCanvas(bitmap.width,bitmap.height);context(canvas).drawImage(bitmap,0,0);bitmap.close();this.staleFrames.delete(neighbor.frame.id);this.keepGhost(this.key(neighbor),{frame:neighbor.frame,signature:this.signature,canvas});}
+   catch(error){if(!this.disposed&&generation===this.generation){console.warn('Onion skin preview unavailable:',error);this.staleFrames.delete(neighbor.frame.id);this.keepGhost(this.key(neighbor),{frame:neighbor.frame,signature:this.signature,canvas:makeCanvas(1,1)});}}
    finally{if(this.busyGeneration===generation)this.busyGeneration=-1;}
   }else{
    const renderer=new LayerRenderer();
@@ -139,10 +147,10 @@ export class OnionSkinOverlay {
     const needsCopy=neighbor.color!==null||ratio<1;
     const tinted=needsCopy?makeCanvas(w,h):original;
     if(needsCopy){const ctx=context(tinted);ctx.drawImage(original,0,0,w,h);
-     if(neighbor.color){ctx.globalCompositeOperation='source-in';ctx.fillStyle=neighbor.color;ctx.fillRect(0,0,w,h);ctx.globalCompositeOperation='source-over';}}
-    if(!this.disposed&&generation===this.generation){this.staleFrames.delete(neighbor.frame.id);this.ghosts.set(this.key(neighbor),{frame:neighbor.frame,signature:this.signature,canvas:tinted});}
+     if(neighbor.color){ctx.globalCompositeOperation='source-in';ctx.fillStyle=neighbor.color;ctx.fillRect(0,0,w,h);ctx.globalCompositeOperation='source-over';}original.width=original.height=0;}
+    if(!this.disposed&&generation===this.generation){this.staleFrames.delete(neighbor.frame.id);this.keepGhost(this.key(neighbor),{frame:neighbor.frame,signature:this.signature,canvas:tinted});}
    }catch(error){console.warn('Onion skin preview unavailable:',error);
-    if(!this.disposed&&generation===this.generation){this.staleFrames.delete(neighbor.frame.id);this.ghosts.set(this.key(neighbor),{frame:neighbor.frame,signature:this.signature,canvas:makeCanvas(1,1)});}
+    if(!this.disposed&&generation===this.generation){this.staleFrames.delete(neighbor.frame.id);this.keepGhost(this.key(neighbor),{frame:neighbor.frame,signature:this.signature,canvas:makeCanvas(1,1)});}
    }finally{renderer.clear();if(this.busyGeneration===generation)this.busyGeneration=-1;}
   }
   if(this.busyGeneration===generation)this.busyGeneration=-1;
@@ -163,5 +171,5 @@ export class OnionSkinOverlay {
   }
   ctx.globalAlpha=1;ctx.restore();
  }
- dispose(){if(this.paintFrame)cancelAnimationFrame(this.paintFrame);this.paintFrame=0;this.disposed=true;this.generation++;this.cancelTask();this.previewWorker.dispose();this.staleFrames.clear();this.ghosts.clear();this.surface.remove();}
+ dispose(){if(this.paintFrame)cancelAnimationFrame(this.paintFrame);this.paintFrame=0;this.disposed=true;this.generation++;this.cancelTask();this.previewWorker.dispose();this.staleFrames.clear();this.clearGhosts();this.surface.remove();}
 }

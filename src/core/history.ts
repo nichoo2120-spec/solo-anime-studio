@@ -32,6 +32,7 @@ export class DocumentStore {
   this.project=state.project;this.entries=state.entries.slice();this.index=state.index;this.serial=state.serial;this.emit();
  }
  getHistory(){return this.entries.map((entry,index)=>({id:entry.id,label:entry.label,index,current:index===this.index,future:index>this.index}));}
+ get historySize(){return this.entries.length-1;}
  get currentIndex(){return this.index;}get canUndo(){return this.index>0;}get canRedo(){return this.index<this.entries.length-1;}
 }
 

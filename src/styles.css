@@ -748,3 +748,18 @@
 .custom-brush-list .custom-brush-name{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;border:0;background:transparent;font-size:11px;color:#e6eef2}
 .custom-brush-list .custom-brush-kind{font-size:9px;color:#7f969e;margin-right:2px}
 .custom-brush-list button.danger{border-color:#c4565b;color:#ffd3d5;background:#3a1a1d}
+
+.drawing-performance-overlay {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  padding: 8px 10px;
+  border: 1px solid #4b6068;
+  border-radius: 6px;
+  color: #e2eef1;
+  background: #142027ee;
+  font: 12px/1.45 monospace;
+  white-space: pre;
+  pointer-events: none;
+}

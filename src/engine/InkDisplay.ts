@@ -18,7 +18,7 @@ import type {RasterRegion} from './liveRaster';
 
 type MixGroup={operations:Layer['operations'];renderer:LayerRenderer;revision:number;matrix:number[];width:number;height:number;frameWidth:number;frameHeight:number;sharp:HTMLCanvasElement;baseline:BlendBaseline;bytes:number};
 
-type MixViewDelta={project:string;layer:string;before:Layer['operations'];after:Layer['operations'];renderer:LayerRenderer;matrix:number[];width:number;height:number;frameWidth:number;frameHeight:number;patch:HistoryTiles;bytes:number};
+type ViewDelta={project:string;layer:string;before:Layer['operations'];after:Layer['operations'];renderer?:LayerRenderer;matrix:number[];width:number;height:number;frameWidth:number;frameHeight:number;patch:HistoryTiles;bytes:number;inkKey?:Key};
 
 type Geometry=ReturnType<typeof strokeGeometry>;
 type Box={x:number;y:number;w:number;h:number};
@@ -33,6 +33,15 @@ export const displayCleanInk=(s:Stroke&ArtworkOrigin)=>!s.stampVersion&&!s.brush
 ));
 const native=(s:Stroke)=>!hasInkEdgeEffect(s)&&!s.inkProfileVersion&&!s.inkTipVersion&&!s.pressureOpacity&&!s.taperStart&&!s.taperEnd&&!(s.pressure&&s.pressureWidth!==false)&&!s.velocityTaper&&['technical','eraser-hard'].includes(s.brushKind??'technical');
 const clean=displayCleanInk;
+const displayInkRanges=new WeakMap<Layer['operations'],{firstClean:number;hasInk:boolean;count:number}>();
+function inkRange(operations:Layer['operations']){
+ const cached=displayInkRanges.get(operations);
+ if(cached?.count===operations.length)return cached;
+ let firstClean=operations.length,hasInk=false;
+ while(firstClean){const op=operations[firstClean-1];if(op.kind!=='stroke'||!clean(op))break;firstClean--;}
+ hasInk=firstClean<operations.length||operations.some(op=>op.kind==='stroke'&&clean(op));
+ const range={firstClean,hasInk,count:operations.length};displayInkRanges.set(operations,range);return range;
+}
 
 /** Clean ink uses the same display-resolution renderer at every zoom and stroke
  * count. Native bitmap prefixes retain their pixels. Scratch surfaces cover
@@ -44,7 +53,7 @@ export class InkDisplay{
  private key?:Key;private liveKey?:{base:Key;stroke:Stroke;geometry?:Geometry};
  private layers=new Map<string,{key:Key;surface:HTMLCanvasElement}>();
  private prefixes=new Map<string,{operations:Layer['operations'];canvas:HTMLCanvasElement;renderer:LayerRenderer;revision:number}>();
- private mixViewHistory=new Map<Layer['operations'][number],MixViewDelta>();private mixViewBytes=0;private readonly mixViewBudget=64*1024*1024;
+ private viewHistory=new Map<Layer['operations'][number],ViewDelta>();private viewHistoryBytes=0;private readonly viewHistoryBudget=64*1024*1024;private viewHistoryHits=0;
  private mixRebase=new Map<string,{project:string;operations:Layer['operations']}>();
  private mixGroups=new Map<string,MixGroup>();private mixGroupBytes=0;private readonly mixGroupBudget=64*1024*1024;
  private nativeFallback?:{base:Key;stroke:string;rect?:Box};
@@ -60,7 +69,7 @@ export class InkDisplay{
  async navigationBitmap(layer:Layer,p:Project,renderer:LayerRenderer):Promise<ImageBitmap|undefined>{
   if(typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined'||typeof createImageBitmap==='undefined')return;
   const generation=this.navigationGeneration;
-  let firstClean=0;for(let i=layer.operations.length-1;i>=0;i--){const op=layer.operations[i];if(op.kind!=='stroke'||!clean(op)){firstClean=i+1;break;}}
+  const {firstClean}=inkRange(layer.operations);
   if(firstClean===layer.operations.length)return;
   // Navigation workers only know the original stroke geometry. A warped ink
   // stroke must not be painted at its unwarped coordinates by that worker.
@@ -82,7 +91,7 @@ export class InkDisplay{
   }catch{base?.close();}
  }
  clear(){
-  for(const entry of this.mixViewHistory.values())entry.patch.clear();this.mixViewHistory.clear();this.mixViewBytes=0;this.mixRebase.clear();
+  for(const entry of this.viewHistory.values())entry.patch.clear();this.viewHistory.clear();this.viewHistoryBytes=0;this.mixRebase.clear();
   for(const group of this.mixGroups.values()){group.sharp.width=group.sharp.height=0;const seed=group.baseline.seed;if(seed)seed.mask.width=seed.mask.height=seed.paint.width=seed.paint.height=0;}this.mixGroups.clear();this.mixGroupBytes=0;
   this.navigationGeneration++;this.navigationWorker?.terminate();this.navigationWorker=undefined;this.navigationStates.clear();for(const job of this.navigationJobs.values()){clearTimeout(job.timer);job.finish({error:"Navigation cancelled"});}this.navigationJobs.clear();
   this.viewSerial++;this.viewWorker?.terminate();this.viewWorker=undefined;if(this.viewPending)clearTimeout(this.viewPending.timer);this.viewPending=undefined;this.viewFailed=false;
@@ -197,7 +206,7 @@ export class InkDisplay{
   // that worker when a projective clean-ink stroke is present; the settled
   // main-thread paint still redraws at the full device pixel ratio.
   if(layer.operations.some(op=>op.kind==='stroke'&&op.perspective))return true;
-  let firstClean=0;for(let i=layer.operations.length-1;i>=0;i--){const op=layer.operations[i];if(op.kind!=='stroke'||!clean(op)){firstClean=i+1;break;}}if(firstClean===layer.operations.length)return true;
+  const {firstClean}=inkRange(layer.operations);if(firstClean===layer.operations.length)return true;
   const m=ctx.getTransform(),matrix=[m.a,m.b,m.c,m.d,m.e,m.f],w=ctx.canvas.width,h=ctx.canvas.height,cached=this.layers.get(layer.id),key:Key={operations:layer.operations,matrix,firstClean,width:w,height:h,frameWidth:p.width,frameHeight:p.height,renderer,rendererRevision:firstClean?renderer.displayRevision:0};
   if(cached&&cached.key.operations===key.operations&&cached.key.renderer===renderer&&cached.key.rendererRevision===key.rendererRevision&&cached.key.width===w&&cached.key.height===h&&cached.key.frameWidth===p.width&&cached.key.frameHeight===p.height&&cached.key.matrix.every((v,i)=>v===matrix[i]))return true;
   if(layer.operations.slice(0,firstClean).some(op=>op.kind==='stroke'&&clean(op)))return true;
@@ -212,18 +221,35 @@ export class InkDisplay{
   }catch{fail();return true;}
  }
  private rememberMixView(previous:Layer,layer:Layer,p:Project,renderer:LayerRenderer,m:DOMMatrix,before:HTMLCanvasElement,after:HTMLCanvasElement){
-  const op=layer.operations.at(-1);if(!op||op.kind!=='stroke'||!op.nativeMixVersion&&op.paintTipVersion!==2&&op.dryBristleVersion!==3||this.mixViewHistory.has(op))return;
+  const op=layer.operations.at(-1);if(!op||op.kind!=='stroke'||!op.nativeMixVersion&&op.paintTipVersion!==2&&op.dryBristleVersion!==3||this.viewHistory.has(op))return;
   const b=strokeRasterBounds(op,p.width,p.height),box=this.screenBounds({...op,transform:undefined,perspective:undefined},{x:b.x,y:b.y,w:b.width,h:b.height},m,before.width,before.height);if(!box)return;
-  const x=Math.max(0,box.x-4),y=Math.max(0,box.y-4),right=Math.min(before.width,box.x+box.w+4),bottom=Math.min(before.height,box.y+box.h+4),rect={x,y,width:right-x,height:bottom-y},bytes=rect.width*rect.height*8;if(bytes>this.mixViewBudget)return;
-  while(this.mixViewHistory.size&&(this.mixViewBytes+bytes>this.mixViewBudget||this.mixViewHistory.size>=160)){const oldest=this.mixViewHistory.keys().next().value!,entry=this.mixViewHistory.get(oldest)!;this.mixViewHistory.delete(oldest);this.mixViewBytes-=entry.bytes;entry.patch.clear();}
-  // Display history is optional; canonical undo remains available if a
-  // device cannot allocate another view patch.
-  let patch:HistoryTiles|undefined;try{patch=new HistoryTiles(before,rect);patch.finish(after);this.mixViewHistory.set(op,{project:p.id,layer:layer.id,before:previous.operations,after:layer.operations,renderer,matrix:[m.a,m.b,m.c,m.d,m.e,m.f],width:before.width,height:before.height,frameWidth:p.width,frameHeight:p.height,patch,bytes});this.mixViewBytes+=bytes;}catch{patch?.clear();}
+  const x=Math.max(0,box.x-4),y=Math.max(0,box.y-4),right=Math.min(before.width,box.x+box.w+4),bottom=Math.min(before.height,box.y+box.h+4),rect={x,y,width:right-x,height:bottom-y},bytes=rect.width*rect.height*8;if(bytes>this.viewHistoryBudget)return;
+  const patch=this.captureViewPatch(before,rect);
+  if(patch)this.keepViewPatch(op,layer,p,previous.operations,renderer,[m.a,m.b,m.c,m.d,m.e,m.f],patch,after);
  }
- private restoreMixView(out:CanvasRenderingContext2D,key:Key,layer:Layer,p:Project,renderer:LayerRenderer){
+ private captureViewPatch(surface:HTMLCanvasElement,rect:{x:number;y:number;width:number;height:number}){
+  const bytes=rect.width*rect.height*8;
+  if(!bytes||bytes>this.viewHistoryBudget)return;
+  while(this.viewHistory.size&&(this.viewHistoryBytes+bytes>this.viewHistoryBudget||this.viewHistory.size>=160)){
+   const oldest=this.viewHistory.keys().next().value!,entry=this.viewHistory.get(oldest)!;
+   this.viewHistory.delete(oldest);this.viewHistoryBytes-=entry.bytes;entry.patch.clear();
+  }
+  try{return new HistoryTiles(surface,rect);}catch{return undefined;}
+ }
+ private keepViewPatch(op:Stroke,layer:Layer,p:Project,before:Layer['operations'],renderer:LayerRenderer|undefined,matrix:number[],patch:HistoryTiles,surface:HTMLCanvasElement,inkKey?:Key){
+  try{
+   patch.finish(surface);
+   this.viewHistory.set(op,{project:p.id,layer:layer.id,before,after:layer.operations,renderer,matrix,width:surface.width,height:surface.height,frameWidth:p.width,frameHeight:p.height,patch,bytes:patch.bytes,inkKey});
+   this.viewHistoryBytes+=patch.bytes;
+  }catch{patch.clear();}
+ }
+ historyStats(){return {bytes:this.viewHistoryBytes,budget:this.viewHistoryBudget,patches:this.viewHistory.size,hits:this.viewHistoryHits};}
+ private restoreViewHistory(out:CanvasRenderingContext2D,key:Key,layer:Layer,p:Project,renderer?:LayerRenderer){
   const old=key.operations,next=layer.operations,undo=next.length<old.length&&next.every((op,i)=>op===old[i]),redo=old.length<next.length&&old.every((op,i)=>op===next[i]);if(!undo&&!redo)return false;
-  const source=undo?old:next,start=undo?next.length:old.length,patches=source.slice(start).map((op,i)=>{const d=this.mixViewHistory.get(op);return d&&d.project===p.id&&d.layer===layer.id&&d.renderer===renderer&&d.width===out.canvas.width&&d.height===out.canvas.height&&d.frameWidth===p.width&&d.frameHeight===p.height&&d.matrix.every((v,j)=>v===key.matrix[j])&&d.before.length===start+i&&d.before.every((v,j)=>v===source[j])?d:undefined;});
+  const source=undo?old:next,start=undo?next.length:old.length,patches=source.slice(start).map((op,i)=>{const d=this.viewHistory.get(op);return d&&d.project===p.id&&d.layer===layer.id&&d.renderer===renderer&&d.width===out.canvas.width&&d.height===out.canvas.height&&d.frameWidth===p.width&&d.frameHeight===p.height&&d.matrix.every((v,j)=>v===key.matrix[j])&&(!d.inkKey||d.inkKey.firstClean===key.firstClean&&d.inkKey.rendererRevision===key.rendererRevision)&&d.before.length===start+i&&(i===0&&d.before===(undo?next:old)||d.before.every((v,j)=>v===source[j]))?d:undefined;});
   if(!patches.every(d=>!!d))return false;for(const d of undo?patches.reverse():patches)d!.patch.restore(out,undo?'before':'after');
+  this.viewHistoryHits++;this.lastLive=undefined;this.liveKey=undefined;
+  if(patches.every(d=>d?.inkKey))return true;
   this.clearNativePreview();const group=this.mixGroups.get(layer.id);if(group){this.mixGroups.delete(layer.id);this.mixGroupBytes-=group.bytes;group.sharp.width=group.sharp.height=0;const seed=group.baseline.seed;if(seed)seed.mask.width=seed.mask.height=seed.paint.width=seed.paint.height=0;}
   this.mixRebase.set(layer.id,{project:p.id,operations:layer.operations});this.lastLive=undefined;this.liveKey=undefined;return true;
  }
@@ -277,14 +303,13 @@ export class InkDisplay{
  setPendingNativeLayer(layer:Layer,p:Project){const n=this.nativePreview;if(n&&layer.operations.at(-1)?.id===n.stroke)n.target={layer,project:p.id,frame:p.animation?.activeFrameId};}
  paintPendingNative(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer){const target=this.nativePreview?.target;if(target&&target.layer.id===layer.id&&target.project===p.id&&target.frame===p.animation?.activeFrameId&&target.layer.operations.length<=layer.operations.length&&target.layer.operations.every((op,i)=>op===layer.operations[i])&&this.presentCommittedMix(ctx,target.layer,p,renderer))return true;const entry=this.layers.get(layer.id),key=entry?.key,m=ctx.getTransform();if(!entry||!key||key.renderer!==renderer||key.width!==ctx.canvas.width||key.height!==ctx.canvas.height||key.frameWidth!==p.width||key.frameHeight!==p.height||![m.a,m.b,m.c,m.d,m.e,m.f].every((v,i)=>v===key.matrix[i])||key.operations.length>layer.operations.length||!key.operations.every((op,i)=>op===layer.operations[i]))return false;ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.drawImage(entry.surface,0,0);ctx.restore();return true;}
  finishNativePreview(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer){this.presentCommittedMix(ctx,layer,p,renderer,false);}
- paint(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,live?:Stroke,geometry?:Geometry,renderer?:LayerRenderer):boolean{
+ paint(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,live?:Stroke,geometry?:Geometry,renderer?:LayerRenderer,dirty?:RasterRegion):boolean{
   if(!live&&renderer&&this.presentCommittedMix(ctx,layer,p,renderer))return true;
   const m=ctx.getTransform(),scale=Math.hypot(m.a,m.b);
   if(!ctx.canvas.width||!ctx.canvas.height||!Number.isFinite(scale)||scale<=0||!layer.operations.length&&!live||live&&!clean(live))return false;
-  let firstClean=0;
-  for(let i=layer.operations.length-1;i>=0;i--){const op=layer.operations[i];if(op.kind!=='stroke'||!clean(op)){firstClean=i+1;break;}}
-  if(firstClean===layer.operations.length&&!live&&!layer.operations.some(op=>op.kind==='stroke'&&clean(op))||firstClean&&!renderer)return false;
-  this.paintRegion(ctx,layer,p,firstClean,live,geometry,renderer);return true;
+  const {firstClean,hasInk}=inkRange(layer.operations);
+  if(!live&&!hasInk||firstClean&&!renderer)return false;
+  this.paintRegion(ctx,layer,p,firstClean,live,geometry,renderer,true,dirty);return true;
  }
  /** Apply a live native paint result only where it changes the sharp layer.
   * Restoring its dirty footprint avoids a whole-layer sharp/blur switch. */
@@ -352,7 +377,7 @@ export class InkDisplay{
  /** Prepare the existing native paint prefix before the first clean-ink
   * contact. This creates no provisional stroke and does not change artwork. */
  primeBase(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,renderer:LayerRenderer){
-  let firstClean=0;for(let i=layer.operations.length-1;i>=0;i--){const op=layer.operations[i];if(op.kind!=='stroke'||!clean(op)){firstClean=i+1;break;}}
+  const {firstClean}=inkRange(layer.operations);
   this.paintRegion(ctx,layer,p,firstClean,undefined,undefined,renderer,false);
  }
  /** Borrow only until the next paint; callers retaining pixels must copy. */
@@ -361,7 +386,7 @@ export class InkDisplay{
   const scale=Math.hypot(m.a,m.b);
    for(const s of strokes){
     if(s.opacity===0)continue;
-    if(!native(s)&&!hasInkEdgeEffect(s)&&s.flatNibVersion!==1&&!s.transform&&!s.perspective&&(s===live||this.solidLive.matches(s))){const direct=s.tool==='brush'&&s.opacity===1,picture=this.solidLive.paint(s,s===live&&geometry?geometry:finalGeometry(s),m,w,h,direct?out.canvas:undefined,direct?{}:undefined);this.rememberLivePaths(s,this.solidLive.lastPaths,s===live);out.resetTransform();out.globalAlpha=s.opacity;out.globalCompositeOperation=s.tool==='eraser'?'destination-out':'source-over';if(direct)out.clearRect(0,0,w,h);out.drawImage(picture,0,0);continue;}
+    if(!native(s)&&!hasInkEdgeEffect(s)&&s.flatNibVersion!==1&&!s.transform&&!s.perspective&&(s===live||s.inkEdgeVersion!==1&&this.solidLive.matches(s))){const direct=s.tool==='brush'&&s.opacity===1,picture=this.solidLive.paint(s,s===live&&geometry?geometry:finalGeometry(s),m,w,h,direct?out.canvas:undefined,direct?{}:undefined);this.rememberLivePaths(s,this.solidLive.lastPaths,s===live);out.resetTransform();out.globalAlpha=s.opacity;out.globalCompositeOperation=s.tool==='eraser'?'destination-out':'source-over';if(direct)out.clearRect(0,0,w,h);out.drawImage(picture,0,0);continue;}
     if(s.flatNibVersion===1&&!s.transform&&!s.perspective&&(s===live||this.flatLive.matches(s))){const picture=this.flatLive.paint(s,s===live&&geometry?geometry:finalGeometry(s),m,w,h);if(s!==live&&this.flatLive.lastPaths){const prepared=this.prepare(s),paths=this.flatLive.lastPaths;if(this.prepared.get(s)===prepared&&paths.items.length<=2048){this.pathBatches-=prepared.paths?.items.length??0;prepared.paths=paths;this.pathBatches+=paths.items.length;this.trim();}}out.resetTransform();out.globalAlpha=s.opacity;out.globalCompositeOperation=s.tool==='eraser'?'destination-out':'source-over';out.drawImage(picture,0,0);continue;}
     const prepared=this.prepare(s,s===live?geometry:undefined,s!==live),rect=this.screenBounds(s,prepared.bounds,m,w,h);if(!rect)continue;
     // Opaque paint is associative source-over. A native stroke is one Canvas
@@ -402,7 +427,7 @@ export class InkDisplay{
    snapshot.then(bitmap=>{if(this.pending!==job){bitmap.close();return;}base.width=base.height=0;worker.postMessage({token,stroke:s,geometry:finalGeometry(s),matrix:[m.a,m.b,m.c,m.d,m.e,m.f],width:w,height:h,base:bitmap},[bitmap]);}).catch(()=>this.failPending());return true;
   }catch{return false;}
  }
- private paintRegion(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,firstClean:number,live?:Stroke,geometry?:Geometry,renderer?:LayerRenderer,present=true){
+ private paintRegion(ctx:CanvasRenderingContext2D,layer:Layer,p:Project,firstClean:number,live?:Stroke,geometry?:Geometry,renderer?:LayerRenderer,present=true,dirty?:RasterRegion){
   const m=ctx.getTransform(),scale=Math.hypot(m.a,m.b),w=ctx.canvas.width,h=ctx.canvas.height;
   const cached=this.layers.get(layer.id);this.key=cached?.key;this.surface=cached?.surface;
   const matrix=[m.a,m.b,m.c,m.d,m.e,m.f],key=this.key;
@@ -411,12 +436,20 @@ export class InkDisplay{
    const surface=this.surface??=document.createElement('canvas');if(surface.width!==w)surface.width=w;if(surface.height!==h)surface.height=h;
    const out=surface.getContext('2d')!;out.resetTransform();out.globalAlpha=1;out.globalCompositeOperation='source-over';
    const append=sameView&&key!.firstClean===firstClean&&key!.operations.length<=layer.operations.length&&key!.operations.every((op,i)=>op===layer.operations[i]);
-   const restored=sameView&&!!renderer&&this.restoreMixView(out,key!,layer,p,renderer);
+   const restored=sameView&&this.restoreViewHistory(out,key!,layer,p,renderer);
    if(!restored){
    if(!append){out.clearRect(0,0,w,h);if(firstClean&&renderer)this.paintPrefix(out,layer,p,firstClean,renderer,m,w,h);out.resetTransform();}
    const added=append?layer.operations.slice(key!.operations.length):[],last=added[0];
    const deferred=added.length===1&&last.kind==='stroke'&&this.deferFinal(layer,last,key!,m,w,h);
-   if(!deferred)this.paintStrokes(out,layer.operations.slice(append?key!.operations.length:firstClean) as Stroke[],m,w,h);
+   if(!deferred){
+    // A pen commit changes only its footprint on this display-resolution layer.
+    // Cache exact before/after pixels so undo can avoid replaying every preceding stroke.
+    const ink=added.length===1&&last.kind==='stroke'&&!this.pending&&!this.viewHistory.has(last)&&!last.transform&&!last.perspective?last:undefined;
+    const box=ink?this.screenBounds(ink,this.prepare(ink).bounds,m,w,h):undefined;
+    const patch=box?this.captureViewPatch(surface,{x:box.x,y:box.y,width:box.w,height:box.h}):undefined;
+    this.paintStrokes(out,layer.operations.slice(append?key!.operations.length:firstClean) as Stroke[],m,w,h);
+    if(ink&&patch)this.keepViewPatch(ink,layer,p,key!.operations,renderer,matrix,patch,surface,key);
+   }
    }
    this.key={operations:layer.operations,matrix,firstClean,width:w,height:h,frameWidth:p.width,frameHeight:p.height,renderer,rendererRevision:firstClean?renderer?.displayRevision:0};
   }
@@ -425,7 +458,19 @@ export class InkDisplay{
   let bytes=0;for(const entry of this.layers.values())bytes+=entry.surface.width*entry.surface.height*4;
   while(this.layers.size>8||this.layers.size>1&&bytes>64*1024*1024){const oldest=this.layers.keys().next().value!,entry=this.layers.get(oldest)!;bytes-=entry.surface.width*entry.surface.height*4;entry.surface.width=entry.surface.height=0;this.layers.delete(oldest);}
   let picture=this.surface!;
-  if(live){
+  if(live?.inkEdgeVersion===1&&geometry&&live.points.length<80&&live.opacity===1&&!hasInkEdgeEffect(live)&&dirty?.width&&dirty.height){
+   // The caller already clips to this device-pixel band. Compose short strokes
+   // inside it and keep the regular incremental path for long strokes.
+   const preview=this.preview??=document.createElement('canvas');
+   if(preview.width!==w)preview.width=w;if(preview.height!==h)preview.height=h;
+   const out=preview.getContext('2d')!,{x,y,width,height}=dirty;
+   out.resetTransform();out.globalAlpha=1;out.globalCompositeOperation='source-over';
+   out.clearRect(x,y,width,height);out.drawImage(picture,x,y,width,height,x,y,width,height);
+   out.save();out.beginPath();out.rect(x,y,width,height);out.clip();out.setTransform(m);
+   this.draw(out,live,this.prepare(live,geometry,false),scale);out.restore();
+   this.liveKey=undefined;this.lastLive=undefined;
+   picture=preview;
+  }else if(live){
    const direct=!native(live)&&!hasInkEdgeEffect(live)&&live.flatNibVersion!==1&&!live.transform&&!live.perspective&&live.tool==='brush'&&live.opacity===1;
    if(direct){this.flatLive.clear();picture=this.solidLive.paint(live,geometry??finalGeometry(live),m,w,h,this.surface,this.key);this.liveKey=undefined;}
    else{

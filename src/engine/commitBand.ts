@@ -23,6 +23,14 @@ export function strokeBand(last:BandFrame|undefined,now:BandFrame,dirty:RasterRe
 // Brushes whose pixels are fully bounded by strokeRasterBounds. Mix, smudge
 // and blend strokes sample neighbours, so they always use a full redraw.
 const bounded=(o:Layer['operations'][number]):o is Stroke=>o.kind==='stroke'&&(o as Stroke).nativeMixVersion===undefined&&(o as Stroke).smudgeVersion===undefined&&!/blend|smudge|mix/i.test(String((o as any).brushTip??'')+' '+String((o as any).brushKind??'')+' '+String((o as any).coloringEngine??''));
+/** Onion frames are painted on a separate canvas. The main canvas keeps
+ * the same presentation across edits to the active cel's drawing. */
+export function sameCanvasProject(a:Project,b:Project){
+ if(a.animation?.activeFrameId!==b.animation?.activeFrameId)return false;
+ for(const key of Object.keys(b) as (keyof Project)[])if(key!=='layers'&&key!=='animation'&&a[key]!==b[key])return false;
+ return Object.keys(a).every(key=>key in b);
+}
+
 export function commitBandRegion(last:BandFrame|undefined,now:BandFrame):RasterRegion|undefined{
  if(!last||!last.exact||!sameView(last,now)||Math.abs(now.rotation)>1e-9||last.revision!==now.revision)return;
  const a=last.p,b=now.p;
@@ -30,9 +38,8 @@ export function commitBandRegion(last:BandFrame|undefined,now:BandFrame):RasterR
  // already exact, so nothing is repainted (no extra full redraw).
  if(a===b&&last.band&&!last.extra)return {x:0,y:0,width:0,height:0};
  if(a===b||a.id!==b.id||a.width!==b.width||a.height!==b.height||a.settings!==b.settings||a.layers.length!==b.layers.length)return;
- // Any other project change (camera, frames, size, settings...) means a full redraw.
- for(const k of Object.keys(b) as (keyof Project)[])if(k!=='layers'&&a[k]!==b[k])return;
- for(const k of Object.keys(a))if(!(k in b))return;
+ // A frame switch, camera or other main canvas presentation change invalidates the band.
+ if(!sameCanvasProject(a,b))return;
  let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity,changed=0;
  for(let i=0;i<a.layers.length;i++){const x=a.layers[i],y=b.layers[i];if(x===y)continue;
   if(x.id!==y.id||x.kind!==y.kind||x.kind==='vector'||x.visible!==y.visible||x.opacity!==y.opacity||x.blend!==y.blend||(x as any).reference!==(y as any).reference||(x as any).clip!==(y as any).clip)return;
@@ -40,10 +47,12 @@ export function commitBandRegion(last:BandFrame|undefined,now:BandFrame):RasterR
   for(const k of Object.keys(x) as (keyof Layer)[])if(!(k in y))return;
   const [short,long]=x.operations.length<=y.operations.length?[x.operations,y.operations]:[y.operations,x.operations];
   if(!short.every((o,j)=>o===long[j]))return;
-  // Clean-ink layers use the display-resolution ink surface; keep their full redraw.
-  if(long.some(o=>o.kind==='stroke'&&displayCleanInk(o as Stroke)))return;
+  // Legacy display contours retain their existing full redraw. The versioned
+  // sharp contour has a bounded footprint shared with the live preview.
+  const changedOps=long.slice(short.length);
+  if(changedOps.some(o=>o.kind==='stroke'&&o.inkEdgeVersion!==1)&&long.some(o=>o.kind==='stroke'&&displayCleanInk(o)))return;
   if(!x.visible)continue;
-  for(const o of long.slice(short.length)){if(!bounded(o))return;const r=strokeRasterBounds(o,a.width,a.height);left=Math.min(left,r.x);top=Math.min(top,r.y);right=Math.max(right,r.x+r.width);bottom=Math.max(bottom,r.y+r.height);changed++;}
+  for(const o of changedOps){if(!bounded(o))return;const r=strokeRasterBounds(o,a.width,a.height);left=Math.min(left,r.x);top=Math.min(top,r.y);right=Math.max(right,r.x+r.width);bottom=Math.max(bottom,r.y+r.height);changed++;}
  }
  if(!changed)return;
  const s=now.zoom*now.dpr,pad=3;

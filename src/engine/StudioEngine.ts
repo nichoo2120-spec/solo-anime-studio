@@ -51,6 +51,7 @@ import {pressureResponse,strokeGeometry} from './strokeGeometry';
 import {StrokeDiagnostics} from './StrokeDiagnostics';
 import {finalGeometry,strokeSnapshot} from './geometryCache';
 import {DrawingPerformance} from './DrawingPerformance';
+import {DrawingPerformanceOverlay} from './DrawingPerformanceOverlay';
 import {DrawingBugRecorder} from './DrawingBugRecorder';
 import {wheelZoom} from '../core/wheelZoom';
 import {InkDisplay,displayCleanInk} from './InkDisplay';
@@ -69,6 +70,7 @@ export type {TransformSettings} from './selectionControls';
 export class StudioEngine {
  readonly onion:OnionSkinOverlay;
  readonly flipbook:FlipbookOverlay;
+ private performanceOverlay:DrawingPerformanceOverlay;
  readonly performance=new DrawingPerformance();readonly diagnostics=new StrokeDiagnostics();private liveGeometry?:ReturnType<typeof strokeGeometry>;private liveTip?:Point;private geometryDirty=false;
  private drawingFrames=new DrawingFrameCache();private editingSnapshot=new EditingSceneSnapshot();private drawingWarmup?:{kind:'idle'|'timer';id:number};
  readonly recorder=new DrawingBugRecorder(this.diagnostics,this.performance);private rasterScene=new RasterSceneDisplay(()=>{this.drawingFrames.invalidate();this.request();});private navigationScene=new RasterSceneDisplay(()=>this.request(),true,(layer,p,renderer)=>this.inkDisplay.navigationBitmap(layer,p,renderer));private viewMoving=false;private viewRefining=false;private viewRefineTimer?:ReturnType<typeof setTimeout>;private liveRaster=new LiveStrokeRaster();private inkDisplay=new InkDisplay(()=>{this.drawingFrames.invalidate();this.request();});private backdrop=new CanvasBackdrop();private viewPending=false;private navigationSnapshot=new NavigationSnapshot();private hasRendered=false;private historyPending?:{action:string;at:number};
@@ -109,6 +111,10 @@ export class StudioEngine {
   this.vectors=new VectorController(store,()=>this.brush,()=>this.request(),notify,()=>this.mirrorDrawing);this.smoothing=new SmoothingController(store,()=>this.request(),notify);
   this.editing=new EditingController(store,()=>this.renderer,()=>this.selection,p=>{this.clearSelection();this.selection=p;this.onSelection(p.length>=3);this.request();},notify);
   this.references=new ReferenceController(store,()=>this.renderer,notify,()=>this.drawing);
+  this.performanceOverlay=new DrawingPerformanceOverlay(canvas.parentElement!,()=>{
+   const raster=this.renderer.cacheStats(),view=this.inkDisplay.historyStats();
+   return {entries:store.historySize,bytes:raster.totalBytes+view.bytes,budget:raster.budget+view.budget};
+  });
   this.onion=new OnionSkinOverlay(canvas.parentElement!,store.getSnapshot(),()=>this.drawing);
   this.cursorOverlay=document.createElement('canvas');this.cursorOverlay.className='brush-cursor-overlay';canvas.parentElement?.appendChild(this.cursorOverlay);
   this.flipbook=new FlipbookOverlay(canvas.parentElement!,store.getSnapshot(),()=>this.drawing);
@@ -128,7 +134,7 @@ export class StudioEngine {
   canvas.addEventListener('pointerdown',this.down);canvas.addEventListener('pointermove',this.move);canvas.addEventListener('pointerrawupdate',this.rawMove);canvas.addEventListener('pointerup',this.up);canvas.addEventListener('pointercancel',this.cancel);canvas.addEventListener('lostpointercapture',this.lostCapture);canvas.addEventListener('wheel',this.wheel,{passive:false});canvas.addEventListener('pointerleave',this.leave);
   window.addEventListener('pointermove',this.windowMove,true);window.addEventListener('blur',this.blur);window.addEventListener('lostpointercapture',this.windowLostCapture,true);this.resize();this.fit();
  }
- dispose(){if(this.rasterCacheTimer)clearTimeout(this.rasterCacheTimer);this.editingSnapshot.clear();this.blendWorker.dispose();this.cancelDrawingWarmup();this.drawingFrames.clear();this.navigationSnapshot.clear();this.navigationHost.remove();if(this.canvasStack){this.canvas.style.zIndex=this.canvasStack.zIndex;this.canvas.style.position=this.canvasStack.position;}this.stopViewMotion();this.navigationScene.dispose();this.rasterScene.dispose();this.cancelGesture();this.recorder.stop();this.renderer.clear();this.inkDisplay.clear();this.backdrop.clear();this.liveRaster.reset();window.removeEventListener('pointermove',this.windowMove,true);window.removeEventListener('blur',this.blur);window.removeEventListener('lostpointercapture',this.windowLostCapture,true);this.disposed=true;this.observer.disconnect();this.unsubscribe();cancelAnimationFrame(this.frame);this.worker?.terminate();this.canvas.removeEventListener('pointerdown',this.down);this.canvas.removeEventListener('pointermove',this.move);this.canvas.removeEventListener('pointerrawupdate',this.rawMove);this.canvas.removeEventListener('pointerup',this.up);this.canvas.removeEventListener('pointercancel',this.cancel);this.canvas.removeEventListener('lostpointercapture',this.lostCapture);this.canvas.removeEventListener('wheel',this.wheel);this.canvas.removeEventListener('pointerleave',this.leave);this.cursorOverlay.remove();this.onion.dispose();this.flipbook.dispose();}
+ dispose(){this.performanceOverlay.dispose();if(this.rasterCacheTimer)clearTimeout(this.rasterCacheTimer);this.editingSnapshot.clear();this.blendWorker.dispose();this.cancelDrawingWarmup();this.drawingFrames.clear();this.navigationSnapshot.clear();this.navigationHost.remove();if(this.canvasStack){this.canvas.style.zIndex=this.canvasStack.zIndex;this.canvas.style.position=this.canvasStack.position;}this.stopViewMotion();this.navigationScene.dispose();this.rasterScene.dispose();this.cancelGesture();this.recorder.stop();this.renderer.clear();this.inkDisplay.clear();this.backdrop.clear();this.liveRaster.reset();window.removeEventListener('pointermove',this.windowMove,true);window.removeEventListener('blur',this.blur);window.removeEventListener('lostpointercapture',this.windowLostCapture,true);this.disposed=true;this.observer.disconnect();this.unsubscribe();cancelAnimationFrame(this.frame);this.worker?.terminate();this.canvas.removeEventListener('pointerdown',this.down);this.canvas.removeEventListener('pointermove',this.move);this.canvas.removeEventListener('pointerrawupdate',this.rawMove);this.canvas.removeEventListener('pointerup',this.up);this.canvas.removeEventListener('pointercancel',this.cancel);this.canvas.removeEventListener('lostpointercapture',this.lostCapture);this.canvas.removeEventListener('wheel',this.wheel);this.canvas.removeEventListener('pointerleave',this.leave);this.cursorOverlay.remove();this.onion.dispose();this.flipbook.dispose();}
  captureBugCanvas():string|null{try{return this.canvas.toDataURL('image/png');}catch{return null;}}
  get drawing(){return !!(this.mirrorPivotDrag||this.stroke||this.lasso||this.strokePending||this.pan||this.drag||this.navigation||this.vectors.drawing||this.smoothing.previewLayer);}
  // Some tablet/browser integrations emit raw pen updates but no normal pointermoves.
@@ -607,7 +613,7 @@ export class StudioEngine {
    if(e.pointerType==='pen')end.p=inputPressure(e.pressure,this.vectors.lastPressure);
    this.vectors.up(end);}
   if(this.navigation){if(this.tool==='zoom'&&!this.navigation.moved)this.zoomTo(this.view.zoom*(this.navigation.alt?.8:1.25));this.navigation=undefined;}
-  const stroke=this.finalizeStroke(this.stroke),target=this.strokeTarget;this.recorder.event('gesture-end',{reason:'release',id:this.capture?.gestureId,pointerId:this.pointerId,sourcePoints:stroke?.points.length??this.lasso?.length??0,captured:this.capture?.count});this.diagnostics.finish('release',stroke,this.lasso,this.audit());this.stroke=undefined;this.strokeTarget=undefined;this.liveGeometry=undefined;this.liveTip=undefined;
+  const stroke=this.finalizeStroke(this.stroke),target=this.strokeTarget;this.recorder.event('gesture-end',{reason:'release',id:this.capture?.gestureId,pointerId:this.pointerId,sourcePoints:stroke?.points.length??this.lasso?.length??0,captured:this.capture?.count});this.diagnostics.finish('release',stroke,this.lasso,this.audit());this.stroke=undefined;this.pickup=undefined;this.strokeTarget=undefined;this.liveGeometry=undefined;this.liveTip=undefined;
   if(this.strokePending){const pending=this.strokePending;if(this.lasso&&this.lasso.length>=3){const found=this.marqueeStrokeIds(this.lasso);this.setStrokeIds(pending.shift?[...new Set([...this.strokeIds,...found])]:found);}else if(!pending.shift)this.clearSelection();this.lasso=undefined;this.strokePending=undefined;}else this.finishSelection();
   this.pan=undefined;this.drag=undefined;this.canvas.style.cursor='';this.paintCursor();this.releaseCapture();const committed=this.commitStroke(stroke,target);if(stroke)this.diagnostics.committed(stroke.id,committed);this.request();
  };
@@ -643,7 +649,13 @@ export class StudioEngine {
   };
   this.drawingWarmup=typeof window.requestIdleCallback==='function'?{kind:'idle',id:window.requestIdleCallback(prepare)}:{kind:'timer',id:window.setTimeout(prepare,0)};
  }
- request(){if(!this.frame&&!this.disposed)this.frame=requestAnimationFrame(()=>{this.frame=0;this.performance.measure('renderMs',()=>this.render());this.performance.visible();});}
+ togglePerformanceOverlay(){this.performanceOverlay.toggle();}
+ request(){if(!this.frame&&!this.disposed)this.frame=requestAnimationFrame(()=>{
+  this.frame=0;
+  const start=this.performanceOverlay.visible?performance.now():undefined;
+  this.performance.measure('renderMs',()=>this.render());this.performance.visible();
+  if(start!==undefined)this.performanceOverlay.rendered(performance.now()-start);
+ });}
  private render(){
   if(this.viewPending)this.publishView();this.hasRendered=true;
   this.vectors.prepareRender(); // Live ink is prepared incrementally by renderNewLayer.
@@ -682,7 +694,9 @@ export class StudioEngine {
   // No bitmap arrived yet: the unchanged preview should not trigger a
   // full-project redraw. First-frame startup still renders normally.
   const blendDirty=workingBlend?this.blendWorker.takeRegion(denseStroke!)??{x:0,y:0,width:0,height:0}:undefined;
-  const changedFrame=cachedDrawing?this.drawingFrames.begin({project:p,renderer:this.renderer,revision:this.renderer.displayRevision,target:this.strokeTarget!.layer,width:W,height:H,dpr,view:this.view},denseStroke!,this.liveGeometry!,blendDirty??(livePainted?this.liveRaster.lastRegion:undefined)):undefined;
+  const previous=this.lastExactFrame;
+  const exactStart=denseStroke?.inkEdgeVersion===1&&!!previous?.exact&&!previous.extra&&previous.p===p&&previous.revision===this.renderer.displayRevision&&previous.W===W&&previous.H===H&&previous.dpr===dpr&&previous.x===this.view.x&&previous.y===this.view.y&&previous.zoom===this.view.zoom&&previous.rotation===this.view.rotation;
+  const changedFrame=cachedDrawing?this.drawingFrames.begin({project:p,renderer:this.renderer,revision:this.renderer.displayRevision,target:this.strokeTarget!.layer,width:W,height:H,dpr,view:this.view},denseStroke!,this.liveGeometry!,blendDirty??(livePainted?this.liveRaster.lastRegion:undefined),exactStart):undefined;
   // Canvas scan conversion can change by a few RGBA levels when the left
   // clip origin moves, including integer zoom on 4K surfaces. Keep its origin
   // fixed and limit the vertical band instead; preserve exact native pixels.
@@ -732,7 +746,7 @@ export class StudioEngine {
    if((cachedDrawing||warmDrawing)&&this.drawingFrames.paintInk(ctx,l))continue;
    if(this.renderer.hasPendingLayerResult()&&(this.renderer.pendingLayerInput(displayed,p)||denseStroke&&workerBlendEligible(denseStroke)&&l.id===this.strokeTarget?.layer&&!this.strokeMirror)){if(this.inkDisplay.paintPendingNative(ctx,displayed,p,this.renderer))continue;ctx.globalAlpha=l.opacity;ctx.drawImage(this.renderer.getDisplay(displayed,p),0,0);continue;}
    if(denseStroke&&workerBlendEligible(denseStroke)&&l.id===this.strokeTarget?.layer&&!this.strokeMirror)this.inkDisplay.finishNativePreview(ctx,displayed,p,this.renderer);
-   if(!(denseStroke&&l.id===this.strokeTarget?.layer&&this.initialPressurePending&&denseStroke.points.length===1)&&!this.mirrorDrawing.enabled&&(selectionStable||!displayed.operations.some(o=>selectedStrokeIds.has(o.id)))&&!(l.id===p.activeLayerId&&this.selection.length&&!selectionStable)&&this.inkDisplay.paint(ctx,displayed,p,denseStroke&&l.id===this.strokeTarget?.layer?denseStroke:undefined,denseStroke&&l.id===this.strokeTarget?.layer?this.liveGeometry:undefined,this.renderer)){if(cachedDrawing||warmDrawing)this.drawingFrames.rememberInk(l.id,this.inkDisplay.cachedSurface(l.id));continue;}
+   if(!(denseStroke&&l.id===this.strokeTarget?.layer&&this.initialPressurePending&&denseStroke.points.length===1)&&!this.mirrorDrawing.enabled&&(selectionStable||!displayed.operations.some(o=>selectedStrokeIds.has(o.id)))&&!(l.id===p.activeLayerId&&this.selection.length&&!selectionStable)&&this.inkDisplay.paint(ctx,displayed,p,denseStroke&&l.id===this.strokeTarget?.layer?denseStroke:undefined,denseStroke&&l.id===this.strokeTarget?.layer?this.liveGeometry:undefined,this.renderer,dirtyFrame)){if(cachedDrawing||warmDrawing)this.drawingFrames.rememberInk(l.id,this.inkDisplay.cachedSurface(l.id));continue;}
    let c=this.renderer.getDisplay(displayed,p);
    if(!selectionStable&&displayed.operations.some(o=>selectedStrokeIds.has(o.id))){ctx.globalAlpha=l.opacity;ctx.drawImage(this.exactStrokePreview(displayed,p),0,0);continue;}
    const workerPreview=denseStroke&&l.id===this.strokeTarget?.layer&&!this.strokeMirror&&workerBlendEligible(denseStroke)?this.blendWorker.preview(denseStroke,c,denseStroke.nativeMixVersion!==undefined?denseStroke.points.length:this.liveGeometry,displayed.operations.some(op=>op.kind==='stroke'&&displayCleanInk(op)),displayed.operations.some(op=>op.kind==='stroke'&&displayCleanInk(op))?this.inkDisplay.mixBaseline(ctx,displayed,p,this.renderer):undefined):undefined;

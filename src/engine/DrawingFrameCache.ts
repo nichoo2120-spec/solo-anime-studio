@@ -4,6 +4,7 @@ import {blendOperation,type LayerRenderer} from './renderer';
 import type {strokeGeometry} from './strokeGeometry';
 import type {RasterRegion} from './liveRaster';
 import {dryRasterPadding} from '../core/dryBrush';
+import {sameCanvasProject} from './commitBand';
 
 type Geometry=ReturnType<typeof strokeGeometry>;
 export type DrawingFrameKey={project:Project;renderer:LayerRenderer;revision:number;target:string;width:number;height:number;dpr:number;view:View};
@@ -44,11 +45,9 @@ export class DrawingFrameCache{
   const compatible=!!this.key&&sameKey(this.key,key);
   if(!compatible){
    const old=this.key,stable=!!old&&sameView(old,key),index=key.project.layers.findIndex(l=>l.id===key.target),below=key.project.layers.slice(index+1),oldBelow=old?.project.layers.slice(old.project.layers.findIndex(l=>l.id===old.target)+1);
-   // A warm frame is only safe when its exact immutable project snapshot
-   // still owns the cached pixels. Layer identity alone is insufficient:
-   // committing a stroke can replace a project while retaining lower layers.
-   // Never display a prefix captured under another snapshot on first pen-down.
-   this.prefixReady=this.prefixReady&&!!old&&old.project===key.project&&stable&&old.target===key.target&&!!oldBelow&&below.length===oldBelow.length&&below.every((l,i)=>l===oldBelow[i]);
+   // The prefix excludes the drawing layer. Reuse it across commits when all
+   // lower layers and their presentation still resolve to the same pixels.
+   this.prefixReady=this.prefixReady&&!!old&&sameCanvasProject(old.project,key.project)&&stable&&old.target===key.target&&!!oldBelow&&below.length===oldBelow.length&&below.every((l,i)=>l===oldBelow[i]);
    this.below=new Set(below.map(l=>l.id));this.above=new Set(key.project.layers.slice(0,index).map(l=>l.id));
    for(const [id,c]of this.ink){if(!this.above.has(id)||c.surface.width!==key.width||c.surface.height!==key.height){c.surface.width=c.surface.height=0;this.ink.delete(id);}else c.ready=c.ready&&stable&&c.layer===key.project.layers.find(l=>l.id===id);}
   }
@@ -57,9 +56,9 @@ export class DrawingFrameCache{
  }
  /** Capture already-rendered static ink at idle, with no extra scene render. */
  warm(key:DrawingFrameKey){this.prepare(key);this.lastStroke='';this.geometry=undefined;}
- begin(key:DrawingFrameKey,stroke:Stroke,geometry:Geometry,rasterRegion?:RasterRegion){
+ begin(key:DrawingFrameKey,stroke:Stroke,geometry:Geometry,rasterRegion?:RasterRegion,exactStart=false){
   const compatible=this.prepare(key),previous=compatible&&this.lastStroke===stroke.id?this.geometry:undefined;
-  if(!previous)return undefined;
+  if(!previous&&!(exactStart&&this.prefixReady))return undefined;
   let region=rasterRegion;
   if(!region){
    const pad=stroke.dryBristleVersion?dryRasterPadding(stroke):stroke.size*Math.max(1,stroke.maxSize??1)+8;
@@ -69,7 +68,7 @@ export class DrawingFrameCache{
    // Native joins can change at the last common segment. Keep two complete
    // common segments and both moving end tapers, rather than the whole stroke.
    prefix=Math.max(0,prefix-2);
-   const length=(g:Geometry)=>g.cubics.reduce((n,c)=>n+Math.hypot(c.b.x-c.a.x,c.b.y-c.a.y),0),local=stroke.engineVersion===10&&stroke.size>=64&&!stroke.pressureOpacity&&!['studio-ink','contour-flow'].includes(stroke.brushKind??'');
+   const length=(g:Geometry)=>g.cubics.reduce((n,c)=>n+Math.hypot(c.b.x-c.a.x,c.b.y-c.a.y),0),local=stroke.engineVersion===10&&(stroke.inkEdgeVersion===1||stroke.size>=64)&&!stroke.pressureOpacity&&!['studio-ink','contour-flow'].includes(stroke.brushKind??'');
    const span=(g:Geometry)=>local?Math.min(length(g)*.45,Math.max(32,stroke.size*2)):Math.max(64,stroke.size*12);
    if(previous&&stroke.taperStart&&local&&span(previous)!==span(geometry))prefix=0;
    for(const g of previous?[previous,geometry]:[geometry]){let i=g.cubics.length,travel=0;while(i>0&&travel<span(g)*(stroke.taperEnd??0)){i--;travel+=Math.hypot(g.cubics[i].b.x-g.cubics[i].a.x,g.cubics[i].b.y-g.cubics[i].a.y);}prefix=Math.min(prefix,Math.max(0,i-2));}

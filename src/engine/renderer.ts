@@ -22,7 +22,7 @@ import {SparseStrokeTiles,supportsSparseStroke} from './SparseStrokeTiles';
 export const makeCanvas=(w:number,h:number)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
 export const context=(c:HTMLCanvasElement)=>c.getContext('2d',{willReadFrequently:true})!;
 export const blendOperation=(mode:Layer['blend']):GlobalCompositeOperation=>mode==='add'?'lighter':mode&&mode!=='normal'?mode:'source-over';
-type HistoryDelta={id:string;prefix:Layer['operations'];operation:Layer['operations'][number];patch:HistoryTiles;width:number;height:number;bytes:number};
+type HistoryDelta={id:string;source:Layer['operations'];index:number;operation:Layer['operations'][number];patch:HistoryTiles;width:number;height:number;bytes:number};
 const releaseRaster=(c:HTMLCanvasElement|ImageBitmap)=>{if('close' in c)c.close();else c.width=c.height=0;};
 export type ExportOptions={transparent?:boolean;width?:number;height?:number;layerId?:string;includeReferences?:boolean;/** v174: 1-based exposure number; render through the scene camera. */cameraFrame?:number};
 const bitmapOrigin=(project:Project,op:ArtworkOrigin)=>op.inShot?project.shotFrame:op.inPreviousStage?project.previousStage:undefined;
@@ -130,16 +130,21 @@ export class LayerRenderer {
  private trim(){while(this.checkpointBytes+this.deltaBytes+this.strokeBytes>this.checkpointBudget||this.deltas.length>160){if(this.checkpoints.length&&this.checkpointBytes+this.deltaBytes+this.strokeBytes>this.checkpointBudget){const old=this.checkpoints.shift()!;this.checkpointBytes-=old.bytes;old.canvas.width=0;old.canvas.height=0;}else if(this.strokeRasters.size&&this.deltas.length<=160)this.dropStroke();else{const old=this.deltas.shift()!;if(this.deltaLookup.get(old.operation)===old)this.deltaLookup.delete(old.operation);this.deltaBytes-=old.bytes;old.patch.clear();}}}
  constructor(private readonly captureHistory=true){}
  private remember(layer:Layer,canvas:HTMLCanvasElement,count:number,force=false){if(!this.captureHistory)return;const bytes=canvas.width*canvas.height*4;const interval=bytes>=4*1024*1024?24:8;if(!count||!force&&count%interval||bytes>this.checkpointBudget||this.checkpoints.some(c=>c.id===layer.id&&c.operations.length===count&&c.operations.every((o,i)=>o===layer.operations[i])))return;const copy=makeCanvas(canvas.width,canvas.height);context(copy).drawImage(canvas,0,0);this.checkpoints.push({id:layer.id,operations:layer.operations.slice(0,count),canvas:copy,bytes});this.checkpointBytes+=bytes;this.trim();}
- private beforeOperation(layer:Layer,canvas:HTMLCanvasElement,index:number){if(!this.captureHistory)return;const op=layer.operations[index];const previous=this.deltaLookup.get(op);if(previous&&previous.id===layer.id&&previous.width===canvas.width&&previous.height===canvas.height&&previous.prefix.length===index&&previous.prefix.every((o,i)=>o===layer.operations[i]))return;let rect={x:0,y:0,width:canvas.width,height:canvas.height};
+ private beforeOperation(layer:Layer,canvas:HTMLCanvasElement,index:number){if(!this.captureHistory)return;const op=layer.operations[index];const previous=this.deltaLookup.get(op);if(previous&&previous.id===layer.id&&previous.width===canvas.width&&previous.height===canvas.height&&previous.index===index&&this.samePatchPrefix(previous,layer.operations))return;let rect={x:0,y:0,width:canvas.width,height:canvas.height};
   if(op.kind==='stroke'){const geometry=op.engineVersion?finalGeometry(op):{points:op.points,cubics:[]},points=[...geometry.points,...geometry.cubics.flatMap(c=>[c.c1,c.c2])],pad=(op.dryBristleVersion===1||op.dryBristleVersion===2||op.dryBristleVersion===3)?dryRasterPadding(op):op.size+4;let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;for(const p of points){minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);}if(op.transform||op.perspective){const q=[{x:minX,y:minY},{x:minX,y:maxY},{x:maxX,y:minY},{x:maxX,y:maxY}].map(p=>op.perspective?projectPoint(p,op.perspective):mapPoint(p,op.transform!));minX=Math.min(...q.map(p=>p.x));minY=Math.min(...q.map(p=>p.y));maxX=Math.max(...q.map(p=>p.x));maxY=Math.max(...q.map(p=>p.y));}const newPad=op.transform?pad*scaleOf(op.transform):pad;const x=Math.max(0,Math.min(canvas.width,Math.floor(minX-newPad))),y=Math.max(0,Math.min(canvas.height,Math.floor(minY-newPad)));rect={x,y,width:Math.max(0,Math.min(canvas.width,Math.ceil(maxX+newPad))-x),height:Math.max(0,Math.min(canvas.height,Math.ceil(maxY+newPad))-y)};}
   // Large strokes use exact tiles too. Only the total memory budget may
   // decline a patch; there is no per-stroke 4 MiB cutoff.
   const bytes=rect.width*rect.height*8;if(bytes>this.checkpointBudget)return;
-  const delta:HistoryDelta={id:layer.id,prefix:layer.operations.slice(0,index),operation:op,patch:new HistoryTiles(canvas,rect),width:canvas.width,height:canvas.height,bytes};
+  const delta:HistoryDelta={id:layer.id,source:layer.operations,index,operation:op,patch:new HistoryTiles(canvas,rect),width:canvas.width,height:canvas.height,bytes};
   this.deltas.push(delta);this.deltaLookup.set(op,delta);this.deltaBytes+=bytes;this.trim();
  }
  private afterOperation(layer:Layer,canvas:HTMLCanvasElement,index:number){const d=this.deltaLookup.get(layer.operations[index]);if(d&&d.id===layer.id)d.patch.finish(canvas);}
- private historyPatch(layer:Layer,op:Layer['operations'][number],index:number,width:number,height:number){const d=this.deltaLookup.get(op);return d&&d.id===layer.id&&d.width===width&&d.height===height&&d.prefix.length===index&&d.prefix.every((o,i)=>o===layer.operations[i])?d:undefined;}
+ private samePatchPrefix(delta:HistoryDelta,operations:Layer['operations']){
+  if(delta.source===operations)return true;
+  for(let i=0;i<delta.index;i++)if(delta.source[i]!==operations[i])return false;
+  return true;
+ }
+ private historyPatch(layer:Layer,op:Layer['operations'][number],index:number,width:number,height:number){const d=this.deltaLookup.get(op);return d&&d.id===layer.id&&d.width===width&&d.height===height&&d.index===index&&this.samePatchPrefix(d,layer.operations)?d:undefined;}
  async prepare(project:Project){
   // v0.5.240 Blend mode "All layers": decode each stroke's saved page sample.
   const blendSamples=project.layers.flatMap(l=>l.operations).filter((o):o is Stroke=>o.kind==='stroke'&&isBrushBlendVersion(o.brushBlendVersion)&&!!o.bbSamplePng&&!!o.bbSampleRect&&!hasBlendSample(o.bbSamplePng));

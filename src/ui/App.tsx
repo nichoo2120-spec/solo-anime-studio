@@ -351,13 +351,22 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
  async function save(kind:'manual'|'autosave'='manual',projectOverride?:Project):Promise<boolean>{
   const intendedId=projectOverride?.id??store.getSnapshot().id;
   if(kind==='autosave'&&(closeRequestRef.current||!activeTabId.current))return false;
-  if(kind==='autosave')await new Promise<void>(resolve=>{if('requestIdleCallback' in window)window.requestIdleCallback(()=>resolve(),{timeout:1000});else setTimeout(resolve,16);});
+  const idle=()=>new Promise<void>(resolve=>{if('requestIdleCallback' in window)window.requestIdleCallback(()=>resolve(),{timeout:1000});else setTimeout(resolve,16);});
+  if(kind==='autosave')await idle();
   if(!mounted.current||kind==='autosave'&&(store.getSnapshot().id!==intendedId||closeRequestRef.current))return false;
   if(operationLock.current||engine.current?.drawing||kind==='autosave'&&pendingSaves.current>0){if(kind==='manual')notify('Finish the current canvas operation before saving.');else{if(autosaveRetry.current)clearTimeout(autosaveRetry.current);autosaveRetry.current=setTimeout(()=>{autosaveRetry.current=null;if(mounted.current&&documentDirty(store.getSnapshot(),saved.current))void save('autosave');},1000);}return false;}
   if(autosaveRetry.current){clearTimeout(autosaveRetry.current);autosaveRetry.current=null;}
   const captured=withCustomBrushes(projectOverride??store.getSnapshot());pendingSaves.current++;if(store.getSnapshot().id===captured.id)setStatus('Saving…');
-  const task=saveChain.current.catch(()=>{}).then(()=>kind==='autosave'?autosaveWriter.save(captured):repository.save(captured,kind));saveChain.current=task;
-  try{const record=await task;const session=sessions.current.get(captured.id);if(session){session.saved=captured;session.savedAt=record.savedAt;setTabIds(ids=>[...ids]);}if(store.getSnapshot().id===captured.id){saved.current=captured;writePreference('last-project',captured.id);if(mounted.current){setLastSaved(record.savedAt);setStatus(!documentDirty(store.getSnapshot(),captured)?(kind==='autosave'?'Autosaved locally':'Saved locally'):'Unsaved changes');if(kind==='manual')notify('Project saved on this device. Download a backup for safekeeping.');}}return true;}
+  const readyToSend=async()=>{
+   await idle();
+   if(!mounted.current||closeRequestRef.current||store.getSnapshot().id!==intendedId)return false;
+   if(!engine.current?.drawing&&!operationLock.current)return true;
+   if(autosaveRetry.current)clearTimeout(autosaveRetry.current);
+   autosaveRetry.current=setTimeout(()=>{autosaveRetry.current=null;if(mounted.current&&documentDirty(store.getSnapshot(),saved.current))void save('autosave');},1000);
+   return false;
+  };
+  const task=saveChain.current.catch(()=>{}).then(()=>kind==='autosave'?autosaveWriter.save(captured,readyToSend):repository.save(captured,kind));saveChain.current=task;
+  try{const record=await task;if(!record){if(mounted.current&&store.getSnapshot().id===captured.id)setStatus(documentDirty(store.getSnapshot(),saved.current)?'Unsaved changes':'Saved locally');return false;}const session=sessions.current.get(captured.id);if(session){session.saved=captured;session.savedAt=record.savedAt;setTabIds(ids=>[...ids]);}if(store.getSnapshot().id===captured.id){saved.current=captured;writePreference('last-project',captured.id);if(mounted.current){setLastSaved(record.savedAt);setStatus(!documentDirty(store.getSnapshot(),captured)?(kind==='autosave'?'Autosaved locally':'Saved locally'):'Unsaved changes');if(kind==='manual')notify('Project saved on this device. Download a backup for safekeeping.');}}return true;}
   catch(e){if(mounted.current){if(store.getSnapshot().id===captured.id)setStatus('Save failed');notify('Save failed for “'+captured.name+'”. Previous successful saves remain intact. '+String(e));}return false;}
   finally{pendingSaves.current--;}
  }
@@ -921,6 +930,7 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
   if(!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.shiftKey&&e.code==='F9'&&!modal){e.preventDefault();if(!e.repeat){setFocusMode(v=>!v);setOnionSettingsOpen(false);}return;}
   if((e.ctrlKey||e.metaKey)&&e.altKey&&e.key.toLowerCase()==='d'){e.preventDefault();setRightTab(old=>old==='diagnostics'?'inspector':'diagnostics');setLayout(old=>({...old,rightClosed:false}));return;}if(modal)return;
   const cmd=e.ctrlKey||e.metaKey;
+  if(cmd&&e.shiftKey&&!e.altKey&&e.code==='KeyP'){e.preventDefault();if(!e.repeat)engine.current?.togglePerformanceOverlay();return;}
   if(cmd&&!e.altKey&&!e.shiftKey&&e.key.toLowerCase()==='w'){e.preventDefault();if(!e.repeat&&activeTabId.current)requestCloseProject(activeTabId.current);return;}
   // Context-sensitive animator transform: W/S/R control the whole selected
   // frame range, without overriding S=Stroke Select / R=Rotate Canvas normally.
