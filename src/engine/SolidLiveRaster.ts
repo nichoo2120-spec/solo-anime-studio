@@ -18,9 +18,15 @@ export class SolidLiveRaster{
   drawSolidInkV10(surface.getContext('2d')!,s,g,undefined,quality,paths,info);info.previous=undefined;
   const count=info.reused??0;
   const reset=key!==this.key||count<this.count||stable.width!==w||stable.height!==h||base!==this.base||baseToken!==this.baseToken;
-  if(reset){stable.width=surface.width=w;stable.height=surface.height=h;this.count=0;this.dirty=undefined;if(base)stable.getContext('2d')!.drawImage(base,0,0);}
+  if(reset){
+   if(stable.width!==w)stable.width=w;if(stable.height!==h)stable.height=h;
+   if(surface.width!==w)surface.width=w;if(surface.height!==h)surface.height=h;
+   const context=stable.getContext('2d')!;context.resetTransform();context.clearRect(0,0,w,h);
+   if(base)context.drawImage(base,0,0);
+   this.count=0;this.dirty=undefined;
+  }
   const sc=stable.getContext('2d')!;sc.setTransform(m);sc.fillStyle=s.color;for(let i=this.count;i<count;i++)sc.fill(paths[i]);this.count=count;
-  if(reset){const ctx=surface.getContext('2d')!;ctx.resetTransform();ctx.drawImage(stable,0,0);}
+  if(reset){const ctx=surface.getContext('2d')!;ctx.resetTransform();ctx.clearRect(0,0,w,h);ctx.drawImage(stable,0,0);}
   const start=count?Math.max(0,info.ends[count-1]-1):0,pad=s.size*Math.max(1,s.maxSize??1)+3;
   let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const p of (info.points??[]).slice(start))for(const dx of [-pad,pad])for(const dy of [-pad,pad]){const x=m.a*(p.x+dx)+m.c*(p.y+dy)+m.e,y=m.b*(p.x+dx)+m.d*(p.y+dy)+m.f;left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x);bottom=Math.max(bottom,y);}

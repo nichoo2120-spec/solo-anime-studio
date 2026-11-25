@@ -84,9 +84,9 @@ test('Brush Pen exposes default edge controls and saves them per preset',async({
  await expect(aa).toHaveValue('off');
 });
 
-test('Brush Pen pointer-up keeps the live canvas pixels and records the new edge version',async({page})=>{
+for(const pointCount of [32,125])test(`Brush Pen pointer-up keeps the pixels and records the edge version after ${pointCount} moves`,async({page})=>{
  await page.goto('/');
- const results=await page.evaluate(async()=>{
+ const results=await page.evaluate(async pointCount=>{
   const load=(path:string)=>import(path);
   const {StudioEngine}=await load('/src/engine/StudioEngine.ts'),{DocumentStore}=await load('/src/core/history.ts');
   const {newProject,activeLayer}=await load('/src/core/model.ts'),{stockPresets}=await load('/src/core/brushes.ts');
@@ -107,15 +107,15 @@ test('Brush Pen pointer-up keeps the live canvas pixels and records the new edge
      pressure:.55+.35*Math.sin(i*.07),clientX:70+i*3,clientY:230+45*Math.sin(i*.11),
     }));
     send('pointerdown',0);
-    for(let i=1;i<=125;i++){send('pointermove',i);if(i%10===0)engine.render();}
+    for(let i=1;i<=pointCount;i++){send('pointermove',i);if(i%10===0)engine.render();}
     engine.render();const preview=read();
-    send('pointerup',125);engine.render();const committed=read();
+    send('pointerup',pointCount);engine.render();const committed=read();
     const stroke=activeLayer(store.getSnapshot()).operations[0];
     results.push({size,version:stroke?.inkEdgeVersion,differences:preview.reduce((n,v,i)=>n+Number(v!==committed[i]),0)});
     store.undo();engine.render();
    }
   }finally{engine.dispose();canvas.remove();}
   return results;
- });
+ },pointCount);
  expect(results).toEqual([5,20,60].map(size=>({size,version:1,differences:0})));
 });
