@@ -1,6 +1,7 @@
 import {projectPoint} from './perspectiveWarp';
 import type {Stroke} from '../core/model';
 import {importedGrainSampler} from '../core/importedGrain';
+import {widthPointExtent} from '../core/widthPoints';
 import type {strokeGeometry} from './strokeGeometry';
 
 export const hasInkEdgeEffect=(s:Stroke)=>s.inkEdgeVersion===1&&(
@@ -17,7 +18,7 @@ export function fillInkPaths(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnType<
   for(const path of paths)ctx.fill(path);
   return;
  }
- const m=ctx.getTransform(),radius=s.size*.5*Math.max(1,s.maxSize??1);
+ const m=ctx.getTransform(),radius=s.size*.5*Math.max(1,s.maxSize??1)*widthPointExtent(s);
  let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
  const include=(p:{x:number;y:number})=>{
   const x=m.a*p.x+m.c*p.y+m.e,y=m.b*p.x+m.d*p.y+m.f;

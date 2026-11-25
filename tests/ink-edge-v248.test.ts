@@ -68,6 +68,12 @@ describe('Versioned Paint ink edges',()=>{
   expect(center(light)).toBe(255);expect(center(firm)).toBe(255);
   expect(solid(light)).toBeLessThan(solid(firm));
  });
+ it('keeps expanded width points within the optional edge mask',()=>{
+  const s=stroke(60,{inkAntialiasing:'off',widthPointVersion:1,widthPoints:[{at:0,scale:2},{at:1,scale:2}]});
+  const ctx=surface();drawStroke(ctx,s);
+  expect(ctx.getImageData(120,23,1,1).data[3]).toBe(255);
+  expect(ctx.getImageData(120,17,1,1).data[3]).toBe(0);
+ });
  it('saves edge settings, validates the version and changes alpha without changing the brush size',()=>{
   const settings=sanitizeBrush({inkEdgeSharpness:.35,inkAntialiasing:'normal'},pen);
   expect(settings).toMatchObject({inkEdgeSharpness:.35,inkAntialiasing:'normal'});
