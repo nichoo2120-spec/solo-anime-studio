@@ -57,8 +57,8 @@ function paintStrokeMetadata(s:InkFlowControls&WatercolorControls&ColoringContro
 }
 
 
-/** One metadata source for captured strokes, brush previews and saved replay. */
-export function brushStrokeMetadata(s:InkFlowControls&WatercolorControls&ColoringControls&DryBristleControls&TipMixControls&SilkBlendControls&BrushBlendSettings&BrushShapeSettings&{brushKind?:string;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;textureStrength?:number;stabilization?:number;pressureFlow?:boolean;mixColors?:boolean;nativeMixEnabled?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number},inkPaint=true):Partial<ReturnType<typeof paintStrokeMetadata>>&SilkBlendControls&InkEdgeControls&{pressureOpacity?:false}{
+/** Ink Paint capture and preview opt in to the versioned edge renderer. */
+export function brushStrokeMetadata(s:InkFlowControls&WatercolorControls&ColoringControls&DryBristleControls&TipMixControls&SilkBlendControls&BrushBlendSettings&BrushShapeSettings&{brushKind?:string;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;textureStrength?:number;stabilization?:number;pressureFlow?:boolean;mixColors?:boolean;nativeMixEnabled?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number},inkPaint=false):Partial<ReturnType<typeof paintStrokeMetadata>>&SilkBlendControls&InkEdgeControls&{pressureOpacity?:false}{
  const silk=silkStrokeMetadata(s);
  if(silk.silkBlendVersion)return {...silk,tipSpacing:s.tipSpacing};
  if(inkPaint&&!s.bbEnabled&&!s.nativeMixEnabled&&supportsInkTip(s.brushKind)){

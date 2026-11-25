@@ -634,7 +634,7 @@ export class StudioEngine {
  private cancelDrawingWarmup(){const task=this.drawingWarmup;if(!task)return;if(task.kind==='idle')window.cancelIdleCallback(task.id);else window.clearTimeout(task.id);this.drawingWarmup=undefined;}
  private warmDrawingInk(p:Project,W:number,H:number,dpr:number){
   if(this.drawingWarmup||this.brush.nativeMixEnabled||this.renderer.hasPendingLayerResult())return;
-  const view={...this.view},revision=this.renderer.displayRevision,layer=p.layers.find(l=>l.id===p.activeLayerId),cleanInk=displayCleanInk({...this.brush,...brushStrokeMetadata(this.brush),kind:'stroke',id:'warm-only',tool:this.tool,points:[]} as Stroke);
+  const view={...this.view},revision=this.renderer.displayRevision,layer=p.layers.find(l=>l.id===p.activeLayerId),cleanInk=displayCleanInk({...this.brush,...brushStrokeMetadata(this.brush,this.tool==='brush'),kind:'stroke',id:'warm-only',tool:this.tool,points:[]} as Stroke);
   if(!cleanInk||!layer||layer.kind==='vector')return;
   const matrix=this.withViewContext(view,dpr,(_ctx,matrix)=>matrix);
   if(this.inkDisplay.baseReady(layer,p,matrix,W,H,this.renderer))return;

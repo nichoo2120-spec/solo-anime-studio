@@ -15,7 +15,7 @@ function surface(){
 const pixels=(ctx:CanvasRenderingContext2D)=>ctx.getImageData(0,0,width,height).data;
 const pen=stockPresets.find(p=>p.id==='brush-pen')!.settings;
 function stroke(size:number,patch:Partial<Stroke>={}):Stroke{
- return {...brushStrokeMetadata(pen),id:'edge-fixture',kind:'stroke',tool:'brush',brushKind:'brush-pen',size,
+ return {...brushStrokeMetadata(pen,true),id:'edge-fixture',kind:'stroke',tool:'brush',brushKind:'brush-pen',size,
   opacity:1,color:'#182436',pressure:true,pressureWidth:true,response:pen.response,
   taperStart:.06,taperEnd:.15,stabilization:.35,smoothness:22,
   points:Array.from({length:22},(_,i)=>({x:28+9*i,y:80.27,p:1})),...patch};
@@ -53,11 +53,12 @@ describe('Versioned Paint ink edges',()=>{
  });
  it('uses width-only pressure and round contours without leaking other brush engines',()=>{
   const settings={...pen,pressureOpacity:true,pressureFlow:true,tsEnabled:true,dbEnabled:true,dbTip:'chalk' as const,brushTip:'water-wet' as const,watercolorMode:'wet' as const,edgeDarkness:1,mixColors:true};
-  const ink=brushStrokeMetadata(settings);
+  const ink=brushStrokeMetadata(settings,true);
+  expect(brushStrokeMetadata(settings).inkEdgeVersion).toBeUndefined();
   expect(ink).toMatchObject({inkEdgeVersion:1,inkEdgeSharpness:1,inkAntialiasing:'low',pressureOpacity:false});
   for(const key of ['stampVersion','watercolorEngine','edgeDarkness','mixVersion','brushBlendVersion'])expect(ink).not.toHaveProperty(key);
-  expect(brushStrokeMetadata({...settings,bbEnabled:true}).inkEdgeVersion).toBeUndefined();
-  expect(brushStrokeMetadata({...settings,nativeMixEnabled:true}).inkEdgeVersion).toBeUndefined();
+  expect(brushStrokeMetadata({...settings,bbEnabled:true},true).inkEdgeVersion).toBeUndefined();
+  expect(brushStrokeMetadata({...settings,nativeMixEnabled:true},true).inkEdgeVersion).toBeUndefined();
   expect(stockPresets.find(p=>p.id==='ink-marker')?.category).toBe('Ink');
   const light=surface(),firm=surface();
   const s=stroke(20),low={...s,points:s.points.map(p=>({...p,p:.3}))};
@@ -74,7 +75,7 @@ describe('Versioned Paint ink edges',()=>{
   drawStroke(a,stroke(20,{inkAntialiasing:'off'}));drawStroke(b,stroke(20));drawStroke(c,stroke(20,{inkAntialiasing:'normal',inkEdgeSharpness:.35}));
   expect(Array.from(pixels(a)).every((v,i)=>i%4!==3||v===0||v===255)).toBe(true);
   expect(pixels(a)).not.toEqual(pixels(b));expect(pixels(b)).not.toEqual(pixels(c));
-  const project=newProject();activeLayer(project).operations=[stroke(20,{...brushStrokeMetadata(settings)})];
+  const project=newProject();activeLayer(project).operations=[stroke(20,{...brushStrokeMetadata(settings,true)})];
   expect(()=>validateProject(JSON.parse(JSON.stringify(project)))).not.toThrow();
   activeLayer(project).operations=[{...stroke(20),inkEdgeVersion:2} as unknown as Stroke];
   expect(()=>validateProject(JSON.parse(JSON.stringify(project)))).toThrow(/Ink edge/);
