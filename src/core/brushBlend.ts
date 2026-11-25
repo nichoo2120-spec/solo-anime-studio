@@ -60,7 +60,7 @@ export function blendStyleFor(s:BlendTip):BlendStyle{
  if(kind.startsWith('graphite-')||/(pencil|crayon|charcoal)/i.test(kind))return 'pencil';
  if(kind.startsWith('dry-')||kind==='dry'||tip==='chalk')return 'dry';
  if(INKS.includes(kind)||/^(ink|pen)(-|$)/i.test(kind))return 'ink';
- if(kind==='marker'||tip==='felt')return 'marker';
+ if((kind==='marker'||kind==='ink-marker')||tip==='felt')return 'marker';
  if(kind==='coloring-texture'||tip==='color-texture'||s.tsEnabled||s.dbEnabled&&s.dbTip)return 'texture';
  if(kind==='coloring-air'||kind==='airbrush'||tip==='color-air')return 'air';
  if(kind==='flat'||kind==='coloring-solid'||tip==='bristle'||tip==='flat-bristle')return 'oil';

@@ -41,7 +41,7 @@ jobs:
       - run: npx playwright install chromium
       - run: npx playwright test tests/browser/distort-preview-v214.spec.ts tests/browser/transform-v116.spec.ts tests/browser/transform-modes-v116.spec.ts
       - run: npx playwright test tests/browser/reselection-loop-v215.spec.ts tests/browser/brush-blend-v4.spec.ts
-      - run: npx playwright test tests/browser/large-blend-performance.spec.ts
+      - run: npx playwright test tests/browser/large-blend-performance.spec.ts tests/browser/crisp-ink-v248.spec.ts
       - run: node tests/offscreen-drawing-v186.mjs
       - run: node tests/drawing-latency-v187.mjs
       - run: node tests/project-tabs-v199.mjs

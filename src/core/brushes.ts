@@ -1,3 +1,4 @@
+import {isInkAntialiasing} from './inkTip';
 import {sanitizeBrushShape} from './brushShape';
 import {sanitizeBrushBlend} from './brushBlend';
 import {validCurve} from './brushCurves';
@@ -29,6 +30,7 @@ export const stockPresets:BrushPreset[]=[
  preset('mapping','Mapping Pen','Ink',{size:4,opacity:1,response:1.6,taperStart:.04,taperEnd:.13,textureStrength:0}),
  preset('technical','Technical Pen','Ink',{size:4,opacity:1,pressureWidth:false,textureStrength:0,smoothness:40}),
  preset('brush-pen','Brush Pen','Ink',{size:14,opacity:1,response:.65,taperStart:.06,taperEnd:.15,textureStrength:0}),
+ preset('ink-marker','Marker','Ink',{size:18,opacity:1,response:.8,taperStart:.025,taperEnd:.07,textureStrength:0}),
  preset('studio-ink','Studio Ink','Ink',{inkFlowAmount:.65,inkFlowLength:180,pressureWidth:false,velocityTaper:false,size:6,opacity:1,stabilization:.08,smoothness:28,response:.9,minSize:.08,maxSize:1,pressureCurve:[{x:0,y:0},{x:.25,y:.18},{x:.5,y:.45},{x:.75,y:.73},{x:1,y:1}],taperStart:.08,taperEnd:.2,textureStrength:0}),
  preset('contour-flow','Contour Flow','Ink',{inkFlowAmount:.92,inkFlowLength:160,pressureWidth:false,size:9,opacity:1,stabilization:.05,smoothness:18,response:1.1,minSize:.035,maxSize:1,pressureCurve:[{x:0,y:0},{x:.25,y:.06},{x:.5,y:.32},{x:.75,y:.72},{x:1,y:1}],taperStart:.025,taperEnd:.09,textureStrength:0,velocityTaper:false}),
  preset('color-solid','Solid Paint','Paint',{brushKind:'coloring-solid',brushTip:'color-solid',coloringEngine:1,colorNib:'chisel',colorNibFollow:false,tipAngle:-25,size:45,opacity:1,flow:1,hardness:1,pressureFlow:false,pressureWidth:true,minSize:.08,textureStrength:0,stabilization:.08,smoothness:18},'coloring'),
@@ -63,11 +65,12 @@ const retiredWatercolorPreset=(p:Partial<BrushPreset>|undefined)=>!!p&&(typeof p
 export function newBrushLibrary():BrushLibrary{return {brushId:'hb',eraserId:'eraser-hard',mode:'paint',presets:stockPresets.map(p=>({...p,defaults:{...p.defaults},settings:{...p.settings}}))};}
 export function sanitizeBrush(value:unknown,fallback:BrushSettings):BrushSettings{
  if(!value||typeof value!=='object')return {...fallback};const p=value as Partial<BrushSettings>,result={...fallback};
- for(const [key,min,max] of [['inkProfileLength',24,1000],['edgeDarkness',0,1],['inkImageAmount',0,1],['inkImageScale',.25,8],['inkTipRoundness',.1,1],['inkTipAngle',-180,180],['inkGrainScale',.25,8],['inkFlowAmount',0,1],['inkFlowLength',24,1000],['size',.1,500],['opacity',0,1],['stabilization',0,1],['smoothness',0,100],['response',.2,3],['taperStart',0,1],['taperEnd',0,1],['minSize',0,1],['maxSize',0,1],['minOpacity',0,1],['maxOpacity',0,1],['textureStrength',0,1],['tolerance',0,255],['tipAngle',-180,180],['tipSpacing',.02,.5],['flow',0,1],['hardness',0,1],['mixAmount',0,1],['mixPickupLen',.2,4],['mixHoldLen',.5,12],['mixStreak',0,1],['mixPaintLoad',0,1],['pigmentPooling',0,1],['pigmentAmount',0,1],['waterAmount',0,1],['edgeSoftness',0,1],['dryness',0,1],['pigmentBuildup',0,1],['pigmentDepletion',0,1],['wetDiffusion',0,1],['edgeBleeding',0,1]] as const){const n=p[key];if(typeof n==='number'&&Number.isFinite(n))(result[key] as number)=Math.max(min,Math.min(max,n));}
+ for(const [key,min,max] of [['inkEdgeSharpness',0,1],['inkProfileLength',24,1000],['edgeDarkness',0,1],['inkImageAmount',0,1],['inkImageScale',.25,8],['inkTipRoundness',.1,1],['inkTipAngle',-180,180],['inkGrainScale',.25,8],['inkFlowAmount',0,1],['inkFlowLength',24,1000],['size',.1,500],['opacity',0,1],['stabilization',0,1],['smoothness',0,100],['response',.2,3],['taperStart',0,1],['taperEnd',0,1],['minSize',0,1],['maxSize',0,1],['minOpacity',0,1],['maxOpacity',0,1],['textureStrength',0,1],['tolerance',0,255],['tipAngle',-180,180],['tipSpacing',.02,.5],['flow',0,1],['hardness',0,1],['mixAmount',0,1],['mixPickupLen',.2,4],['mixHoldLen',.5,12],['mixStreak',0,1],['mixPaintLoad',0,1],['pigmentPooling',0,1],['pigmentAmount',0,1],['waterAmount',0,1],['edgeSoftness',0,1],['dryness',0,1],['pigmentBuildup',0,1],['pigmentDepletion',0,1],['wetDiffusion',0,1],['edgeBleeding',0,1]] as const){const n=p[key];if(typeof n==='number'&&Number.isFinite(n))(result[key] as number)=Math.max(min,Math.min(max,n));}
  if(p.inkProfileVersion===1&&validCurve(p.inkProfile,false))result.inkProfileVersion=1;else if(p.inkProfileVersion===undefined)delete result.inkProfileVersion;
  if(validCurve(p.inkProfile,false))result.inkProfile=p.inkProfile.map(n=>({...n}));
  if(p.inkImage===undefined)delete result.inkImage;else if(validImportedGrain(p.inkImage))result.inkImage={...p.inkImage};
  if(typeof p.inkImageInvert==='boolean')result.inkImageInvert=p.inkImageInvert;
+ if(isInkAntialiasing(p.inkAntialiasing))result.inkAntialiasing=p.inkAntialiasing;
  if(p.inkTipVersion===1)result.inkTipVersion=1;
  if(p.inkTipShape==='round'||p.inkTipShape==='oval')result.inkTipShape=p.inkTipShape;
  if(typeof p.inkTipFollow==='boolean')result.inkTipFollow=p.inkTipFollow;
