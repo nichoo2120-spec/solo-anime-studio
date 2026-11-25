@@ -21,6 +21,7 @@ try{
   const pts=(L=170)=>Array.from({length:L},(_,i)=>{const t=i/(L-1);return {x:50+t*(W-100),y:115+92*Math.sin(t*Math.PI*5),p:.35+.65*Math.sin(Math.min(1,t*1.15)*Math.PI*.5+.4)};});
   const strokeFor=(id,version,blend={},extra={})=>{const preset=stockPresets.find(p=>p.id===id);const settings={...preset.settings,bbEnabled:true,...blend};const {bbEnabled:_e,...plain}=settings;let meta=brushStrokeMetadata(settings);
    if(version===1){const {bbStyle:_s,...m}=meta;meta={...m,brushBlendVersion:1};}
+   else{for(const key of ['bbMode','bbColorCarry','bbSoftness','bbTextureKeep','bbSmoothing','bbEdgeDarkness'])delete meta[key];meta.brushBlendVersion=2;}
    return {...plain,...meta,id:'qa-'+id,kind:'stroke',tool:'brush',color:'#00ff00',size:34,opacity:1,pressure:true,response:1,points:pts(),...extra};};
   const reload=(s,base)=>{const res=make();const ctx=res.getContext('2d');ctx.drawImage(base,0,0);const mask=make();drawStroke(mask.getContext('2d'),s);compositePaintStroke(ctx,mask,s);return res;};
   const data=c=>c.getContext('2d').getImageData(0,0,W,H).data;

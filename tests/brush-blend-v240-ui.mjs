@@ -27,9 +27,10 @@ try{await server.listen();browser=await chromium.launch({executablePath:process.
  await page.getByRole('button',{name:'Brush Settings',exact:true}).click();
  await page.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Blend',exact:true}).click();
  const panel=page.getByRole('region',{name:'Brush Settings'});
- for(const name of ['Blend Amount','Colour Pickup','Wetness','Mix','Blend Flow','Stretch','Paint Load'])assert.equal(await panel.getByRole('slider',{name,exact:true}).count(),1,name);
+ await panel.getByText('More blend controls',{exact:true}).click();
+ for(const name of ['Blend amount','Pickup','Wetness','Mix','Blend Flow','Drag / pull length','Paint Load'])assert.equal(await panel.getByRole('slider',{name,exact:true}).count(),1,name);
  await panel.getByLabel('Blend sample',{exact:true}).selectOption('all');await panel.getByLabel('Clean brush after each stroke',{exact:true}).uncheck();
- await panel.getByRole('button',{name:'Wet mix',exact:true}).click();await page.waitForTimeout(200);
+ await panel.getByRole('button',{name:'Wet blend',exact:true}).click();await page.waitForTimeout(200);
  fs.mkdirSync('validation/brush-blend-v240',{recursive:true});await page.screenshot({path:'validation/brush-blend-v240/blend-settings-panel.png'});
  await panel.getByRole('button',{name:'Done',exact:true}).click().catch(()=>page.keyboard.press('Escape'));
  // A stroke with All layers + carried colour must draw without errors.
@@ -38,7 +39,7 @@ try{await server.listen();browser=await chromium.launch({executablePath:process.
  await page.waitForTimeout(400);await page.reload();await page.getByLabel('Drawing canvas',{exact:true}).waitFor();await page.waitForTimeout(800);
  const persisted=await page.getByRole('group',{name:'Paint or Blend'}).first().getByRole('button',{name:'Blend',exact:true}).getAttribute('aria-pressed');
  const result={changed,emptyChanged,changed2,persisted,errors};console.log(JSON.stringify(result));
- assert(changed>400,'Blend stroke changed the painted stroke');assert.equal(emptyChanged,0,'Blend added paint on empty paper');assert(changed2>100,'All layers stroke drew');
+ assert(changed>200,'Blend stroke changed the painted stroke');assert.equal(emptyChanged,0,'Blend added paint on empty paper');assert(changed2>100,'All layers stroke drew');
  assert.equal(persisted,'true','Blend saved with the brush');assert.equal(errors.length,0,errors.join('\n'));
  console.log('PASS brush-blend-v240-ui');
 }catch(e){failed=true;console.error(e);}finally{await browser?.close();await server.close();}

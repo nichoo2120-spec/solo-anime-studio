@@ -1,6 +1,7 @@
-import {blendPath,encodeCarry,registerBlendSample,sampleFromCanvas,setLiveBlendSample,type BlendSampleSource} from './brushBlend';
+import {blendPath,blendTransformScale,encodeCarry,registerBlendSample,sampleFromCanvas,setLiveBlendSample,type BlendSampleSource} from './brushBlend';
 import type {SilkBlendControls} from '../core/silkBlend';
-import type {BrushBlendSettings} from '../core/brushBlend';
+import {brushBlendV4Reach} from './brushBlendStyles';
+import {isBrushBlendVersion,type BrushBlendSettings} from '../core/brushBlend';
 import type {BrushShapeSettings} from '../core/brushShape';
 /** Pen azimuth (degrees, -180..180) and altitude (0..90). */
 function penTilt(e:PointerEvent):{az:number;alt:number}|undefined{const ev=e as PointerEvent&{azimuthAngle?:number;altitudeAngle?:number};if(typeof ev.azimuthAngle==='number'&&typeof ev.altitudeAngle==='number'){let az=ev.azimuthAngle*180/Math.PI;if(az>180)az-=360;return {az:Math.round(az*10)/10,alt:Math.round(Math.max(0,Math.min(90,ev.altitudeAngle*180/Math.PI))*10)/10};}if(!e.tiltX&&!e.tiltY)return undefined;const tx=e.tiltX*Math.PI/180,ty=e.tiltY*Math.PI/180,az=Math.atan2(Math.tan(ty),Math.tan(tx))*180/Math.PI,alt=90-Math.min(90,Math.hypot(e.tiltX,e.tiltY));return {az:Math.round(az*10)/10,alt:Math.round(alt*10)/10};}
@@ -191,9 +192,10 @@ export class StudioEngine {
  private blendPageSample?:BlendSampleSource;private lastBlendEnd?:{layer:string;x:number;y:number;r:number};
  private prepareBrushBlend(s:Stroke,layer:Layer,doc:Project){
   this.blendPageSample=undefined;this.blendWorker.blendSample=undefined;setLiveBlendSample(undefined);
-  if(s.brushBlendVersion!==1&&s.brushBlendVersion!==2)return;
+  if(!isBrushBlendVersion(s.brushBlendVersion))return;
   if(s.tool!=='brush'){for(const k of Object.keys(s))if(k==='brushBlendVersion'||k.startsWith('bb'))delete (s as Record<string,unknown>)[k];return;}
   s.nativeMixVersion=undefined;s.nativeMixPickupVersion=undefined;s.nativeMixAmount=undefined;s.nativeMixPaintLoad=undefined;s.nativeMixRadius=undefined;
+  if(s.brushBlendVersion>=3)s.stabilization=Math.max(s.stabilization??0,s.bbSmoothing??0);
   if(s.bbClean===false&&this.lastBlendEnd&&this.lastBlendEnd.layer===layer.id&&layer.operations.length){const e=this.lastBlendEnd;try{s.bbCarry=encodeCarry(this.renderer.get(layer,doc),e.x,e.y,e.r);}catch{/* no carry */}}
   if(s.bbSample==='all'){const page=this.renderer.composite(doc,{includeReferences:false});const sample=sampleFromCanvas(page,{x:0,y:0,width:page.width,height:page.height});this.blendPageSample=sample;this.blendWorker.blendSample=sample;setLiveBlendSample(sample);}
  }
@@ -202,7 +204,7 @@ export class StudioEngine {
   const last=stroke.points[stroke.points.length-1],target=this.strokeTarget;
   if(last&&target)this.lastBlendEnd={layer:target.layer,x:last.x,y:last.y,r:Math.max(1,stroke.size*.5)};
   if(stroke.bbSample!=='all'||!page||!stroke.points.length)return stroke;
-  const path=blendPath(stroke),pad=Math.ceil(stroke.size*.75+8);let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
+  const path=blendPath(stroke),pad=Math.ceil((stroke.brushBlendVersion===4?brushBlendV4Reach(stroke)*blendTransformScale(stroke):stroke.size*.75)+8);let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const p of path){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);}
   // Mirrored copies replay elsewhere on the page, so they keep the whole page.
   if(this.strokeMirror){left=pad;top=pad;right=page.width-pad;bottom=page.height-pad;}
@@ -221,7 +223,7 @@ export class StudioEngine {
    const {left,top,right,bottom}=strokeRasterExtent(stroke),p=this.store.getSnapshot();
    if(left>=0&&top>=0&&right<=p.width&&bottom<=p.height)stroke={...stroke,worldStroke:undefined};
   }
-  if(stroke.brushBlendVersion===1||stroke.brushBlendVersion===2)stroke=this.finishBrushBlend(stroke);
+  if(isBrushBlendVersion(stroke.brushBlendVersion))stroke=this.finishBrushBlend(stroke);
   const snapshot=strokeSnapshot(stroke);
   if(snapshot.worldStroke&&this.worldOnlyStroke)return snapshot;
   if(!this.strokeMirror&&this.blendSource&&this.blendWorker.matches(snapshot,this.blendSource)){const pending=this.blendWorker.finish(snapshot);if(pending){this.finalBlendResult={stroke:snapshot,base:this.blendSource,...pending};const ms=performance.now()-start;this.performance.record('finalProcessingMs',ms);this.diagnostics.timing('finalProcessingMs',ms);return snapshot;}}

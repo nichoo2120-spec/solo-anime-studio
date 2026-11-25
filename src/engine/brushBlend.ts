@@ -17,24 +17,31 @@ import type {RasterRegion} from './liveRaster';
 import {SilkSurface,TILE,PATCH,CELLS,type Tile} from './silkBlend';
 import {finalGeometry} from './geometryCache';
 import {paintSamples} from './paintPass';
-import {BrushBlendGestureV2} from './brushBlendStyles';
+import {BrushBlendGestureV2,BrushBlendGestureV3,emptyBlendMask} from './brushBlendStyles';
+import {projectiveInkGeometry} from './projectiveInkGeometry';
 
 const clamp01=(v:number)=>v<0?0:v>1?1:v;
 type Ctx=CanvasRenderingContext2D;
 type Readable={getContext(kind:'2d',options?:unknown):unknown;width:number;height:number};
 
-/** Lazily read alpha of the brush mask, in 64 px tiles. `invalidate` drops the
- * cache when the live mask grows. */
+/** Lazily read alpha of the brush mask, in 64 px tiles. Each live update owns a reader for its current mask. */
 class MaskReader{
  private tiles=new Map<number,Uint8Array>();
  constructor(private readonly ctx:Ctx,private readonly ox:number,private readonly oy:number,private readonly width:number,private readonly height:number){}
- invalidate(){this.tiles.clear();}
+
  tile(tx:number,ty:number){
   const key=ty*65536+tx;let t=this.tiles.get(key);
-  if(!t){t=new Uint8Array(TILE*TILE);const x=tx*TILE,y=ty*TILE,w=Math.min(TILE,this.width-x),h=Math.min(TILE,this.height-y);
+  if(!t){t=emptyBlendMask;const x=tx*TILE,y=ty*TILE,w=Math.min(TILE,this.width-x),h=Math.min(TILE,this.height-y);
    const sx=x-this.ox,sy=y-this.oy,cw=this.ctx.canvas.width,ch=this.ctx.canvas.height;
    const ix=Math.max(0,sx),iy=Math.max(0,sy),iw=Math.min(cw,sx+w)-ix,ih=Math.min(ch,sy+h)-iy;
-   if(iw>0&&ih>0){const d=this.ctx.getImageData(ix,iy,iw,ih).data;for(let j=0;j<ih;j++)for(let i=0;i<iw;i++)t[(iy-sy+j)*TILE+ix-sx+i]=d[(j*iw+i)*4+3];}
+   if(iw>0&&ih>0){
+    const d=this.ctx.getImageData(ix,iy,iw,ih).data;
+    for(let j=0;j<ih;j++)for(let i=0;i<iw;i++){
+     const alpha=d[(j*iw+i)*4+3];if(!alpha)continue;
+     if(t===emptyBlendMask)t=new Uint8Array(TILE*TILE);
+     t[(iy-sy+j)*TILE+ix-sx+i]=alpha;
+    }
+   }
    this.tiles.set(key,t);}
   return t;
  }
@@ -195,8 +202,25 @@ export class BrushBlendGesture{
  }
 }
 
+/** Match how the paint renderer positions affine masks, including saved copies. */
+function blendTransform(s:Stroke){
+ return s.brushBlendVersion===4&&!s.perspective&&(s.stampVersion!==1||s.rasterTransformVersion===1)?s.transform:undefined;
+}
+export function blendTransformScale(s:Stroke){
+ const matrix=blendTransform(s);if(!matrix)return 1;
+ const [a,b,c,d]=matrix,trace=a*a+b*b+c*c+d*d,det=a*d-b*c;
+ return Math.max(.001,Math.sqrt((trace+Math.sqrt(Math.max(0,trace*trace-4*det*det)))*.5));
+}
+
 /** The dab path used for the canonical (final / reload) result. */
 export function blendPath(s:Stroke):Point[]{
+ if(s.brushBlendVersion===4&&(s.transform||s.perspective)){
+  const geometry=s.perspective?projectiveInkGeometry(s):finalGeometry(s);
+  const path=paintSamples(geometry,.25).points;
+  const matrix=blendTransform(s);if(!matrix)return path;
+  const [a,b,c,d,e,f]=matrix;
+  return path.map(p=>({...p,x:a*p.x+c*p.y+e,y:b*p.x+d*p.y+f}));
+ }
  if(s.points.length<2)return s.points;
  const pts=paintSamples(finalGeometry(s),.25).points;
  return pts.length?pts:s.points;
@@ -214,8 +238,9 @@ export function renderBrushBlend(ctx:Ctx,mask:Readable,s:Stroke,maskX=0,maskY=0,
 /** Live (blend worker): incremental dabs over the growing brush mask. The final
  * call restores the live pixels and renders the canonical pass. */
 /** v1 strokes keep the frozen v0.5.240 recipe; v2 strokes blend in their family style. */
-type AnyGesture=BrushBlendGesture|BrushBlendGestureV2;
+type AnyGesture=BrushBlendGesture|BrushBlendGestureV2|BrushBlendGestureV3;
 function gestureFor(s:Stroke,W:number,H:number,read:Ctx,reader:MaskReader):AnyGesture{
+ if(s.brushBlendVersion===3||s.brushBlendVersion===4)return new BrushBlendGestureV3(s,W,H,read,reader,blendSampleFor(s),decodeCarry(s.bbCarry),sampleSnapshot,blendTransformScale(s));
  return s.brushBlendVersion===2?new BrushBlendGestureV2(s,W,H,read,reader,blendSampleFor(s),decodeCarry(s.bbCarry),sampleSnapshot):new BrushBlendGesture(s,W,H,read,reader,blendSampleFor(s));
 }
 let live:{id:string;target:unknown;gesture:AnyGesture}|undefined;
