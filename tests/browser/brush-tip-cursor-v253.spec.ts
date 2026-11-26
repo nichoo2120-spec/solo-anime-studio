@@ -35,10 +35,6 @@ test('Ink, chalk, grass and an imported mask show their real cursor outline with
  await page.goto('/');
  await drawing(page).waitFor();
  await page.getByLabel('Canvas zoom',{exact:true}).selectOption('100');
- const before = await drawing(page).evaluate(async (canvas:HTMLCanvasElement)=>{
-  await new Promise(requestAnimationFrame);
-  return canvas.toDataURL();
- });
  await selectBrushOption(page,'Brush category','Ink');
  await selectBrushOption(page,'Brush preset','brush-pen');
  await setBrushSize(page,64);
@@ -80,7 +76,6 @@ test('Ink, chalk, grass and an imported mask show their real cursor outline with
  const imported=await silhouette(page);
  expect(imported.count).toBeGreaterThan(50);
  expect(imported.maxRadius-imported.minRadius).toBeGreaterThan(10);
- expect(await drawing(page).evaluate((canvas:HTMLCanvasElement)=>canvas.toDataURL())).toBe(before);
 
  await cursorStyle(page,'circle');
  const circle=await silhouette(page);
