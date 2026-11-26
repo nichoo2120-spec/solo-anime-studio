@@ -72,12 +72,14 @@ test('Brush Pen exposes default edge controls and saves them per preset',async({
  await selectBrushOption(page,'Brush preset','brush-pen');
  await openBrushSettings(page);
  const panel=page.getByRole('region',{name:'Brush Settings'});
- await panel.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Brush tip',exact:true}).click();
+ const nav=panel.getByRole('navigation',{name:'Brush settings sections'});
+ await nav.getByRole('button',{name:'Brush tip',exact:true}).click();
+ await expect(panel.getByRole('combobox',{name:'Ink tip shape'})).toHaveValue('round');
+ await nav.getByRole('button',{name:'Ink',exact:true}).click();
  const edges=panel.getByRole('group',{name:'Ink edges'});
  await expect(edges.getByRole('slider',{name:'Edge sharpness'})).toHaveValue('100');
  const aa=edges.getByRole('combobox',{name:'Antialiasing'});
  await expect(aa).toHaveValue('low');
- await expect(panel.getByRole('combobox',{name:'Ink tip shape'})).toHaveValue('round');
  await aa.selectOption('off');
  await panel.getByRole('combobox',{name:'Settings brush preset'}).selectOption('g-pen');
  await expect(aa).toHaveValue('low');
