@@ -1,5 +1,6 @@
 import {expect,test} from '@playwright/test';
 
+const baselineUrl = process.env.BLEND_BASELINE_URL;
 const baselineOnly = process.env.BLEND_BASELINE_ONLY === '1';
 
 test('profiles each Blend family and style on a 1920 × 1080 canvas',async({page})=>{
@@ -15,7 +16,7 @@ test('profiles each Blend family and style on a 1920 × 1080 canvas',async({page
   const {SilkGesture,renderSilkStroke,applySilkBlend,resetSilkBlend}=await load('/src/engine/silkBlend.ts');
   const width=1920,height=1080;
   const surface=()=>Object.assign(document.createElement('canvas'),{width,height}).getContext('2d',{willReadFrequently:true})!;
-  const base=surface(),mask=surface(),out=surface(),before=surface(),after=surface(),historic=surface();
+  const base=surface(),mask=surface(),out=surface(),before=surface(),after=surface();
   const fill=base.createLinearGradient(370,260,1330,820);
   fill.addColorStop(0,'#b53858');fill.addColorStop(.55,'#e7af62');fill.addColorStop(1,'#4069bd');
   base.fillStyle=fill;base.fillRect(0,0,width,height);
@@ -58,7 +59,6 @@ test('profiles each Blend family and style on a 1920 × 1080 canvas',async({page
     else renderBrushBlend(canvas,mask.canvas,s);
     return performance.now()-t;
    };
-   if(style!=='silk'&&!baselineOnly&&size===300)canonical(historic,{...stroke,brushBlendVersion:3,blendRasterVersion:undefined});
    const measure=(s:typeof baseline)=>{
     out.clearRect(0,0,width,height);out.drawImage(base.canvas,0,0);resetBrushBlend();resetSilkBlend();
     const samples:number[]=[];
@@ -77,7 +77,7 @@ test('profiles each Blend family and style on a 1920 × 1080 canvas',async({page
    await frame();
    const prior=measure(baseline);
    const oldMs=canonical(before,baseline);
-   let updated:ReturnType<typeof measure>|undefined,meanDelta:number|undefined,maxDelta:number|undefined,historicalDelta:number|undefined,canonicalMs:number|undefined;
+   let updated:ReturnType<typeof measure>|undefined,meanDelta:number|undefined,maxDelta:number|undefined,liveDelta:number|undefined,canonicalMs:number|undefined;
    if(!baselineOnly){
     updated=measure(candidate);
     canonicalMs=canonical(after,candidate);
@@ -94,14 +94,9 @@ test('profiles each Blend family and style on a 1920 × 1080 canvas',async({page
     }
     meanDelta=sum/Math.max(1,changed);
     maxDelta=max;
-    if(mismatch)throw Error(label+' '+size+' final worker/fallback parity differs by '+mismatch+' channels');
-    if(style!=='silk'&&size===300){
-     canonical(after,{...stroke,brushBlendVersion:3,blendRasterVersion:undefined});
-     const h=historic.getImageData(crop.x,crop.y,crop.w,crop.h).data,hh=after.getImageData(crop.x,crop.y,crop.w,crop.h).data;
-     historicalDelta=h.reduce((n,value,i)=>n+Number(value!==hh[i]),0);
-    }
+    liveDelta=mismatch;
    }
-   rows.push({label,size,maskMs,prior,oldMs,updated,canonicalMs,meanDelta,maxDelta,historicalDelta});
+   rows.push({label,size,maskMs,prior,oldMs,updated,canonicalMs,meanDelta,maxDelta,liveDelta});
   }
   return rows;
  },{baselineOnly});
@@ -109,7 +104,7 @@ test('profiles each Blend family and style on a 1920 × 1080 canvas',async({page
   console.log('BLEND_V254_PROFILE '+JSON.stringify(row));
   if(!baselineOnly){
    expect.soft(row.meanDelta,row.label+' '+row.size+' changed-pixel MAE').toBeLessThanOrEqual(2);
-   if(row.historicalDelta!==undefined)expect.soft(row.historicalDelta,row.label+' historical v3 repeat').toBe(0);
+   expect.soft(row.liveDelta,row.label+' '+row.size+' final/fallback changed bytes').toBe(0);
   }
  }
 });
@@ -158,7 +153,14 @@ test('large Blend preserves responsive input, a canonical worker result and exac
      if(coalesced)Object.defineProperty(last,'getCoalescedEvents',{value:()=>coalesced.map(event)});
      canvas.dispatchEvent(last);
     };
-    const cost:number[]=[],render=engine.render.bind(engine);
+    const cost:number[]=[],previewTimes:number[]=[],render=engine.render.bind(engine);
+    let skipped=0;
+    const receive=engine.blendWorker.receive.bind(engine.blendWorker);
+    engine.blendWorker.receive=(reply:{unchanged?:boolean;final?:boolean;bitmap?:ImageBitmap})=>{
+     if(reply.unchanged)skipped++;
+     else if(reply.bitmap&&!reply.final&&engine.drawing)previewTimes.push(performance.now());
+     receive(reply);
+    };
     let undoAt:number|undefined,undo=0;
     engine.render=()=>{
      const t=performance.now();
@@ -194,11 +196,13 @@ test('large Blend preserves responsive input, a canonical worker result and exac
     canonical.clear();
     cost.sort((a,b)=>a-b);
     rows.push({style,size,version,selectedVersion,stored:operation.blendRasterVersion,worker:engine.blendWorker.available(),
-     frame:cost[Math.ceil(cost.length*.95)-1],frames:cost.length,penUp,settled,undo,parity,undoMismatch});
+     frame:cost[Math.ceil(cost.length*.95)-1],frames:cost.length,penUp,settled,undo,parity,undoMismatch,
+     previewFrames:previewTimes.length,skipped});
    }finally{engine.dispose();host.remove();}
   }
   return rows;
  });
+ expect(rows.filter(row=>row.version===2).some(row=>row.skipped>0)).toBe(true);
  for(const row of rows){
   console.log('BLEND_V254_INPUT '+JSON.stringify(row));
   if(row.version!==2)continue;
@@ -213,4 +217,41 @@ test('large Blend preserves responsive input, a canonical worker result and exac
   expect.soft(row.penUp,id+' pen-up handler').toBeLessThanOrEqual(50);
   expect.soft(row.undo,id+' undo to display').toBeLessThanOrEqual(50);
  }
+});
+
+
+test('replays historical blend strokes byte for byte against the previous release',async({page,context})=>{
+ test.skip(!baselineUrl,'Set BLEND_BASELINE_URL to a Vite server running v0.5.253.');
+ const frozen=await context.newPage();
+ await Promise.all([page.goto('/'),frozen.goto(baselineUrl!)]);
+ const sample=(source:typeof page)=>source.evaluate(async()=>{
+  const load=(path:string)=>import(path);
+  const {stockPresets}=await load('/src/core/brushes.ts');
+  const {brushStrokeMetadata}=await load('/src/core/paintTips.ts');
+  const {drawStroke}=await load('/src/engine/renderer.ts');
+  const {renderBrushBlend}=await load('/src/engine/brushBlend.ts');
+  const surface=()=>Object.assign(document.createElement('canvas'),{width:1050,height:590}).getContext('2d',{willReadFrequently:true})!;
+  const ctx=surface(),mask=surface();
+  const points=Array.from({length:26},(_,i)=>({x:278+i*19,y:292+Math.sin(i*.19)*42,p:.67+.31*i/25,v:.65}));
+  const checks=[];
+  for(const [id,style] of [['soft-paint','auto'],['water-flat','auto'],['flat','auto'],['color-air','auto'],
+   ['hb','auto'],['g-pen','auto'],['marker','auto'],['color-texture','auto'],['dry','auto'],
+   ...['blur','wet','smudge','dry'].map(style=>['soft-paint',style])]){
+   const settings={...stockPresets.find((p:{id:string})=>p.id===id).settings,bbEnabled:true,bbRenderStyle:style,pressureWidth:false};
+   const base={...settings,...brushStrokeMetadata(settings),id:'historical-blend-'+id,kind:'stroke',tool:'brush',size:300,points,pressure:false};
+   mask.clearRect(0,0,1050,590);drawStroke(mask,base);
+   for(const version of [3,4,6]){
+    ctx.clearRect(0,0,1050,590);
+    const palette=ctx.createLinearGradient(95,130,918,466);
+    palette.addColorStop(0,'#a02bc4');palette.addColorStop(.38,'#dea158');palette.addColorStop(1,'#258baf');
+    ctx.fillStyle=palette;ctx.fillRect(90,180,870,390);ctx.clearRect(559,211,88,156);
+    renderBrushBlend(ctx,mask.canvas,{...base,brushBlendVersion:version,blendRasterVersion:version===6?1:undefined});
+    const digest=await crypto.subtle.digest('SHA-256',ctx.getImageData(0,0,1050,590).data);
+    checks.push({id,style,version,digest:Array.from(new Uint8Array(digest))});
+   }
+  }
+  return checks;
+ });
+ const [before,after]=await Promise.all([sample(frozen),sample(page)]);
+ expect(after).toEqual(before);
 });

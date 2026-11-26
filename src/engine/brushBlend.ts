@@ -295,6 +295,11 @@ function gestureFor(s:Stroke,W:number,H:number,read:Ctx,reader:MaskReader):AnyGe
 }
 let live:{id:string;target:unknown;gesture:AnyGesture;mask?:MaskReader;source?:Readable}|undefined;
 export function resetBrushBlend(){live=undefined;}
+export function brushBlendNeedsDab(ctx:Ctx,s:Stroke){
+ const current=live;
+ return !current||current.id!==s.id||current.target!==ctx.canvas||
+  !(current.gesture instanceof BrushBlendGestureV3)||current.gesture.needsDab(s.points);
+}
 export function applyBrushBlendLive(ctx:Ctx,mask:Readable,s:Stroke,base:Readable,final:boolean,livePath:Point[],maskDirty?:RasterRegion):RasterRegion|undefined{
  if(s.opacity<=0||!s.points.length)return undefined;
  const read=base.getContext('2d') as Ctx,W=ctx.canvas.width,H=ctx.canvas.height;

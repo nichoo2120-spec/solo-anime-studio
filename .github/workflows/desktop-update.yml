@@ -42,6 +42,7 @@ jobs:
       - run: npx playwright test tests/browser/distort-preview-v214.spec.ts tests/browser/transform-v116.spec.ts tests/browser/transform-modes-v116.spec.ts
       - run: npx playwright test tests/browser/reselection-loop-v215.spec.ts tests/browser/brush-blend-v4.spec.ts
       - run: npx playwright test tests/browser/large-blend-performance.spec.ts tests/browser/crisp-ink-v248.spec.ts
+      - run: npx playwright test tests/browser/large-blend-v254.spec.ts --workers=1
       - run: npx playwright test tests/browser/drawing-session-v249.spec.ts --workers=1
       - run: npx playwright test tests/browser/nature-brush-v250.spec.ts --workers=1
       - run: npx playwright test tests/browser/bitmap-brush-v251.spec.ts tests/browser/brush-workspace-v252.spec.ts tests/browser/brush-tip-cursor-v253.spec.ts --workers=1

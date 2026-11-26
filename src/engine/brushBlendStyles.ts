@@ -213,6 +213,18 @@ export class BrushBlendGestureV2{
   }
   return Math.max(.6,2*r*spacing);
  }
+ /** A live mask rebuild only helps when the brush contacts the canvas. */
+ needsDab(points:Point[]){
+  if(this.pointCount>points.length||!this.next)return true;
+  let distance=this.carry;
+  for(let i=this.next;i<points.length;i++){
+   const a=points[i-1],b=points[i],length=Math.hypot(b.x-a.x,b.y-a.y);
+   if(length<1e-9)continue;
+   if(distance<=length)return true;
+   distance-=length;
+  }
+  return false;
+ }
  advance(points:Point[]){
   if(!points.length)return;
   for(let i=this.count;i<points.length;i++)this.path.push(points[i]);this.count=points.length;
@@ -402,11 +414,19 @@ export class BrushBlendGestureV2{
       if(ta<.5)continue;
       const o=c*4,pa=f[o+3],na=protect?pa:pa+(Math.max(pa,ta)-pa)*(water?Math.min(1,a*(1+this.waterSpread*.8)):a);
       if(na<.5)continue;
-      const inP=pa>=.5?1/pa:0;
       const edgeShade=!water&&!this.crisp&&this.v3!.edgeDarkness?1-this.v3!.edgeDarkness*.14*ease(.68,.99,d):1;
-      for(let ch=0;ch<3;ch++){
-       const tc=colours[position+ch],pc=pa>=.5?f[o+ch]*inP:tc;
-       f[o+ch]=(pc+(tc-pc)*a)*na*edgeShade;
+      const red=colours[position],green=colours[position+1],blue=colours[position+2];
+      if(na===pa){
+       f[o]=(f[o]+(red*pa-f[o])*a)*edgeShade;
+       f[o+1]=(f[o+1]+(green*pa-f[o+1])*a)*edgeShade;
+       f[o+2]=(f[o+2]+(blue*pa-f[o+2])*a)*edgeShade;
+      }else if(pa>=.5){
+       const inP=1/pa,cr=f[o]*inP,cg=f[o+1]*inP,cb=f[o+2]*inP;
+       f[o]=(cr+(red-cr)*a)*na*edgeShade;
+       f[o+1]=(cg+(green-cg)*a)*na*edgeShade;
+       f[o+2]=(cb+(blue-cb)*a)*na*edgeShade;
+      }else{
+       f[o]=red*na*edgeShade;f[o+1]=green*na*edgeShade;f[o+2]=blue*na*edgeShade;
       }
       f[o+3]=na;changed[c]=1;any=true;
       continue;
