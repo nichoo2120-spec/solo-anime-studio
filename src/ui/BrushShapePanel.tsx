@@ -1,3 +1,4 @@
+import {BrushSettingInput,BrushSettingSelect} from './BrushQuickSettings';
 import {memo,useEffect,useRef,useState} from 'react';
 import {ExactRange} from './ExactRange';
 import {dualModes,shapeDefaults,brushStampTip,canShapeBrush,isDualMode,type DualMode} from '../core/brushShape';
@@ -29,17 +30,17 @@ export const TipShapePanel=memo(function TipShapePanel({settings:s,patch}:{setti
  if(!canShapeBrush(s))return <p className="hint">This brush is a blender and keeps its own tip.</p>;
  const d=shapeDefaults,on=!!s.tsEnabled;
  return <div className="brush-shape-panel" role="group" aria-label="Tip shape settings">
-  <label className="check-row"><span>Custom tip shape</span><input aria-label="Custom tip shape" type="checkbox" checked={on} onChange={e=>patch({tsEnabled:e.target.checked})}/></label>
+  <label className="check-row"><span>Custom tip shape</span><BrushSettingInput aria-label="Custom tip shape" type="checkbox" checked={on} onChange={e=>patch({tsEnabled:e.target.checked})}/></label>
   <StampPreview settings={s} force="shape" label="Live tip preview"/>
   <fieldset className="brush-blend-controls" disabled={!on}>
    <ExactRange live name="Tip roundness (shape)" min={5} max={100} value={pct(s.tsRoundness,d.tsRoundness)} unit="%" set={v=>patch({tsRoundness:v/100})}/>
    <ExactRange live name="Tip angle (shape)" min={-180} max={180} value={Math.round(s.tsAngle??0)} unit="°" set={v=>patch({tsAngle:v})}/>
    <ExactRange live name="Scale X" min={10} max={300} value={pct(s.tsScaleX,1)} unit="%" set={v=>patch({tsScaleX:v/100})}/>
    <ExactRange live name="Scale Y" min={10} max={300} value={pct(s.tsScaleY,1)} unit="%" set={v=>patch({tsScaleY:v/100})}/>
-   <label className="check-row"><span>Flip X</span><input aria-label="Flip X" type="checkbox" checked={!!s.tsFlipX} onChange={e=>patch({tsFlipX:e.target.checked})}/></label>
-   <label className="check-row"><span>Flip Y</span><input aria-label="Flip Y" type="checkbox" checked={!!s.tsFlipY} onChange={e=>patch({tsFlipY:e.target.checked})}/></label>
-   <label className="check-row"><span>Angle follows stroke direction</span><input aria-label="Angle follows stroke direction" type="checkbox" checked={!!s.tsFollow} onChange={e=>patch({tsFollow:e.target.checked})}/></label>
-   <label className="check-row"><span>Pen tilt turns and stretches the tip</span><input aria-label="Pen tilt controls tip" type="checkbox" checked={!!s.tsTilt} onChange={e=>patch({tsTilt:e.target.checked})}/></label>
+   <label className="check-row"><span>Flip X</span><BrushSettingInput aria-label="Flip X" type="checkbox" checked={!!s.tsFlipX} onChange={e=>patch({tsFlipX:e.target.checked})}/></label>
+   <label className="check-row"><span>Flip Y</span><BrushSettingInput aria-label="Flip Y" type="checkbox" checked={!!s.tsFlipY} onChange={e=>patch({tsFlipY:e.target.checked})}/></label>
+   <label className="check-row"><span>Angle follows stroke direction</span><BrushSettingInput aria-label="Angle follows stroke direction" type="checkbox" checked={!!s.tsFollow} onChange={e=>patch({tsFollow:e.target.checked})}/></label>
+   <label className="check-row"><span>Pen tilt turns and stretches the tip</span><BrushSettingInput aria-label="Pen tilt controls tip" type="checkbox" checked={!!s.tsTilt} onChange={e=>patch({tsTilt:e.target.checked})}/></label>
   </fieldset>
   <div className="silk-actions"><button type="button" aria-label="Reset tip shape" onClick={()=>patch({tsRoundness:1,tsAngle:0,tsScaleX:1,tsScaleY:1,tsFlipX:false,tsFlipY:false,tsFollow:false,tsTilt:false})}>Reset shape</button></div>
   <p className="hint">Roundness squeezes the tip, Scale X and Scale Y stretch it, Angle turns it and Flip mirrors it. Angle follows direction turns the tip with your line; Pen tilt uses your pen's tilt (pen only).</p>
@@ -55,11 +56,11 @@ export const DualBrushPanel=memo(function DualBrushPanel({settings:s,patch,libra
  const pick=(p:BrushPreset|undefined)=>{if(!p)return;const t=brushStampTip(p.settings);patch({dbBrushId:p.id,dbBrushName:p.name.slice(0,60),dbTip:t.tip,dbNatureTip:p.settings.nature?.tip,dbBitmap:p.settings.nature?.bitmap?.tips[0],dbHardness:t.hardness,dbTexture:p.settings.nature?.grain??t.texture,dbEnabled:true});};
  const mode:DualMode=isDualMode(s.dbMode)?s.dbMode:'multiply';
  return <div className="brush-shape-panel" role="group" aria-label="Dual brush settings">
-  <label className="check-row"><span>Dual brush (merge two brushes)</span><input aria-label="Use dual brush" type="checkbox" checked={on} onChange={e=>{if(e.target.checked&&!s.dbTip)pick(choices.find(p=>p.settings.brushTip==='chalk')??choices[0]);else patch({dbEnabled:e.target.checked});}}/></label>
+  <label className="check-row"><span>Dual brush (merge two brushes)</span><BrushSettingInput aria-label="Use dual brush" type="checkbox" checked={on} onChange={e=>{if(e.target.checked&&!s.dbTip)pick(choices.find(p=>p.settings.brushTip==='chalk')??choices[0]);else patch({dbEnabled:e.target.checked});}}/></label>
   <StampPreview settings={s} force="dual" label="Dual brush preview"/>
   <fieldset className="brush-blend-controls" disabled={!on}>
-   <label className="studio-select">Second brush<select aria-label="Second brush" value={s.dbBrushId&&choices.some(p=>p.id===s.dbBrushId)?s.dbBrushId:''} onChange={e=>pick(choices.find(p=>p.id===e.target.value))}><option value="" disabled>{s.dbBrushName??'Choose a brush'}</option>{choices.map(p=><option key={p.id} value={p.id}>{p.custom?'★ ':''}{p.name}</option>)}</select></label>
-   <label className="studio-select">Mode<select aria-label="Dual brush mode" value={mode} onChange={e=>patch({dbMode:e.target.value as DualMode})}>{dualModes.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+   <label className="studio-select">Second brush<BrushSettingSelect aria-label="Second brush" value={s.dbBrushId&&choices.some(p=>p.id===s.dbBrushId)?s.dbBrushId:''} onChange={e=>pick(choices.find(p=>p.id===e.target.value))}><option value="" disabled>{s.dbBrushName??'Choose a brush'}</option>{choices.map(p=><option key={p.id} value={p.id}>{p.custom?'★ ':''}{p.name}</option>)}</BrushSettingSelect></label>
+   <label className="studio-select">Mode<BrushSettingSelect aria-label="Dual brush mode" value={mode} onChange={e=>patch({dbMode:e.target.value as DualMode})}>{dualModes.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</BrushSettingSelect></label>
    <p className="hint silk-hint">{dualModes.find(m=>m.id===mode)!.hint}</p>
    <ExactRange live name="Second tip size" min={10} max={300} value={pct(s.dbScale,d.dbScale)} unit="%" set={v=>patch({dbScale:v/100})}/>
    <ExactRange live name="Second tip spacing" min={2} max={200} value={pct(s.dbSpacing,d.dbSpacing)} unit="%" set={v=>patch({dbSpacing:v/100})}/>

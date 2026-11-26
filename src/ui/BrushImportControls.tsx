@@ -1,10 +1,10 @@
-import {useRef,useState,type DragEvent, type ReactNode} from 'react';
+import {useEffect,useRef,useState,type DragEvent, type ReactNode} from 'react';
 import {addImportedBrushes,type BrushLibrary} from '../core/brushes';
 import {importInWorker} from '../core/brushImport/client';
 import {brushAccept,packName,type AlphaSource,type BrushImportAsset} from '../core/brushImport/types';
 
-export function BrushImportControls({children,change,notify,enabled}:{
- children:ReactNode;enabled:boolean;
+export function BrushImportControls({children,change,notify,enabled,showActions=true,droppedFiles}:{
+ children:ReactNode;enabled:boolean;showActions?:boolean;droppedFiles?:File[];
  change:(update:(library:BrushLibrary)=>BrushLibrary)=>void;notify:(message:string)=>void;
 }){
  const input=useRef<HTMLInputElement>(null),busy=useRef(false),[state,setState]=useState<{name:string;current:number;total:number}>();
@@ -33,12 +33,14 @@ export function BrushImportControls({children,change,notify,enabled}:{
    if(errors.length)setError(errors.join('\n'));
   }finally{setState(undefined);busy.current=false;}
  }
+ const incoming=useRef(droppedFiles);
+ useEffect(()=>{if(incoming.current){const files=incoming.current;incoming.current=undefined;void load(files);}},[]);
  const hasFiles=(e:DragEvent)=>e.dataTransfer.types.includes('Files');
  return <div className="brush-import-surface"
   onDragOver={enabled?e=>{if(hasFiles(e)){e.preventDefault();e.dataTransfer.dropEffect='copy';}}:undefined}
   onDrop={enabled?e=>{if(hasFiles(e)){e.preventDefault();e.stopPropagation();void load(Array.from(e.dataTransfer.files));}}:undefined}>
   {enabled&&<>
-   <div className="brush-import-actions">
+   <div className="brush-import-actions" hidden={!showActions}>
     <button type="button" disabled={!!state} onClick={()=>input.current?.click()}>Import brushes</button>
     <select aria-label="Imported image mask" value={mode} disabled={!!state} onChange={e=>setMode(e.target.value as AlphaSource)}><option value="auto">Auto image mask</option><option value="luminance">Dark paint</option><option value="alpha">Use alpha</option></select>
     <input ref={input} type="file" aria-label="Choose brush files" accept={brushAccept} multiple hidden onChange={e=>{const files=Array.from(e.target.files??[]);e.target.value='';void load(files);}}/>

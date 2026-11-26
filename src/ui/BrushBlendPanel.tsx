@@ -1,3 +1,4 @@
+import {BrushSettingInput,BrushSettingSelect} from './BrushQuickSettings';
 import {memo,useEffect,useRef} from 'react';
 import {ExactRange} from './ExactRange';
 import {blendDefaultsFor,blendModes,blendPresets,brushBlendSettingsFor,blendPressureCurves,blendRenderStyles,blendStrengthPresets,canBrushBlend,isBlendMode,isBlendSample,blendStyleFor,blendStyleNames,type BlendPressureCurve,type BlendRenderStyle,type BlendMode,type BlendStyle} from '../core/brushBlend';
@@ -77,17 +78,17 @@ export const BrushBlendSettingsPanel=memo(function BrushBlendSettingsPanel({sett
   <BrushBlendToggle settings={s} patch={patch} shortcut={shortcut}/>
   {!s.bbEnabled?<p className="hint">Switch to Blend to adjust this brush’s blending. Its family look stays <strong>{blendStyleNames[style]}</strong>.</p>:<>
    <BlendPreview settings={s}/>
-   <label className="studio-select">Blend style<select aria-label="Blend style" value={values.bbRenderStyle} onChange={e=>patch({bbRenderStyle:e.target.value as BlendRenderStyle})}>{Object.entries(blendRenderStyles).map(([key,name])=><option key={key} value={key}>{name}</option>)}</select></label>
+   <label className="studio-select">Blend style<BrushSettingSelect aria-label="Blend style" value={values.bbRenderStyle} onChange={e=>patch({bbRenderStyle:e.target.value as BlendRenderStyle})}>{Object.entries(blendRenderStyles).map(([key,name])=><option key={key} value={key}>{name}</option>)}</BrushSettingSelect></label>
    {values.bbRenderStyle==='silk'?<SilkBlendPanel settings={s} patch={patch} reset={resetSilk}/>:<>
-   <label className="studio-select">Blend mode<select aria-label="Blend mode" value={mode} onChange={e=>patch({bbMode:e.target.value as BlendMode})}>{blendModes.map(m=><option key={m} value={m}>{m[0].toUpperCase()+m.slice(1)}</option>)}</select></label>
+   <label className="studio-select">Blend mode<BrushSettingSelect aria-label="Blend mode" value={mode} onChange={e=>patch({bbMode:e.target.value as BlendMode})}>{blendModes.map(m=><option key={m} value={m}>{m[0].toUpperCase()+m.slice(1)}</option>)}</BrushSettingSelect></label>
    <p className="hint brush-blend-style" aria-label="Brush family style">Brush character: <strong>{blendStyleNames[style]}</strong> — {styleHints[style]}.</p>
    <p className="hint">Blend mode uses this brush’s nib and grain to mix existing canvas colours. {shortcut?`Press ${shortcut.toUpperCase()} to switch Paint / Blend.`:''}</p>
    <div className="silk-presets" role="group" aria-label="Blend presets">{blendPresets.map(p=><button key={p.id} type="button" className={active===p.id?'active':''} aria-pressed={active===p.id} onClick={()=>patch({...p.values,bbEnabled:true})}>{p.name}</button>)}</div>
    <div className="silk-presets" role="group" aria-label="Blend strength presets">{blendStrengthPresets.map(p=><button key={p.name} type="button" className={values.bbStrength===p.strength?'active':''} aria-pressed={values.bbStrength===p.strength} onClick={()=>patch({bbStrength:p.strength})}>{p.name}</button>)}</div>
    <fieldset className="brush-blend-controls">
     <ExactRange live name="Blend strength" value={pct(values.bbStrength,1)} max={200} unit="%" set={v=>patch({bbStrength:v/100})}/>
-    <label className="check-row"><span>Pressure affects blend</span><input aria-label="Pressure changes blend" type="checkbox" checked={values.bbPressure} onChange={e=>patch({bbPressure:e.target.checked})}/></label>
-    <label className="studio-select">Pressure curve<select aria-label="Blend pressure curve" value={values.bbPressureCurve} onChange={e=>patch({bbPressureCurve:e.target.value as BlendPressureCurve})}>{blendPressureCurves.map(curve=><option key={curve} value={curve}>{curve[0].toUpperCase()+curve.slice(1)}</option>)}</select></label>
+    <label className="check-row"><span>Pressure affects blend</span><BrushSettingInput aria-label="Pressure changes blend" type="checkbox" checked={values.bbPressure} onChange={e=>patch({bbPressure:e.target.checked})}/></label>
+    <label className="studio-select">Pressure curve<BrushSettingSelect aria-label="Blend pressure curve" value={values.bbPressureCurve} onChange={e=>patch({bbPressureCurve:e.target.value as BlendPressureCurve})}>{blendPressureCurves.map(curve=><option key={curve} value={curve}>{curve[0].toUpperCase()+curve.slice(1)}</option>)}</BrushSettingSelect></label>
     <ExactRange live name="Minimum blend at light pressure" value={pct(values.bbMinPressure,.7)} unit="%" set={v=>patch({bbMinPressure:v/100})}/>
     <ExactRange live name="Blend amount" value={pct(s.bbAmount,defaults.bbAmount)} unit="%" set={v=>patch({bbAmount:v/100})}/>
     <ExactRange live name="Pickup" value={pct(s.bbPickup,defaults.bbPickup)} unit="%" set={v=>patch({bbPickup:v/100})}/>
@@ -104,9 +105,9 @@ export const BrushBlendSettingsPanel=memo(function BrushBlendSettingsPanel({sett
      <ExactRange live name="Mix" value={pct(s.bbMix,defaults.bbMix)} unit="%" set={v=>patch({bbMix:v/100})}/>
      <ExactRange live name="Blend Flow" value={pct(s.bbFlow,defaults.bbFlow)} unit="%" set={v=>patch({bbFlow:v/100})}/>
      <ExactRange live name="Paint Load" value={pct(s.bbPaintLoad,defaults.bbPaintLoad)} unit="%" set={v=>patch({bbPaintLoad:v/100})}/>
-     <label className="studio-select">Sample<select aria-label="Blend sample" value={isBlendSample(s.bbSample)?s.bbSample:'layer'} onChange={e=>patch({bbSample:e.target.value as 'layer'|'all'})}><option value="layer">Current layer</option><option value="all">All layers</option></select></label>
-     <label className="check-row"><span>Clean brush after each stroke</span><input aria-label="Clean brush after each stroke" type="checkbox" checked={s.bbClean??defaults.bbClean} onChange={e=>patch({bbClean:e.target.checked})}/></label>
-     <label className="check-row"><span>Protect transparency</span><input aria-label="Protect transparency" type="checkbox" checked={s.bbProtectAlpha??defaults.bbProtectAlpha} onChange={e=>patch({bbProtectAlpha:e.target.checked})}/></label>
+     <label className="studio-select">Sample<BrushSettingSelect aria-label="Blend sample" value={isBlendSample(s.bbSample)?s.bbSample:'layer'} onChange={e=>patch({bbSample:e.target.value as 'layer'|'all'})}><option value="layer">Current layer</option><option value="all">All layers</option></BrushSettingSelect></label>
+     <label className="check-row"><span>Clean brush after each stroke</span><BrushSettingInput aria-label="Clean brush after each stroke" type="checkbox" checked={s.bbClean??defaults.bbClean} onChange={e=>patch({bbClean:e.target.checked})}/></label>
+     <label className="check-row"><span>Protect transparency</span><BrushSettingInput aria-label="Protect transparency" type="checkbox" checked={s.bbProtectAlpha??defaults.bbProtectAlpha} onChange={e=>patch({bbProtectAlpha:e.target.checked})}/></label>
     </fieldset>
    </details>
    <div className="silk-actions brush-blend-actions"><button type="button" onClick={copyFromSilk}>Copy settings from Silk Blend</button><button type="button" aria-label="Reset Blend settings" onClick={reset}>Reset to brush default</button></div>

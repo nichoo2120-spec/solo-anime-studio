@@ -1,3 +1,4 @@
+import {BrushSettingInput,BrushSettingSelect} from './BrushQuickSettings';
 import {memo} from 'react';
 import {ExactRange} from './ExactRange';
 import {silkModes,silkPresets,isSilkMode,type SilkMode} from '../core/silkBlend';
@@ -9,7 +10,7 @@ export const SilkBlendPanel=memo(function SilkBlendPanel({settings:s,patch,reset
  const active=silkPresets.find(p=>Object.entries(p.values).every(([k,v])=>(s as Record<string,unknown>)[k]===v))?.id;
  return <div className="silk-panel" role="group" aria-label="Silk Blend settings">
   <div className="silk-title"><span className="silk-badge" aria-hidden="true">✦</span><strong>SILK BLEND</strong><span>blends colours on this layer</span></div>
-  <label className="studio-select">Mode<select aria-label="Silk Blend mode" value={mode} onChange={e=>patch({silkMode:e.target.value as SilkMode})}>{silkModes.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+  <label className="studio-select">Mode<BrushSettingSelect aria-label="Silk Blend mode" value={mode} onChange={e=>patch({silkMode:e.target.value as SilkMode})}>{silkModes.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</BrushSettingSelect></label>
   <p className="hint silk-hint">{info.hint}</p>
   <div className="silk-presets" role="group" aria-label="Silk Blend presets">{silkPresets.map(p=><button key={p.id} type="button" className={active===p.id?'active':''} aria-pressed={active===p.id} onClick={()=>patch({...p.values})}>{p.name}</button>)}</div>
   <ExactRange live name="Size" min={1} max={150} step={.1} value={s.size} unit=" px" set={size=>patch({size})}/>

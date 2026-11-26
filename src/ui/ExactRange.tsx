@@ -1,3 +1,4 @@
+import {useBrushSettingPin} from './BrushQuickSettings';
 import {useId,useState,useRef,useEffect,type KeyboardEvent} from 'react';
 
 export type ExactRangeProps={
@@ -19,6 +20,7 @@ export type ExactRangeProps={
  */
 export function ExactRange({live=false,name,value,min=0,max=100,step=1,unit='',set}:ExactRangeProps){
   const id=useId();
+  const pin=useBrushSettingPin(name,{kind:'number',props:{name,value,min,max,step,unit,set}});
   const [editing,setEditing]=useState(false);
   const [draft,setDraft]=useState('');
   const [sliding,setSliding]=useState<number|null>(null);
@@ -57,6 +59,7 @@ export function ExactRange({live=false,name,value,min=0,max=100,step=1,unit='',s
         onKeyDown={onKeyDown}/>
       {unit&&<span aria-hidden="true">{unit.trim()}</span>}
     </label>
+    {pin}
   </div>;
 }
 
