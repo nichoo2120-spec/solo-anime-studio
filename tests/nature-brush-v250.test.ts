@@ -8,6 +8,8 @@ import {brushStrokeMetadata} from '../src/core/paintTips';
 import {drawStroke} from '../src/engine/renderer';
 import {LiveStrokeRaster} from '../src/engine/liveRaster';
 import {strokeGeometry} from '../src/engine/strokeGeometry';
+import {natureTipAlpha} from '../src/engine/natureTips';
+import {traceTipMask} from '../src/engine/tipContours';
 
 const width=390,height=210;
 const surface=()=>createCanvas(width,height).getContext('2d') as unknown as CanvasRenderingContext2D;
@@ -60,4 +62,13 @@ it('stores a custom brush and captures the original seeded tip for Blend',()=>{
  expect(()=>validateProject(JSON.parse(JSON.stringify(project)))).not.toThrow();
  activeLayer(project).operations.push({...stroke(preset),nature:{...settings.nature,seed:-1}});
  expect(()=>validateProject(project)).toThrow(/Nature brush/);
+});
+
+it('traces the real tall-grass tip with separated blades and open space above their roots',()=>{
+ const contours=traceTipMask(natureTipAlpha('grass-tall'));
+ const points=contours.flat();
+ expect(contours.length).toBeGreaterThan(1);
+ expect(points.some(p=>p.y<-.25)).toBe(true);
+ expect(points.some(p=>p.y>.04)).toBe(true);
+ expect(Math.max(...points.map(p=>p.x))-Math.min(...points.map(p=>p.x))).toBeGreaterThan(.65);
 });

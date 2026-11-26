@@ -2,7 +2,7 @@ import {readBitmapLibrary,smallBrushPreferences,writeBitmapLibrary} from '../cor
 import {StrokeWidthEditor} from './StrokeWidthEditor';
 import {createPortal} from 'react-dom';
 import {MirrorControls} from './MirrorControls';
-import {useEffect,useMemo,useRef,useState,useSyncExternalStore,Fragment,type ReactNode} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState,useSyncExternalStore,Fragment,type ReactNode} from 'react';
 import {Plus,ChevronDown,ChevronRight,Folder,Layers,Copy,Trash2,Eye,EyeOff,Lock,Unlock,ArrowUp,ArrowDown,Undo2,Redo2,Maximize,RotateCcw,Settings,Download,Check,Keyboard,X,PanelLeftClose,PanelRightClose,GripVertical,Film,Play,Pause,Square,SkipBack,SkipForward,ChevronsLeft,ChevronsRight,SlidersHorizontal,Palette,Image as ImageIcon,Save,FilePlus,FolderOpen,Clock,MousePointer2,Maximize2,Minimize2,PanelLeftOpen,PanelRightOpen,Link2,MapPinned,Target} from 'lucide-react';
 import {AutosaveWriter} from '../core/AutosaveWriter';
 import {ViewPreferences,documentDirty} from '../core/viewPreferences';
@@ -60,6 +60,7 @@ import {DrawingBugRecorderPanel,BugRecordingIndicator} from './DrawingBugRecorde
 import {buildInfo} from '../core/buildInfo';
 import {replayTrace} from '../engine/diagnosticReplay';
 import {BrushStudio} from './BrushStudio';
+import {brushCursorStyle,type BrushCursorStyle} from '../core/brushCursor';
 import {ExactRange} from './ExactRange';
 import {VectorStudio,type VectorDefaults} from './VectorStudio';
 import {activePreset,activeInputPreset,restoreBrushLibrary,updatePreset,portableCustomBrushes,mergeCustomBrushes,type BrushLibrary} from '../core/brushes';
@@ -210,6 +211,12 @@ export function App(){
  const [strokeCount,setStrokeCount]=useState(0),[strokeMode,setStrokeMode]=useState<'select'|'lasso'|'move'|'scale'|'rotate'|'perspective-move'|'perspective'|'freeform'>('select'),[freeformCornerMode,setFreeformCornerMode]=useState<'scale'|'perspective'>('scale'),[strokePickMode,setStrokePickMode]=useState<'touch'|'enclose'>('touch'),[strokeShape,setStrokeShape]=useState<'rectangle'|'lasso'>('lasso'),[strokeScope,setStrokeScope]=useState<'current'|'visible'>('current');
  const [hasSelection,setHasSelection]=useState(false),[busy,setBusy]=useState(false),[transform,setTransform]=useState<TransformSettings>({dx:0,dy:0,scale:1,angle:0});
  const [layout,setLayout]=useState<Layout>(()=>{const p=readPreference<Layout>('layout',{left:232,right:280,bottom:160,leftClosed:false,rightClosed:false,bottomClosed:false});const migrated=readPreference<boolean>('workspace-compact-initialized',false);return {...p,left:Math.max(180,Math.min(300,Number(p.left)||232)),right:Math.max(240,Math.min(340,Number(p.right)||280)),bottom:migrated?Math.max(110,Math.min(500,Number(p.bottom)||160)):160};});
+ const [cursorStyle,setCursorStyle]=useState(()=>brushCursorStyle(readPreference('brush-cursor-style',null)));
+ const changeCursorStyle=useCallback((style:BrushCursorStyle)=>{
+  setCursorStyle(style);
+  writePreference('brush-cursor-style',style);
+ },[]);
+ useEffect(()=>{engine.current?.setBrushCursorStyle(cursorStyle);},[cursorStyle,engineReady]);
  const [shortcuts,setShortcuts]=useState(()=>normalizeShortcuts(readPreference('shortcuts',initialShortcuts)));
  const [fillSettings,setFillSettings]=useState<FillSettings>(()=>{const s=readPreference<FillSettings>('fill-settings',{reference:'current',lineLayerId:'',gap:0,expansion:0});return {reference:['current','visible','line'].includes(s.reference)?s.reference:'current',lineLayerId:typeof s.lineLayerId==='string'?s.lineLayerId:'',gap:Math.max(0,Math.min(10,s.gap||0)),expansion:Math.max(0,Math.min(5,s.expansion||0))};});
  const [fillQuestion,setFillQuestion]=useState<{message:string;resolve:(answer:boolean)=>void}|null>(null);
@@ -1272,7 +1279,7 @@ const lastId=readPreference<string|null>('last-project',null);(lastId?repository
     </>}
    </aside><div className="panel-resizer left-resizer" role="separator" aria-label="Resize project panel" onPointerDown={e=>resizePanel(e,'left')}/>
    <main className="center-panel"><ProjectTabs tabs={tabIds.map(id=>{const session=sessions.current.get(id)!,project=id===activeTabId.current?doc:session.history.project;return {id,name:project.name,dirty:documentDirty(project,id===activeTabId.current?saved.current:session.saved)};})} activeId={activeTabId.current} disabled={busy||sequenceBusy||closingTab} onSelect={id=>void selectProjectTab(id)} onClose={requestCloseProject} onNew={startNew} onOpen={()=>void listProjects()} onHome={()=>void showOnboarding()}/><div className="canvas-tabbar"><span className="canvas-workspace-label">{workspaceMode==='DRAW'?'ILLUSTRATION':'ANIMATION'}</span><div className="canvas-controls"><MirrorControls engine={engineReady}/><IconButton label="Undo" onClick={undo} disabled={!store.canUndo||busy}><Undo2 size={15}/></IconButton><IconButton label="Redo" onClick={redo} disabled={!store.canRedo||busy}><Redo2 size={15}/></IconButton><span className="vertical-divider"/><CameraZoom camera={camera} engine={engineReady} outside={showingOutside}/><button title="Reset rotation" aria-label="Reset rotation" onClick={()=>engine.current?.rotate(0)}>0°</button><IconButton label="Fit canvas" onClick={()=>engine.current?.fit()}><Maximize size={15}/></IconButton><IconButton label="Reset view" onClick={()=>engine.current?.reset()}><RotateCcw size={15}/></IconButton><button type="button" className={"canvas-focus-tab-action "+(focusMode?"selected":"")} title={focusMode?"Exit Canvas Focus Mode · F9":"Focus Canvas · F9"} aria-label={focusMode?"Exit Canvas Focus Mode (F9)":"Focus Canvas (F9)"} aria-pressed={focusMode} onClick={()=>{setFocusMode(v=>!v);setOnionSettingsOpen(false);}}>{focusMode?<Minimize2 size={14}/>:<Maximize2 size={14}/>}<span>{focusMode?"Exit Focus":"Focus"}</span></button><button type="button" className={"outside-frame-button "+(showingOutside?"selected":"")} title={outsideFrameLabel} onClick={toggleOutsideFrame} disabled={busy||sequenceBusy}>{outsideFrameLabel}</button><CameraAngle camera={camera} engine={engineReady}/></div></div>
-    <div className="brush-workspace">{(tool==='brush'||tool==='eraser')&&!layer.reference&&<BrushStudio library={brushLibrary} eraser={tool==='eraser'} onChange={stablePanelHandlers.current.brushChange} notify={stablePanelHandlers.current.notice} blendShortcut={shortcuts.blendToggle}/>}
+    <div className="brush-workspace">{(tool==='brush'||tool==='eraser')&&!layer.reference&&<BrushStudio library={brushLibrary} eraser={tool==='eraser'} cursorStyle={cursorStyle} onCursorStyle={changeCursorStyle} onChange={stablePanelHandlers.current.brushChange} notify={stablePanelHandlers.current.notice} blendShortcut={shortcuts.blendToggle}/>}
     <div className={'canvas-xsheet-row'+(timelineView==='xsheet'?' has-side-xsheet':'')+(xsheetSide==='left'?' xsheet-left':' xsheet-right')}>
     <div className="drawing-workspace" ref={workspace}
      onPointerDownCapture={e=>{

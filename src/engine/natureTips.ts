@@ -171,6 +171,12 @@ function base(tip:NatureTip){
  return image;
 }
 export function warmNatureTip(tip:NatureTip){base(tip);}
+export function natureTipAlpha(tip:NatureTip){
+ const {data,width,height}=base(tip);
+ const alpha=new Uint8Array(width*height);
+ for(let i=0;i<alpha.length;i++)alpha[i]=data[i*4+3];
+ return {width,height,alpha};
+}
 
 const paletteCache=new Map<string,HTMLCanvasElement>();
 const unit=(v:number)=>Math.max(0,Math.min(1,v));

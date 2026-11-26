@@ -1,3 +1,4 @@
+import {brushCursorStyle,brushCursorStyles,type BrushCursorStyle} from '../core/brushCursor';
 import {importedCategory} from '../core/bitmapBrush';
 import {BrushContextBar,type BrushMenu} from './BrushContextBar';
 import {BrushPins,BrushSettingGroup,BrushSettingInput,BrushSettingSelect,type QuickRegistry} from './BrushQuickSettings';
@@ -28,7 +29,7 @@ import {activePreset,activeInputPreset,brushList,updatePreset,type BrushLibrary}
 import {linearPressure} from '../engine/strokeGeometry';
 import type {BrushSettings} from '../engine/StudioEngine';
 function Slider(props:ExactRangeProps){return <ExactRange {...props} live/>;}
-export const BrushStudio=memo(function BrushStudio({library,eraser,onChange,notify,blendShortcut}:{library:BrushLibrary;eraser:boolean;blendShortcut?:string;onChange:(library:BrushLibrary|((old:BrushLibrary)=>BrushLibrary))=>void;notify:(message:string)=>void}){
+export const BrushStudio=memo(function BrushStudio({library,eraser,onChange,notify,blendShortcut,cursorStyle,onCursorStyle}:{cursorStyle:BrushCursorStyle;onCursorStyle:(style:BrushCursorStyle)=>void;library:BrushLibrary;eraser:boolean;blendShortcut?:string;onChange:(library:BrushLibrary|((old:BrushLibrary)=>BrushLibrary))=>void;notify:(message:string)=>void}){
  const preset=activePreset(library,eraser),s=preset.settings,inputPreset=activeInputPreset(library,eraser);
  const [settingsCollapsed,setSettingsCollapsed]=useState(false),[helpOpen,setHelpOpen]=useState(false),[helpText,setHelpText]=useState(''),[settingsOpen,setSettingsOpen]=useState(false),[settingsSection,setSettingsSection]=useState('width');
  const settingsPanel=useRef<HTMLElement>(null);
@@ -164,6 +165,9 @@ export const BrushStudio=memo(function BrushStudio({library,eraser,onChange,noti
 <p className="hint">Save a custom preset to keep a separate copy of this brush. Reset restores only this brush's defaults.</p>  </BrushSettingGroup></section>
 <section className="brush-settings-section" hidden={settingsSection!=='nature'||!!s.nature} aria-label="Nature"><BrushSettingGroup id="nature"><h3>Nature</h3><p className="brush-availability">Select a Nature or imported brush to edit its stamp settings.</p></BrushSettingGroup></section>
 <section className="brush-settings-section" hidden={settingsSection!=='cursor'} aria-label="Cursor"><BrushSettingGroup id="cursor"><h3>Cursor</h3>
+ <label className="studio-select">Cursor style<select aria-label="Cursor style" value={cursorStyle} onChange={e=>onCursorStyle(brushCursorStyle(e.target.value))}>
+  {brushCursorStyles.map(([id,label])=><option key={id} value={id}>{label}</option>)}
+ </select></label>
  <label className="check-row">Show brush cursor<BrushSettingInput type="checkbox" aria-label="Show brush cursor" checked={cursorVisible} onChange={e=>{const next={...hiddenCursors,[preset.id]:!e.target.checked};setHiddenCursors(next);writePreference('brush-hidden-cursors',next);}}/></label>
 </BrushSettingGroup></section>
  </div></div>
