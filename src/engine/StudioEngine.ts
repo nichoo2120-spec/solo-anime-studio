@@ -1,3 +1,5 @@
+import type {NatureControls} from '../core/natureBrush';
+import {naturePalette} from './natureTips';
 import type {InkEdgeControls} from '../core/inkTip';
 import {applySilkBlend} from './silkBlend';
 import {blendPath,blendTransformScale,encodeCarry,registerBlendSample,sampleFromCanvas,setLiveBlendSample,type BlendSampleSource} from './brushBlend';
@@ -64,7 +66,7 @@ import {rejectCanvasContact,endsCanvasCaptureOnControl} from './penContact';
 import {hitStroke,idsInMarquee,boundsOf,selectable,transformedStroke,projectiveStroke,mapPoint,nearSelection,polyline,IDENTITY, type Selectable,type PickMode} from './strokeSelection';
 import {transformVector,projectiveVector} from './vector';
 import {affineH,multiplyH,projectPoint,homography,quadValid,type XY,type H} from './perspectiveWarp';
-export type BrushSettings=InkEdgeControls&{size:number;opacity:number;color:string;stabilization:number;pressure:boolean;response:number;tolerance:number;smoothness?:number;pressureWidth?:boolean;pressureOpacity?:boolean;pressureCurve?:{x:number;y:number}[];taperStart?:number;taperEnd?:number;brushKind?:string;textureStrength?:number;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;pressureFlow?:boolean;mixColors?:boolean;mixAmount?:number;mixTipA?:PaintTip;mixTipB?:PaintTip;mixBlend?:number;mixPickupLen?:number;mixHoldLen?:number;mixStreak?:number;mixPaintLoad?:number;nativeMixEnabled?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number}&InkFlowControls&PressureSettings&WatercolorControls&ColoringControls&DryBristleControls&SilkBlendControls&BrushBlendSettings&BrushShapeSettings;
+export type BrushSettings=NatureControls&InkEdgeControls&{size:number;opacity:number;color:string;stabilization:number;pressure:boolean;response:number;tolerance:number;smoothness?:number;pressureWidth?:boolean;pressureOpacity?:boolean;pressureCurve?:{x:number;y:number}[];taperStart?:number;taperEnd?:number;brushKind?:string;textureStrength?:number;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;pressureFlow?:boolean;mixColors?:boolean;mixAmount?:number;mixTipA?:PaintTip;mixTipB?:PaintTip;mixBlend?:number;mixPickupLen?:number;mixHoldLen?:number;mixStreak?:number;mixPaintLoad?:number;nativeMixEnabled?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number}&InkFlowControls&PressureSettings&WatercolorControls&ColoringControls&DryBristleControls&SilkBlendControls&BrushBlendSettings&BrushShapeSettings;
 export const defaultBrush:BrushSettings={size:6,opacity:1,color:'#263039',stabilization:.25,pressure:true,response:1,tolerance:24};
 export type {TransformSettings} from './selectionControls';
 export class StudioEngine {
@@ -244,7 +246,8 @@ export class StudioEngine {
   if(snapshot.liveRefinementVersion===3&&!this.displayInk(snapshot)){
    const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===this.strokeTarget?.layer),bounds=this.pigmentPreviewBounds(snapshot,doc,geometry);
    const sc=this.scratch.getContext('2d')!;
-   if(bounds){
+   if(snapshot.natureVersion===1)this.liveRaster.paint(sc,snapshot,geometry);
+   else if(bounds){
     sc.clearRect(bounds.x,bounds.y,bounds.width,bounds.height);
     if(bounds.width&&bounds.height)drawModernStroke(sc,snapshot,'final',geometry,bounds);
    }else if(snapshot.brushKind==='airbrush'&&snapshot.paintTipVersion!==2){sc.clearRect(0,0,this.scratch.width,this.scratch.height);drawStroke(sc,snapshot,'final',geometry);}
@@ -272,6 +275,7 @@ export class StudioEngine {
  }
  private displayInk(stroke:Stroke){return !stroke.transform&&displayCleanInk(stroke)&&!this.mirrorDrawing.enabled&&!this.selection.length&&!this.strokeIds.length;}
  private pigmentPreviewBounds(stroke:Stroke,p:Project,geometry:ReturnType<typeof finalGeometry>){
+  if(stroke.natureVersion===1&&!this.strokeMirror&&!stroke.brushBlendVersion)return strokeRasterBounds(stroke,p.width,p.height,geometry);
   if(this.strokeMirror||stroke.nativeMixVersion||stroke.mixStops?.length||stroke.paintTipVersion!==2||stroke.coloringEngine!==1||
      (stroke.brushTip!=='color-solid'&&stroke.brushTip!=='color-soft'))return undefined;
   return strokeRasterBounds(stroke,p.width,p.height,geometry);
@@ -366,7 +370,7 @@ export class StudioEngine {
  }
  zoomTo(zoom:number){zoom=Math.max(this.minimumZoom,Math.min(8,zoom));const pivot={x:this.width/2,y:this.height/2},p=toProject(pivot,this.view),v={...this.view,zoom};const s=toScreen(p,v);this.setView({...v,x:v.x+pivot.x-s.x,y:v.y+pivot.y-s.y},false,true);}
  rotate(deg:number){const pivot={x:this.width/2,y:this.height/2},p=toProject(pivot,this.view),v={...this.view,rotation:deg*Math.PI/180};const s=toScreen(p,v);this.setView({...v,x:v.x+pivot.x-s.x,y:v.y+pivot.y-s.y});}
- setInput(t:Tool,brush:BrushSettings,preset?:{id:string;name:string}){const next=preset?{...preset}:{id:brush.brushKind??'custom',name:brush.brushKind??'Custom brush'},changed=t!==this.tool,presetChanged=next.id!==this.preset.id||brush.brushKind!==this.brush.brushKind;if((changed||presetChanged&&!this.drawing)&&this.pointerId!==undefined)this.finishGesture(changed?'tool-change':'preset-change');if(this.recorder.recording)this.recorder.event(changed?'tool-change':presetChanged?'preset-change':'brush-settings',{tool:t,preset:next,settings:structuredClone(brush)});if(changed&&t!=='transform'&&(t==='stroke-select'||this.tool==='stroke-select'))this.clearSelection();this.preset=next;this.tool=t;this.canvas.style.cursor='';this.brush=structuredClone(brush);if(t==='brush'&&(this.brush.nativeMixEnabled||workerBlendEligible({...this.brush,...brushStrokeMetadata(this.brush),tool:'brush'})))this.blendWorker.warm();this.paintCursor();this.request();}
+ setInput(t:Tool,brush:BrushSettings,preset?:{id:string;name:string}){const next=preset?{...preset}:{id:brush.brushKind??'custom',name:brush.brushKind??'Custom brush'},changed=t!==this.tool,presetChanged=next.id!==this.preset.id||brush.brushKind!==this.brush.brushKind;if((changed||presetChanged&&!this.drawing)&&this.pointerId!==undefined)this.finishGesture(changed?'tool-change':'preset-change');if(this.recorder.recording)this.recorder.event(changed?'tool-change':presetChanged?'preset-change':'brush-settings',{tool:t,preset:next,settings:structuredClone(brush)});if(changed&&t!=='transform'&&(t==='stroke-select'||this.tool==='stroke-select'))this.clearSelection();this.preset=next;this.tool=t;this.canvas.style.cursor='';this.brush=structuredClone(brush);if(t==='brush'&&brush.nature)naturePalette(brush.nature,brush.color);if(t==='brush'&&(this.brush.nativeMixEnabled||workerBlendEligible({...this.brush,...brushStrokeMetadata(this.brush),tool:'brush'})))this.blendWorker.warm();this.paintCursor();this.request();}
  setTool(t:Tool){this.setInput(t,this.brush);}
  clearSelection(){const changed=!!(this.selection.length||this.strokeIds.length||this.warpQuad||this.transform.dx||this.transform.dy||this.transform.angle||this.transform.scale!==1||(this.transform.scaleX??1)!==1||(this.transform.scaleY??1)!==1);if(this.canvas)this.canvas.style.cursor='';this.selection=[];this.strokeIds=[];this.strokeExact.clear();this.warpQuad=undefined;this.transform={dx:0,dy:0,scale:1,angle:0};if(changed){this.onSelection(false);this.onStrokeSelection(0);}if(this.vectors.selectedId!==null)this.vectors.select(null);this.smoothing.cancel();this.request();}
  setTransform(settings:Partial<TransformSettings>){this.transform={...this.transform,...settings};this.onTransform(this.transform);this.request();}
@@ -569,7 +573,7 @@ export class StudioEngine {
   const metadata=brushStrokeMetadata(this.tool==='eraser'?{...this.brush,bbEnabled:false}:this.brush,this.tool==='brush');
   const silk=metadata.silkBlendVersion!==undefined;
   const fastBlend=this.brush.size>64&&(silk||metadata.brushBlendVersion===6);
-  const nativeMix=this.tool==='brush'&&this.brush.nativeMixEnabled&&!silk;
+  const nativeMix=this.tool==='brush'&&this.brush.nativeMixEnabled&&!silk&&!metadata.natureVersion;
   const workspaceStroke=!silk&&doc.version===6&&!this.mirrorDrawing.enabled&&!this.brush.nativeMixEnabled&&!this.brush.mixColors&&
    supportsSparseStroke({...this.brush,...metadata,tool:this.tool==='eraser'?'eraser':'brush'});
   if(beyond&&!workspaceStroke){this.diagnostics.note('Press began outside project boundaries.');if(this.infinite)this.notify('Use Pencil, Solid Paint, Soft Paint or Hard Eraser to draw here.');return;}

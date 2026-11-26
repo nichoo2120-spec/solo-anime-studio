@@ -1,3 +1,4 @@
+import {LiveNatureRaster} from './natureRaster';
 import {drawStampStroke,stampBounds,stampPlan,stampChange,type StampPlan} from './stampBrush';
 const clipRegion=(r:RasterRegion,w:number,h:number):RasterRegion=>{const x=Math.max(0,r.x),y=Math.max(0,r.y);return {x,y,width:Math.max(0,Math.min(w,r.x+r.width)-x),height:Math.max(0,Math.min(h,r.y+r.height)-y)};};
 import {LiveDryBristleV3} from './dryBristleV3';
@@ -31,7 +32,7 @@ export class LiveStrokeRaster{
  private footprint?:{id:string;region:RasterRegion};
  /** Area changed on the scratch surface by the last paint. Undefined means full canvas. */
  lastRegion?:RasterRegion;
- reset(){this.stampRegion=undefined;this.stampPlan=undefined;this.stampCanvas=undefined;this.footprint=undefined;this.dryV2.reset();this.dryV3.reset();this.mixColors?.reset();this.mixColors=undefined;this.mixGeometry=undefined;this.mixId='';this.unmixed?.reset();this.unmixed=undefined;if(this.mixSurface)this.mixSurface.width=this.mixSurface.height=0;this.mixSurface=undefined;this.painting.reset();this.id='';this.previous=undefined;this.lastRegion=undefined;this.settledCurves=0;for(const c of [this.settled,this.paintMask])if(c)c.width=c.height=0;this.settled=this.paintMask=undefined;}
+ reset(){this.natureActive=false;this.nature?.reset();this.stampRegion=undefined;this.stampPlan=undefined;this.stampCanvas=undefined;this.footprint=undefined;this.dryV2.reset();this.dryV3.reset();this.mixColors?.reset();this.mixColors=undefined;this.mixGeometry=undefined;this.mixId='';this.unmixed?.reset();this.unmixed=undefined;if(this.mixSurface)this.mixSurface.width=this.mixSurface.height=0;this.mixSurface=undefined;this.painting.reset();this.id='';this.previous=undefined;this.lastRegion=undefined;this.settledCurves=0;for(const c of [this.settled,this.paintMask])if(c)c.width=c.height=0;this.settled=this.paintMask=undefined;}
  paint(ctx:CanvasRenderingContext2D,stroke:Stroke,geometry:ReturnType<typeof strokeGeometry>){
   const pixels=this.rasterize(ctx,stroke,geometry);
   // A reflow still redraws the scratch stroke for exact pixels. Only its old
@@ -45,10 +46,19 @@ export class LiveStrokeRaster{
   }else this.footprint=undefined;
   return pixels;
  }
+ private nature?:LiveNatureRaster;
+ private natureActive=false;
  private stampRegion?:RasterRegion;
  private stampPlan?:StampPlan;
  private stampCanvas?:HTMLCanvasElement|OffscreenCanvas;
  private rasterize(ctx:CanvasRenderingContext2D,stroke:Stroke,geometry:ReturnType<typeof strokeGeometry>){
+  if(stroke.natureVersion===1){
+   if(!this.natureActive){ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);this.natureActive=true;}
+   this.lastRegion=(this.nature??=new LiveNatureRaster()).paint(ctx,stroke,geometry);
+   this.id=stroke.id;this.previous=geometry;
+   return this.lastRegion.width*this.lastRegion.height;
+  }
+  if(this.natureActive){this.nature?.reset();this.natureActive=false;}
   // v0.5.241 Tip shape / Dual Brush: redraw the stamp stroke over the union of
   // its old and new footprint (the stamp engine is a pure function of the path).
   if(stroke.stampVersion===1){

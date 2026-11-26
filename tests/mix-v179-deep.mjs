@@ -13,7 +13,7 @@ try{
   const {stockPresets,isRetiredBlendPresetId}=await import('/src/core/brushes.ts'),{brushStrokeMetadata,watercolorSeedFor}=await import('/src/core/paintTips.ts'),{drawStroke}=await import('/src/engine/renderer.ts'),{compositePaintStroke,strokeRasterBounds}=await import('/src/engine/paintCompositing.ts');
   const make=()=>{const c=document.createElement('canvas');c.width=560;c.height=180;return c;},rows=[],strokes=[];
   // Catalog additions are new brushes, not historical saved strokes.
-  const cases=saved??stockPresets.filter(p=>p.category!=='Eraser'&&!isRetiredBlendPresetId(p.id)).flatMap(p=>[0,1,2].flatMap(version=>[1,.43].map(alpha=>{
+  const cases=saved??stockPresets.filter(p=>!p.settings.nature&&p.category!=='Eraser'&&!isRetiredBlendPresetId(p.id)).flatMap(p=>[0,1,2].flatMap(version=>[1,.43].map(alpha=>{
    const id='legacy-'+p.id,stroke={...p.settings,...brushStrokeMetadata(p.settings),id,kind:'stroke',tool:'brush',size:55,opacity:.63,color:'#379567',nativeMixVersion:version||undefined,nativeMixAmount:.72,nativeMixRadius:.5,dryBristleSeed:watercolorSeedFor(id),watercolorSeed:watercolorSeedFor(id),colorSeed:watercolorSeedFor(id),points:Array.from({length:42},(_,i)=>({x:30+i*11.3,y:90+24*Math.sin(i/41*Math.PI*2),p:.15+.85*Math.sin(i/41*Math.PI)**2,v:.65}))};
    return {preset:p.id,version,alpha,stroke};
   })));
@@ -31,7 +31,7 @@ try{
   const make=()=>{const c=document.createElement('canvas');c.width=900;c.height=560;return c;},rows=[],errors=[],timing=[];
   const NativeWorker=window.Worker;window.Worker=class extends NativeWorker{constructor(...args){super(...args);this.addEventListener('message',e=>{if(e.data.error)errors.push(e.data.error);});}};
   const base=make(),bc=base.getContext('2d');bc.fillStyle='rgba(230,22,41,.45)';bc.fillRect(0,20,330,520);bc.fillStyle='rgba(18,70,205,.72)';bc.fillRect(330,20,340,520);
-  const presets=stockPresets.filter(p=>p.category!=='Eraser'&&!isRetiredBlendPresetId(p.id));
+  const presets=stockPresets.filter(p=>!p.settings.nature&&p.category!=='Eraser'&&!isRetiredBlendPresetId(p.id));
   let waiter;const client=new LiveBlendWorker(()=>{waiter?.();waiter=undefined;});
   for(const preset of presets.filter(p=>!focus||focus.includes(p.id)))for(const config of [{size:7,opacity:.25,shape:'line'},{size:90,opacity:1,shape:'curve'},{size:150,opacity:.65,shape:'reverse'}]){
    const id=preset.id+'-'+config.size,settings={...preset.settings,size:config.size},s={...settings,...brushStrokeMetadata(settings),id,kind:'stroke',tool:'brush',color:'#00ff00',pressure:true,nativeMixVersion:3,nativeMixAmount:.73,nativeMixRadius:.5,opacity:config.opacity,dryBristleSeed:watercolorSeedFor(id),watercolorSeed:watercolorSeedFor(id),colorSeed:watercolorSeedFor(id),points:Array.from({length:81},(_,i)=>({x:config.shape==='reverse'?820-i*9.2:40+i*9.2,y:280+(config.shape==='line'?0:90*Math.sin(i/80*Math.PI*3)),p:.12+.88*Math.sin(i/80*Math.PI)**2,v:i<40?.25:.85}))};

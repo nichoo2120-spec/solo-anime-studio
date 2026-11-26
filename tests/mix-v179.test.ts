@@ -19,7 +19,7 @@ describe('native pigment Mix compatibility',()=>{
   expect(()=>validateProject(p)).toThrow();
  });
  it('every active brush retains native settings and sends Mix to the worker',()=>{
-  for(const preset of stockPresets.filter(p=>p.category!=='Eraser'&&!isRetiredBlendPresetId(p.id))){
+  for(const preset of stockPresets.filter(p=>!p.settings.nature&&p.category!=='Eraser'&&!isRetiredBlendPresetId(p.id))){
    const library=newBrushLibrary();library.brushId=preset.id;
    expect(activeInputPreset(library).settings).toEqual(preset.settings);
    library.mode='mix';const settings=activeInputPreset(library).settings;

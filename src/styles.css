@@ -763,3 +763,10 @@
   white-space: pre;
   pointer-events: none;
 }
+
+.nature-brush-settings { display: grid; gap: 7px; }
+.nature-seed { display: flex; align-items: end; gap: 8px; }
+.nature-seed label { flex: 1; min-width: 0; }
+.nature-seed input { width: 100%; }
+.nature-quick-list > summary { cursor: pointer; }
+.nature-quick-list .paint-tip-picker { max-height: 245px; overflow: auto; }
