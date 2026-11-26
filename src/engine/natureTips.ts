@@ -174,7 +174,7 @@ export function warmNatureTip(tip:NatureTip){base(tip);}
 
 const paletteCache=new Map<string,HTMLCanvasElement>();
 const unit=(v:number)=>Math.max(0,Math.min(1,v));
-function colorChannels(rgb:number,turn:number,sat:number,light:number){
+export function colorChannels(rgb:number,turn:number,sat:number,light:number){
  const r=(rgb>>>16)/255,g=(rgb>>>8&255)/255,b=(rgb&255)/255,high=Math.max(r,g,b),low=Math.min(r,g,b),spread=high-low,l=(high+low)/2;
  const h=spread===0?0:(high===r?(g-b)/spread:high===g?2+(b-r)/spread:4+(r-g)/spread)/6;
  const s=spread?spread/(1-Math.abs(2*l-1)):0,lum=unit(l+light),chroma=(1-Math.abs(2*lum-1))*unit(s*(1+sat));

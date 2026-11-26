@@ -1,3 +1,5 @@
+import {importedCategory} from './bitmapBrush';
+import type {BrushImportAsset} from './brushImport/types';
 import {isInkAntialiasing} from './inkTip';
 import {natureTipFromKind,natureCategory,naturePresets,natureSettings} from './natureBrush';
 import {sanitizeBrushShape} from './brushShape';
@@ -11,9 +13,9 @@ import {isPaintTip,isWatercolorTip,isMixTip,canMixTips} from './paintTips';
 import type {BrushSettings} from '../engine/StudioEngine';
 import {linearPressure} from '../engine/strokeGeometry';
 import {sanitizeSilk} from './silkBlend';
-export type BrushCategory='Pencil'|'Ink'|'Paint'|'Eraser'|typeof natureCategory;
+export type BrushCategory='Pencil'|'Ink'|'Paint'|'Eraser'|typeof natureCategory|typeof importedCategory;
 export type BrushFamily='coloring'|'paint'|'media'|'watercolor'|'blend';
-export type BrushPreset={id:string;name:string;category:BrushCategory;family?:BrushFamily;defaults:BrushSettings;settings:BrushSettings;custom?:boolean};
+export type BrushPreset={id:string;name:string;category:BrushCategory;family?:BrushFamily;defaults:BrushSettings;settings:BrushSettings;custom?:boolean;pack?:string};
 export type BrushMode='paint'|'mix';
 export type BrushLibrary={brushId:string;eraserId:string;mode:BrushMode;presets:BrushPreset[]};
 const common:BrushSettings={size:4,opacity:.85,color:'#30343a',stabilization:.25,smoothness:25,pressure:true,pressureWidth:true,pressureOpacity:false,response:1,pressureCurve:linearPressure,taperStart:0,taperEnd:0,tolerance:24,textureStrength:.12};
@@ -125,7 +127,7 @@ export function restoreBrushLibrary(value:unknown):BrushLibrary{
    const graphite:{[key:string]:string}={hb:'graphite-hb','2b':'graphite-2b',mechanical:'graphite-mechanical',blue:'graphite-blue'};
    if(graphite[stock.id]&&settings.brushKind===stock.id)settings.brushKind=graphite[stock.id];
    return {...stock,settings};});
-  for(const custom of old.presets.slice(0,200))if(custom?.custom&&!retiredWatercolorPreset(custom)&&typeof custom.id==='string'&&!fresh.presets.some(p=>p.id===custom.id)&&typeof custom.name==='string'&&['Pencil','Ink','Paint','Eraser',natureCategory].includes(custom.category)){let fallback=[...stockPresets,legacyAirbrushPreset].find(p=>p.settings.brushKind===custom.settings?.brushKind)?.settings??common;if(['studio-ink','contour-flow'].includes(custom.settings?.brushKind??'')&&custom.settings?.inkFlowAmount===undefined)fallback={...fallback,inkFlowAmount:undefined,inkFlowLength:undefined};if(custom.settings?.smudgeVersion===2&&custom.settings?.brushTip==='color-blender')fallback=stockPresets.find(p=>p.id==='smudge-bristle')!.settings;if((custom.settings?.dryBristleVersion===1||custom.settings?.dryBristleVersion===2)&&fallback.dryBristleVersion===3)fallback={...fallback,dryBristleVersion:custom.settings.dryBristleVersion,dryMaterial:custom.settings.dryBristleVersion===1?undefined:custom.settings.dryMaterial};fresh.presets.push({...custom,name:custom.name.slice(0,60),defaults:{...sanitizeBrush(custom.defaults,fallback),brushTip:isPaintTip(custom.defaults?.brushTip)?custom.defaults.brushTip:'round'},settings:{...sanitizeBrush(custom.settings,fallback),brushTip:isPaintTip(custom.settings?.brushTip)?custom.settings.brushTip:'round'}});}
+  for(const custom of old.presets)if(custom?.custom&&!retiredWatercolorPreset(custom)&&typeof custom.id==='string'&&!fresh.presets.some(p=>p.id===custom.id)&&typeof custom.name==='string'&&['Pencil','Ink','Paint','Eraser',natureCategory,importedCategory].includes(custom.category)){let fallback=[...stockPresets,legacyAirbrushPreset].find(p=>p.settings.brushKind===custom.settings?.brushKind)?.settings??common;if(['studio-ink','contour-flow'].includes(custom.settings?.brushKind??'')&&custom.settings?.inkFlowAmount===undefined)fallback={...fallback,inkFlowAmount:undefined,inkFlowLength:undefined};if(custom.settings?.smudgeVersion===2&&custom.settings?.brushTip==='color-blender')fallback=stockPresets.find(p=>p.id==='smudge-bristle')!.settings;if((custom.settings?.dryBristleVersion===1||custom.settings?.dryBristleVersion===2)&&fallback.dryBristleVersion===3)fallback={...fallback,dryBristleVersion:custom.settings.dryBristleVersion,dryMaterial:custom.settings.dryBristleVersion===1?undefined:custom.settings.dryMaterial};fresh.presets.push({...custom,name:custom.name.slice(0,custom.category===importedCategory?512:60),defaults:{...sanitizeBrush(custom.defaults,fallback),brushTip:isPaintTip(custom.defaults?.brushTip)?custom.defaults.brushTip:'round'},settings:{...sanitizeBrush(custom.settings,fallback),brushTip:isPaintTip(custom.settings?.brushTip)?custom.settings.brushTip:'round'}});}
  }
  if(old.brushId==='airbrush'){fresh.brushId='color-air';const saved=old.presets?.find(p=>p.id==='airbrush'),target=fresh.presets.find(p=>p.id==='color-air')!;if(saved){const migrated=sanitizeBrush(saved.settings,legacyAirbrushPreset.defaults);target.settings={...target.settings,size:migrated.size,color:migrated.color};}}
  else if(fresh.presets.some(p=>p.id===old.brushId&&p.category!=='Eraser'))fresh.brushId=old.brushId;
@@ -146,7 +148,7 @@ export function updatePreset(library:BrushLibrary,id:string,settings:BrushSettin
 export function brushList(library:BrushLibrary,category:BrushCategory,family?:BrushFamily){
  return library.presets.filter(p=>p.category===category&&(!family||p.family===family)&&!isRetiredBlendPresetId(p.id));
 }
-export const brushSupportsMix=(preset:BrushPreset)=>preset.category!=='Eraser'&&preset.category!==natureCategory;
+export const brushSupportsMix=(preset:BrushPreset)=>preset.category!=='Eraser'&&preset.category!==natureCategory&&preset.category!==importedCategory;
 export function mixifiedBrushSettings(settings:BrushSettings):BrushSettings{
  return {...settings,nativeMixEnabled:true,mixColors:false};
 }
@@ -166,7 +168,7 @@ export const scratchBrushSettings=():BrushSettings=>({...stockPresets.find(p=>p.
 /** New custom brush from the given settings (current brush or scratch). It is selected. */
 export function createCustomBrush(library:BrushLibrary,name:string,source:BrushPreset,settings:BrushSettings,eraser=false):BrushLibrary{
  const clean=customBrushName(name);if(!clean)return library;
- const s=sanitizeBrush(settings,source.defaults),copy:BrushPreset={id:customId(),name:clean,category:source.category,family:source.family,custom:true,defaults:{...s},settings:{...s}};
+ const s=sanitizeBrush(settings,source.defaults),copy:BrushPreset={id:customId(),name:clean,category:source.category,family:source.family,pack:source.pack,custom:true,defaults:{...s},settings:{...s}};
  return {...library,[eraser?'eraserId':'brushId']:copy.id,presets:[...library.presets,copy]};
 }
 export function renameCustomBrush(library:BrushLibrary,id:string,name:string):BrushLibrary{
@@ -184,6 +186,7 @@ export function deleteCustomBrush(library:BrushLibrary,id:string):BrushLibrary{
  return {...library,presets,brushId:library.brushId===id?fallback(p.category==='Eraser'?'Paint':p.category):library.brushId,eraserId:library.eraserId===id?fallback('Eraser'):library.eraserId};
 }
 export const customBrushes=(library:BrushLibrary)=>library.presets.filter(p=>p.custom);
+export const portableCustomBrushes=(library:BrushLibrary)=>customBrushes(library).filter(p=>p.category!==importedCategory||!p.id.startsWith('import-')).slice(0,100);
 /** Add custom brushes carried by a project or backup (new ids only, cleaned). */
 export function mergeCustomBrushes(library:BrushLibrary,incoming:unknown):{library:BrushLibrary;added:number}{
  if(!Array.isArray(incoming))return {library,added:0};
@@ -192,4 +195,31 @@ export function mergeCustomBrushes(library:BrushLibrary,incoming:unknown):{libra
  const restored=restoreBrushLibrary({...library,presets:[...library.presets,...fresh]});
  const kept=restored.presets.filter(p=>fresh.some((f:BrushPreset)=>f.id===p.id));
  return {library:{...library,presets:[...library.presets,...kept]},added:kept.length};
+}
+
+/** Convert worker data to ordinary brush presets, so existing controls and shortcuts apply. */
+export function addImportedBrushes(library:BrushLibrary,pack:string,assets:BrushImportAsset[]):BrushLibrary{
+ const fallback=stockPresets.find(p=>p.id==='nature-leaves-round')!.defaults;
+ const added=assets.map((asset):BrushPreset=>{
+  const id='import-'+crypto.randomUUID();
+  const radius=Math.max(1,asset.size);
+  const clamp01=(n:number|undefined)=>n===undefined||!Number.isFinite(n)?undefined:Math.max(0,Math.min(1,n));
+  const nature=natureSettings('leaves-round',{
+   scatter:0,count:1,sizeJitter:0,rotation:0,spacing:.25,opacityJitter:0,density:1,
+   hue:0,saturation:0,brightness:0,grain:0,scale:1,mix:false,flipX:false,flipY:false,...Object.fromEntries(Object.entries(asset.settings??{}).filter(([,value])=>value!==undefined)),
+   bitmap:{version:1,tips:asset.tips,grain:asset.grain,roundnessJitter:clamp01(asset.roundnessJitter)??0,
+    textureMode:asset.textureMode??'multiply',bothAxes:asset.bothAxes??true,countJitter:clamp01(asset.countJitter)??0,
+    selection:asset.selection,minSize:clamp01(asset.minSize),minRoundness:clamp01(asset.minRoundness)},
+  });
+  const dual=asset.dual;
+  const settings=sanitizeBrush({...fallback,nature,size:radius,opacity:clamp01(asset.opacity)??1,flow:clamp01(asset.flow)??1,color:'#252632',
+   pressureWidth:asset.pressureWidth??true,pressureOpacity:asset.pressureOpacity??false,minSize:asset.pressureMinSize??asset.minSize,
+   tsEnabled:!!(asset.angle||asset.roundness&&asset.roundness!==1||asset.flipX||asset.flipY),
+   tsAngle:asset.angle,tsRoundness:asset.roundness,tsFlipX:asset.flipX,tsFlipY:asset.flipY,
+   ...(dual?{dbEnabled:true,dbTip:'soft-round',dbBitmap:dual.mask,dbScale:dual.size/radius,dbSpacing:dual.spacing,dbScatter:dual.scatter,dbCount:dual.count,dbMode:dual.mode}:{})
+  },fallback);
+  return {id,name:asset.name.trim().slice(0,512)||'Imported brush',category:importedCategory,pack,custom:true,settings,defaults:settings};
+ });
+ if(!added.length)return library;
+ return {...library,brushId:added[0].id,presets:[...library.presets,...added]};
 }

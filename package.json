@@ -1,7 +1,7 @@
 {
   "name": "solo-anime-studio",
   "private": true,
-  "version": "0.5.250",
+  "version": "0.5.251",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -32,6 +32,11 @@
     "electron-updater": "^6.8.11"
   },
   "devDependencies": {
+    "@plist/binary.parse": "1.1.0",
+    "@types/sql.js": "1.16.1",
+    "ag-psd": "34.2.3",
+    "fflate": "0.8.3",
+    "sql.js": "1.17.0",
     "@napi-rs/canvas": "1.2.1",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

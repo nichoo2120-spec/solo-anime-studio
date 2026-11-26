@@ -1,3 +1,4 @@
+import {decodeProjectBrushMasks,encodeProjectBrushMasks} from './brushImport/portableMasks';
 import {validateProject,type Project} from './model';
 import type {SceneAudio} from '../animation/audio';
 export type SavedRecord={id:string;project:Project;savedAt:string;kind:'manual'|'autosave'};
@@ -145,11 +146,11 @@ export class ProjectRepository {
  async load(id:string){const p=(await this.list()).find(p=>p.id===id);if(!p)throw Error('Project was not found.');validateProject(p.project);return p;}
 }
 export const repository=new ProjectRepository();
-export function downloadProject(project:Project){validateProject(project);const blob=new Blob([JSON.stringify(project)],{type:'application/json'});downloadBlob(blob,project.name.replace(/[^a-z\d -]/gi,'_')+'.solo.json');}
+export function downloadProject(project:Project){validateProject(project);const blob=new Blob([encodeProjectBrushMasks(project)],{type:'application/json'});downloadBlob(blob,project.name.replace(/[^a-z\d -]/gi,'_')+'.solo.json');}
 export function downloadBlob(blob:Blob,name:string){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 export async function importProject(file:File){
  if(file.size>200*1024*1024)throw Error('Project backups are limited to 200 MB.');
- const project=validateProject(JSON.parse(await file.text()));
+ const project=validateProject(decodeProjectBrushMasks(JSON.parse(await file.text())));
  if(!project.animation)return project;
  // JSON backups lose reference sharing between held and duplicated drawings.
  // Only share exact content. An operation ID can survive an independent edit.

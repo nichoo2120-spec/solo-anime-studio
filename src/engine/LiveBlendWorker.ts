@@ -9,7 +9,7 @@ export type NativeMixSeed={mask:HTMLCanvasElement;paint:HTMLCanvasElement;box:{x
 export type BlendBaseline={pixels:Uint8ClampedArray;region:RasterRegion;seed?:NativeMixSeed};
 export type BlendDelta={mask:HTMLCanvasElement;patch:HTMLCanvasElement;tiles:Map<string,{x:number;y:number;w:number;h:number}>;revision:number;final?:boolean;group?:BlendBaseline;support?:RasterRegion;dirty?:RasterRegion;box?:{x:number;y:number;w:number;h:number}};
 type Reply={maskData?:Uint8ClampedArray;paintData?:Uint8ClampedArray;token:number;serial:number;deltaMask?:ImageBitmap;deltaPaint?:ImageBitmap;tiles?:{x:number;y:number;w:number;h:number}[];support?:RasterRegion;bitmap?:ImageBitmap;region?:RasterRegion;final?:boolean;error?:string};
-type Job={token:number;id:string;ownershipBase?:BlendBaseline;source:HTMLCanvasElement;signature:string;ready:boolean;inFlight:boolean;queued?:{stroke:Stroke;final:boolean};geometry?:unknown;pointsRef?:Point[];pointCount:number;lastPoint?:Point;resolve?:(surface:HTMLCanvasElement|undefined)=>void;timer?:ReturnType<typeof setTimeout>};
+type Job={token:number;id:string;ownershipBase?:BlendBaseline;source:HTMLCanvasElement;signature:string;ready:boolean;inFlight:boolean;queued?:{stroke:Stroke;final:boolean};geometry?:unknown;pointsRef?:Point[];pointCount:number;bitmapSent?:boolean;lastPoint?:Point;resolve?:(surface:HTMLCanvasElement|undefined)=>void;timer?:ReturnType<typeof setTimeout>};
 
 /** Keep the existing browser Canvas pigment calculations off the input thread.
  * One update is in flight; newer input coalesces instead of building a backlog.
@@ -38,7 +38,11 @@ export class LiveBlendWorker{
  takeRegion(s:Stroke){if(this.job?.id!==s.id)return undefined;const r=this.dirty??{x:0,y:0,width:0,height:0};this.dirty=undefined;return r;}
  preview(s:Stroke,source:HTMLCanvasElement,geometry:unknown,nativeDelta=false,ownershipBase?:BlendBaseline){
   this.warm();if(!this.worker||this.failed||!workerBlendEligible(s))return undefined;
-  const signature=JSON.stringify({...s,points:undefined,mixStops:undefined});
+  const bitmap=s.nature?.bitmap;
+  const signature=JSON.stringify({...s,points:undefined,mixStops:undefined,
+   ...(bitmap?{nature:{...s.nature,bitmap:{...bitmap,tips:bitmap.tips.map(t=>t.id),grain:bitmap.grain?.id}}}:{}),
+   ...(s.dbBitmap?{dbBitmap:s.dbBitmap.id}:{}),
+  });
   if(!this.job||this.job.id!==s.id||this.job.source!==source||this.job.signature!==signature||this.job.ownershipBase!==ownershipBase){
    this.cancel(true);const token=++this.token,j:Job={token,id:s.id,ownershipBase,source,signature,ready:false,inFlight:false,pointCount:0};this.job=j;
    if(this.surfaceReadback!==nativeDelta){this.surface=canvas(1,1);this.surfaceReadback=nativeDelta;}
@@ -63,9 +67,15 @@ export class LiveBlendWorker{
   const resetPoints=!canAppend;
   const pointDelta=points.slice(resetPoints?0:j.pointCount);
   const {points:_points,...metadata}=q.stroke;
+  const hasBitmap=!!(metadata.nature?.bitmap||metadata.dbBitmap),reuseBitmap=hasBitmap&&j.bitmapSent===true;
+  if(reuseBitmap){
+   if(metadata.nature?.bitmap)metadata.nature={...metadata.nature,bitmap:undefined};
+   delete metadata.dbBitmap;
+  }
+  if(hasBitmap)j.bitmapSent=true;
   // Keep the growing point history on the worker. Only the newly captured
   // samples cross the UI-thread boundary for ordinary pointer updates.
-  this.worker!.postMessage({kind:'update',token:j.token,serial,stroke:{...metadata,points:[]},pointDelta,resetPoints,final:q.final});
+  this.worker!.postMessage({kind:'update',token:j.token,serial,stroke:{...metadata,points:[]},pointDelta,resetPoints,reuseBitmap,final:q.final});
   j.pointsRef=points;j.pointCount=points.length;j.lastPoint=points.length?{...points[points.length-1]}:undefined;
   j.timer=setTimeout(()=>this.fail(),5000);
 }
