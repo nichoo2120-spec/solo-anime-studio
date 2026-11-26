@@ -1,16 +1,18 @@
+import {openBrushImports,openBrushSelection} from '../brush-workspace.mjs';
 import {expect,test} from '@playwright/test';
 import {abrFixture,longBrushName} from '../fixtures/brushImport';
 
 test('imports a named ABR pack in a worker, shows real tips and reloads its library',async({page})=>{
  await page.goto('/');
+ await openBrushImports(page);
  await expect(page.getByRole('button',{name:'Import brushes',exact:true})).toBeVisible();
  await page.getByLabel('Choose brush files').setInputFiles({name:'Artiste.abr',mimeType:'application/octet-stream',buffer:abrFixture(10)});
+ await openBrushSelection(page);
  const category=page.getByLabel('Brush category',{exact:true});
  await expect(category).toHaveValue('Imported');
  const preset=page.getByLabel('Brush preset',{exact:true});
  await expect(preset.locator('optgroup')).toHaveAttribute('label','Artiste');
  await expect(preset.locator('option:checked')).toHaveText(longBrushName);
- await page.getByText('Browse Artiste',{exact:true}).click();
  const thumbnail=page.getByLabel(longBrushName+' stroke preview',{exact:true});
  await expect.poll(()=>thumbnail.evaluate((c:HTMLCanvasElement)=>c.getContext('2d')!.getImageData(0,0,c.width,c.height).data.some((v,i)=>i%4===3&&v>0))).toBe(true);
  await expect.poll(()=>page.evaluate(async()=>{
@@ -18,6 +20,8 @@ test('imports a named ABR pack in a worker, shows real tips and reloads its libr
   return (await (await import(name)).readBitmapLibrary())?.presets.length??0;
  })).toBe(1);
  await page.reload();
+ await openBrushImports(page);
+ await openBrushSelection(page);
  await expect(category).toHaveValue('Imported');
  await expect(preset.locator('option:checked')).toHaveText(longBrushName);
  await page.getByLabel('Choose brush files').setInputFiles({name:'broken.abr',mimeType:'application/octet-stream',buffer:Buffer.from('broken')});
@@ -143,7 +147,9 @@ test('Bitmap Blend uses the seeded stamp mask and agrees with saved replay',asyn
 test('opens a Clip Studio brush through the packaged SQLite worker',async({page})=>{
  const {sutFixture}=await import('../fixtures/clipBrush');
  await page.goto('/');
+ await openBrushImports(page);
  await page.getByLabel('Choose brush files').setInputFiles({name:'Cliffs.sut',mimeType:'application/octet-stream',buffer:await sutFixture()});
+ await openBrushSelection(page);
  await expect(page.getByLabel('Brush category',{exact:true})).toHaveValue('Imported');
  await expect(page.getByLabel('Brush preset',{exact:true}).locator('option:checked')).toHaveText('Roche · 山');
 });

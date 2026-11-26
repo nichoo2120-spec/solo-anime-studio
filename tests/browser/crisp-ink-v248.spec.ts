@@ -1,3 +1,4 @@
+import {selectBrushOption,openBrushSettings} from '../brush-workspace.mjs';
 import {expect,test} from '@playwright/test';
 
 test('Ink Paint edges stay narrow and live, commit and redo agree at DPR 2',async({browser})=>{
@@ -67,11 +68,11 @@ test('Ink Paint edges stay narrow and live, commit and redo agree at DPR 2',asyn
 test('Brush Pen exposes default edge controls and saves them per preset',async({page})=>{
  await page.goto('/');
  await page.getByLabel('Drawing canvas',{exact:true}).waitFor();
- await page.getByLabel('Brush category',{exact:true}).selectOption('Ink');
- await page.getByLabel('Brush preset',{exact:true}).selectOption('brush-pen');
- await page.getByRole('button',{name:'Brush Settings',exact:true}).click();
+ await selectBrushOption(page,'Brush category','Ink');
+ await selectBrushOption(page,'Brush preset','brush-pen');
+ await openBrushSettings(page);
  const panel=page.getByRole('region',{name:'Brush Settings'});
- await panel.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Tip & texture',exact:true}).click();
+ await panel.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Brush tip',exact:true}).click();
  const edges=panel.getByRole('group',{name:'Ink edges'});
  await expect(edges.getByRole('slider',{name:'Edge sharpness'})).toHaveValue('100');
  const aa=edges.getByRole('combobox',{name:'Antialiasing'});

@@ -1,3 +1,4 @@
+import {selectBrushOption,openBrushSettings,activeBrush,openBrushSelection} from './brush-workspace.mjs';
 import {createServer} from 'vite';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
@@ -15,14 +16,16 @@ try{
  await page.waitForFunction(()=>document.querySelector('.document-tab')?.textContent.includes('Native Mix UI'));
  assert.equal(await page.getByRole('tablist',{name:'Brush paint or mix mode'}).count(),0,'separate Mix mode selector should be removed');
  assert.equal(await page.getByRole('button',{name:'Mix',exact:true}).count(),0,'separate Mix tool action should be removed');
- await page.getByLabel('Brush category',{exact:true}).selectOption('Paint');
- await page.getByLabel('Brush family',{exact:true}).selectOption('all');
- const preset=page.getByLabel('Brush preset',{exact:true});
+ await selectBrushOption(page,'Brush category','Paint');
+ await selectBrushOption(page,'Brush family','all');
+ const picker=await openBrushSelection(page);
+ const preset=picker.getByLabel('Brush preset',{exact:true});
  const available=await preset.locator('option').evaluateAll(options=>options.map(o=>o.value));
  for(const retired of ['color-blender','smudge-bristle','blender-soft','wet-mix'])assert(!available.includes(retired),retired+' should not appear as a standalone brush preset');
  await preset.selectOption('soft-paint');
- await page.getByRole('button',{name:'Brush Settings',exact:true}).click();
- await page.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Paint',exact:true}).click();
+ await activeBrush(page).click();
+ await openBrushSettings(page);
+ await page.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Stroke',exact:true}).click();
  assert(await page.getByLabel('Flow exact value',{exact:true}).isVisible(),'Paint flow remains available');
  assert.deepEqual(errors,[]);
  console.log('MIX TOOL REMOVAL',JSON.stringify({separateMixMode:false,retiredMixPresets:available.filter(x=>['color-blender','smudge-bristle','blender-soft','wet-mix'].includes(x)),paintFlow:true}));

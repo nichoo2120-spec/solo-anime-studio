@@ -834,7 +834,7 @@
 .brush-picker-actions button{justify-content:flex-start;padding:6px;font-size:12px}
 .brush-context .brush-import-actions[hidden],.compact-brush-dialog[hidden]{display:none}
 .brush-context .brush-import-actions:not([hidden]){margin:7px 0}
-.compact-brush-dialog:not(.is-collapsed){width:600px;height:min(650px,calc(100dvh - 108px));max-height:calc(100dvh - 20px);max-width:calc(100vw - 16px);min-width:min(380px,calc(100vw - 16px));min-height:260px;resize:both;overflow:hidden}
+.compact-brush-dialog:not(.is-collapsed){width:600px;height:min(650px,calc(100dvh - 150px));max-height:calc(100dvh - 150px);max-width:calc(100vw - 16px);min-width:min(380px,calc(100vw - 16px));min-height:260px;resize:both;overflow:hidden}
 .compact-brush-dialog .brush-settings-header>div:first-child{display:flex;align-items:center;gap:6px}
 .compact-brush-dialog .brush-settings-header>div>span{max-width:135px;text-overflow:ellipsis;overflow:hidden}
 .compact-brush-dialog .brush-settings-preview{border-top:0;border-bottom:1px solid #334043;padding:5px 10px}

@@ -16,7 +16,7 @@ type Change=(update:(current:BrushLibrary)=>BrushLibrary)=>void;
 export function BrushLibraryPicker({library,preset,eraser,onChange,choose,notify,close,drop}:{library:BrushLibrary;preset:BrushPreset;eraser:boolean;onChange:Change;choose:(id:string)=>void;notify:(message:string)=>void;close:()=>void;drop?:File[]}){
  const [category,setCategory]=useState<Category>(()=>categoryOf(preset));
  const [query,setQuery]=useState(''),[page,setPage]=useState(1),[importOpen,setImportOpen]=useState(!!drop);
- const [family,setFamily]=useState<BrushFamily|'all'>(preset.family??'all');
+ const [family,setFamily]=useState<BrushFamily|'all'>('all');
  const categoryOptions:BrushCategory[]=eraser?['Eraser']:['Pencil','Ink','Paint',natureCategory,...(library.presets.some(p=>p.category===importedCategory)?[importedCategory]:[])];
  const nativePresets=brushList(library,preset.category,preset.category==='Paint'?(family==='all'?undefined:family):undefined);
  const nativeGroups=new Map<string,BrushPreset[]>();

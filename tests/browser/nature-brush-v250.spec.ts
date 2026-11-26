@@ -1,13 +1,13 @@
+import {selectBrushOption,openBrushSettings} from '../brush-workspace.mjs';
 import {expect,test} from '@playwright/test';
 
 test('Nature presets expose actual thumbnails, seed settings and a large brush size',async({page})=>{
  await page.goto('/');
- await page.getByLabel('Brush category',{exact:true}).selectOption('Texture / Nature');
- const select=page.getByLabel('Brush preset',{exact:true});
- await select.selectOption('nature-foliage-clump');
- await page.getByRole('button',{name:'Brush Settings',exact:true}).click();
+ await selectBrushOption(page,'Brush category','Texture / Nature');
+ await selectBrushOption(page,'Brush preset','nature-foliage-clump');
+ await openBrushSettings(page);
  const region=page.getByRole('region',{name:'Brush Settings'});
- await region.getByRole('button',{name:'Texture',exact:true}).click();
+ await region.getByRole('button',{name:'Nature',exact:true}).click();
  const thumbnails=region.getByRole('group',{name:'Texture / Nature brush previews'});
  await expect(thumbnails.getByRole('button',{name:'Use Foliage clump',exact:true})).toHaveAttribute('aria-pressed','true');
  const preview=thumbnails.getByLabel('Foliage clump stroke preview',{exact:true});
@@ -19,7 +19,8 @@ test('Nature presets expose actual thumbnails, seed settings and a large brush s
  await expect(seed).toHaveValue('234567');
  await region.getByRole('button',{name:'New random',exact:true}).click();
  await expect(seed).not.toHaveValue('234567');
- await expect(page.getByRole('slider',{name:'Size',exact:true})).toHaveAttribute('max','500');
+ await region.getByRole('button',{name:'Brush size',exact:true}).click();
+ await expect(region.getByRole('slider',{name:'Brush size',exact:true})).toHaveAttribute('max','500');
 });
 
 test('Nature Paint responds within budget at 50, 150 and 300 px',async({page})=>{

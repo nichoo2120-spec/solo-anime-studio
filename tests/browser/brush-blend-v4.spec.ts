@@ -1,3 +1,4 @@
+import {selectBrushOption,openBrushSettings,activeBrush} from '../brush-workspace.mjs';
 import {expect,test} from '@playwright/test';
 
 test('New Blend strokes keep the real custom brush mask and match worker final pixels',async({page})=>{
@@ -153,12 +154,12 @@ test('watercolor presets keep distinct feel with their real masks and worker rep
 test('Blend Settings previews strength presets, saves per brush and resets',async({page})=>{
  await page.goto('/');
  await page.getByLabel('Drawing canvas',{exact:true}).waitFor();
- await page.getByLabel('Brush category',{exact:true}).selectOption('Paint');
- await page.getByLabel('Brush family',{exact:true}).selectOption('all');
- await page.getByLabel('Brush preset',{exact:true}).selectOption('water-flat');
+ await selectBrushOption(page,'Brush category','Paint');
+ await selectBrushOption(page,'Brush family','all');
+ await selectBrushOption(page,'Brush preset','water-flat');
  await page.getByRole('group',{name:'Paint or Blend'}).first().getByRole('button',{name:'Blend',exact:true}).click();
- await page.getByRole('button',{name:'Brush Settings',exact:true}).click();
- await page.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Blend',exact:true}).click();
+ await openBrushSettings(page);
+ await page.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Blend settings',exact:true}).click();
  const panel=page.getByRole('region',{name:'Brush Settings'});
  const preview=panel.getByRole('img',{name:'Live preview of two colours blending with the current settings'});
  const pixels=()=>preview.evaluate((c:HTMLCanvasElement)=>c.toDataURL());
@@ -275,13 +276,13 @@ test('real stock brush masks keep light-pressure blending strong across families
 test('Silk toolbar and B B activate the current brush in the shared Blend settings',async({page})=>{
  await page.goto('/');
  await page.getByLabel('Drawing canvas',{exact:true}).waitFor();
- const preset=page.getByLabel('Brush preset',{exact:true});
+ const preset=activeBrush(page);
  const silk=page.getByRole('button',{name:'Silk Blend (B B)',exact:true}).first();
  const toggle=page.getByRole('group',{name:'Paint or Blend'}).first();
- const id=await preset.inputValue();
+ const id=await preset.getAttribute('data-current-brush-id');
  await silk.click();
  await expect(silk).toHaveAttribute('aria-pressed','true');
- await expect(preset).toHaveValue(id);
+ await expect(preset).toHaveAttribute('data-current-brush-id',id!);
  await expect(toggle.getByRole('button',{name:'Blend',exact:true})).toHaveAttribute('aria-pressed','true');
  await page.keyboard.press('j');
  await expect(toggle.getByRole('button',{name:'Paint',exact:true})).toHaveAttribute('aria-pressed','true');
@@ -289,11 +290,11 @@ test('Silk toolbar and B B activate the current brush in the shared Blend settin
  await page.keyboard.press('b');
  await page.keyboard.press('b');
  await expect(silk).toHaveAttribute('aria-pressed','true');
- await expect(preset).toHaveValue(id);
+ await expect(preset).toHaveAttribute('data-current-brush-id',id!);
  await expect(page.getByRole('group',{name:'Silk Blend settings',exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'Brush Settings',exact:true}).click();
+ await openBrushSettings(page);
  const panel=page.getByRole('region',{name:'Brush Settings'});
- await panel.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Blend',exact:true}).click();
+ await panel.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Blend settings',exact:true}).click();
  const controls=panel.getByRole('group',{name:'Silk Blend settings',exact:true});
  const style=panel.getByRole('combobox',{name:'Blend style',exact:true});
  await expect(style).toHaveValue('silk');
