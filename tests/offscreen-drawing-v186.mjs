@@ -1,3 +1,4 @@
+import {selectBrushOption,setBrushSize} from './brush-workspace.mjs';
 import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
 
@@ -75,11 +76,11 @@ export async function verifyOffscreenDrawing(page,extension='ts'){
   await page.evaluate(()=>new Promise(requestAnimationFrame));
  };
  for(const [brush,budget] of [['Pencil',65],['Paint',120]]){
-  await page.getByLabel('Brush category').selectOption({label:brush});
+  await selectBrushOption(page,'Brush category',{label:brush});
   if(brush==='Paint'){
-   await page.getByLabel('Brush family').selectOption('all');
-   await page.getByLabel('Brush preset').selectOption('color-soft');
-   const size=page.getByLabel('Size exact value',{exact:true});await size.fill('100');await size.press('Enter');
+   await selectBrushOption(page,'Brush family','all');
+   await selectBrushOption(page,'Brush preset','color-soft');
+   await setBrushSize(page,100);
   }
   for(let i=0;i<4;i++)await draw(i);
   await page.evaluate(()=>window.soloStrokeDiagnostics.performance.start());

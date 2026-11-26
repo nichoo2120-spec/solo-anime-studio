@@ -1,3 +1,4 @@
+import {selectBrushOption,setBrushSize} from './brush-workspace.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -53,7 +54,6 @@ async function verifyLargePage(page,extension){
  },extension);
  await page.locator('input[accept=".json,.solo.json"]').setInputFiles({name:'perf.solo.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(project))});
  await page.locator('.document-tab').filter({hasText:project.name}).waitFor();
- const category=page.getByLabel('Brush category');
  for(const mode of ['large-page']){
   if(mode==='offscreen'){
    await button('Show Outside Frame').click();await button('Frame Only').waitFor();
@@ -66,12 +66,11 @@ async function verifyLargePage(page,extension){
   }
   await page.getByLabel('Canvas zoom').selectOption('50');
   for(const brush of ['Pencil','Paint']){
-   await category.selectOption({label:brush});
+   await selectBrushOption(page,'Brush category',{label:brush});
    if(brush==='Paint'){
-    if(await page.getByLabel('Brush family').count())await page.getByLabel('Brush family').selectOption('all');
-    await page.getByLabel('Brush preset').selectOption('color-soft');
-    await page.getByRole('spinbutton',{name:'Size exact value',exact:true}).fill('100');
-    await page.getByRole('spinbutton',{name:'Size exact value',exact:true}).press('Enter');
+    await selectBrushOption(page,'Brush family','all');
+    await selectBrushOption(page,'Brush preset','color-soft');
+    await setBrushSize(page,100);
    }
    await settle(650);
    const {x,y,width,height}=await canvas.boundingBox(),x0=x+width*.28,y0=y+height*.38;

@@ -775,3 +775,78 @@
 .brush-import-error{color:#f4aea8;font-size:11px;white-space:pre-line;overflow-wrap:anywhere}
 .brush-import-progress{display:grid;gap:4px;margin-bottom:8px;overflow-wrap:anywhere}
 .brush-import-progress progress{width:100%}
+
+/* Brush context controls live outside the drawing surface. */
+.brush-workspace{display:flex;flex:1;flex-direction:column;min-width:0;min-height:0;position:relative}
+.brush-workspace:has(>.brush-context.dock-left){flex-direction:row}
+.brush-workspace:has([data-brush-cursor=hidden]) .brush-cursor-overlay{visibility:hidden}
+.brush-workspace:has([data-brush-cursor=hidden]) .drawing-canvas:is(.tool-brush,.tool-eraser){cursor:default!important}
+.brush-context{--brush-panel:#1f2326;--brush-line:#383f43;--brush-accent:#75dacb;position:relative;z-index:13;align-self:start;flex:none;padding:3px 5px;font-size:12px}
+.brush-context-bar{height:30px;display:flex;align-items:center;gap:3px;background:var(--brush-panel);border:1px solid var(--brush-line);border-radius:8px;padding:1px 3px;width:max-content;max-width:100%}
+.brush-context-bar>button,.brush-context .brush-number-value{height:24px;flex:none;padding:2px 5px;gap:4px;font-size:12px}
+.brush-bar-grip,.brush-settings-header{cursor:grab;touch-action:none}
+.brush-bar-grip:active,.brush-settings-header:active{cursor:grabbing}
+.brush-context-bar .brush-bar-preset{min-width:0;flex:0 1 auto;color:#e2ebec}
+.brush-bar-preset span{display:block;max-width:clamp(68px,15vw,186px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brush-context-bar .brush-blend-toggle{display:flex;gap:1px;margin:0;padding:0;border:0;background:none}
+.brush-context-bar .brush-blend-toggle button{height:24px;min-height:0;padding:1px 5px;border-radius:4px;font-size:10px;white-space:nowrap}
+.brush-context-bar .brush-blend-toggle button.active{color:#9ce7dc;border-color:#44645f;background:#28403d}
+.brush-context-bar .brush-bar-more[aria-expanded=true]{color:var(--brush-accent);background:#2c4440}
+.brush-number{display:inline-flex;align-items:center;max-width:100%;white-space:nowrap}
+.brush-number-value{touch-action:none;cursor:ew-resize;max-width:100%;border:1px solid #39474c;font-variant-numeric:tabular-nums;background:#272e31;color:#e4eded}
+.brush-number input{width:65px;height:24px;padding:1px 4px;text-align:right;font-size:12px;font-variant-numeric:tabular-nums}
+.brush-context.dock-left{align-self:stretch}
+.dock-left .brush-context-bar{height:auto;max-width:118px;display:grid;grid-template-columns:auto auto;justify-items:stretch;gap:3px;padding:3px}
+.dock-left .brush-bar-preset{grid-column:1/-1;grid-row:2}
+.dock-left .brush-bar-preset span{max-width:60px}
+.dock-left .brush-blend-toggle{grid-column:1/-1;justify-content:center}
+.dock-left .brush-bar-more{grid-column:2;grid-row:1;justify-self:end}
+.brush-popover{position:absolute;top:calc(100% + 2px);left:5px;background:var(--brush-panel);border:1px solid var(--brush-line);border-radius:8px;padding:8px;box-shadow:0 12px 30px #0006;color:#dce6e8;max-width:calc(100vw - 32px)}
+.dock-left .brush-popover{top:3px;left:100%}
+.brush-quick-popover{width:236px;max-height:min(480px,55vh);overflow:auto}
+.brush-quick-row{display:flex;align-items:center;justify-content:space-between;gap:7px;min-height:32px}
+.brush-quick-row>span:first-child{flex:1;min-width:0}
+.brush-quick-row select{max-width:115px;padding:2px 5px;font-size:11px}
+.brush-quick-row input[type=color]{width:42px;height:24px;padding:0 2px}
+.brush-full-settings{width:100%;display:flex;justify-content:space-between;border-top:1px solid var(--brush-line);border-radius:0;margin-top:5px;padding:8px 2px 3px;white-space:nowrap}
+.brush-full-settings kbd{font-size:10px;color:#97a8aa}
+.brush-picker-popover{width:388px}
+.brush-picker-header{display:flex;align-items:center;gap:5px}
+.brush-picker-search{height:30px;display:flex;align-items:center;gap:5px;padding-left:7px;border:1px solid var(--brush-line);border-radius:6px;min-width:0;flex:1;background:#171b1d}
+.brush-picker-search input{width:100%;padding:3px;border:0;background:none}
+.brush-picker-header button{height:28px;width:28px;padding:0;border-color:var(--brush-line)}
+.brush-picker-tabs{display:flex;flex-wrap:wrap;gap:3px;margin:7px 0}
+.brush-picker-tabs button{font-size:11px;padding:4px 5px;background:#272d2f}
+.brush-picker-scroll{max-height:min(380px,48vh);overflow:auto}
+.brush-picker-scroll h4{margin:6px 0;font-size:11px;font-weight:600;color:#aebfc1}
+.brush-picker-results{display:grid;gap:3px}
+.brush-picker-results.grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
+.brush-picker-results .paint-tip-card{min-width:0;min-height:32px;justify-items:start;text-align:left;overflow:hidden}
+.brush-picker-results.list .paint-tip-card{display:grid;grid-template-columns:83px minmax(0,1fr);align-items:center;padding:2px 6px}
+.brush-picker-results .paint-tip-card canvas{height:27px;width:100%;object-fit:contain}
+.brush-picker-results .paint-tip-card span{font-size:12px}
+.brush-picker-results .paint-tip-card small{display:none}
+.brush-picker-empty{font-size:12px;margin:8px 0;color:#a7b8b9}
+.brush-picker-edit{display:flex;align-items:center;gap:5px;padding:5px 0}
+.brush-picker-edit input{min-width:55px;flex:1}
+.brush-picker-dismiss{position:fixed;inset:0;border:0;background:transparent!important;z-index:1}
+.brush-picker-actions{position:fixed;z-index:2;width:176px;display:grid;background:var(--brush-panel);border:1px solid var(--brush-line);border-radius:8px;padding:4px;box-shadow:0 12px 22px #0007}
+.brush-picker-actions button{justify-content:flex-start;padding:6px;font-size:12px}
+.brush-context .brush-import-actions[hidden],.compact-brush-dialog[hidden]{display:none}
+.brush-context .brush-import-actions:not([hidden]){margin:7px 0}
+.compact-brush-dialog:not(.is-collapsed){width:600px;height:min(650px,calc(100dvh - 150px));max-height:calc(100dvh - 150px);max-width:calc(100vw - 16px);min-width:min(380px,calc(100vw - 16px));min-height:260px;resize:both;overflow:hidden}
+.compact-brush-dialog .brush-settings-header>div:first-child{display:flex;align-items:center;gap:6px}
+.compact-brush-dialog .brush-settings-header>div>span{max-width:135px;text-overflow:ellipsis;overflow:hidden}
+.compact-brush-dialog .brush-settings-preview{border-top:0;border-bottom:1px solid #334043;padding:5px 10px}
+.compact-brush-dialog .brush-settings-preview .brush-studio-preview{height:67px}
+.compact-brush-dialog .brush-settings-body{grid-template-columns:122px minmax(0,1fr)}
+.compact-brush-dialog .brush-settings-body nav button{font-size:11px}
+.compact-brush-dialog .brush-settings-content .exact-range:has(.brush-pin-setting){grid-template-columns:minmax(67px,1fr) minmax(28px,1.4fr) 55px 22px}
+.compact-brush-dialog .brush-pin-setting{width:22px;height:22px;padding:2px;color:#8fa3a5}
+.compact-brush-dialog .brush-pin-setting[aria-pressed=true]{color:#7ed9c8}
+.compact-brush-dialog .brush-pin-setting:hover{background:#344843}
+.compact-brush-dialog .studio-select:has(.brush-pin-setting)>select{min-width:0;flex:1}
+.brush-availability{color:#a7b8b9;font-size:12px}
+.brush-picker-keyboard{color:#9db3b5;font-size:11px;margin:4px 0}
+.brush-picker-keyboard summary{cursor:pointer;padding:3px 0}
+.brush-picker-keyboard .studio-select{margin:3px 0}
