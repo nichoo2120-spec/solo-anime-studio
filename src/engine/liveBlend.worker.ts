@@ -15,7 +15,7 @@ import {drawStroke} from './renderer';
 import {resetDryBristleV3MixModel} from './dryBristleV3';
 import type {RasterRegion} from './liveRaster';
 Object.defineProperty(globalThis,'document',{value:{createElement:(tag:string)=>{if(tag!=='canvas')throw Error('Unsupported worker element');return new OffscreenCanvas(1,1);}}});
-type Message={kind:'begin'|'update'|'cancel';token:number;serial:number;width:number;height:number;base?:ImageBitmap;readFrequently?:boolean;nativeDelta?:boolean;basePixels?:Uint8ClampedArray;deltaPixels?:Uint8ClampedArray;deltaRegion?:RasterRegion;seeded?:boolean;compactReplies?:boolean;blendSample?:BlendSampleSource;reuseSurfaces?:boolean;stroke?:Stroke;pointDelta?:Point[];resetPoints?:boolean;final?:boolean};
+type Message={kind:'begin'|'update'|'cancel';token:number;serial:number;width:number;height:number;base?:ImageBitmap;readFrequently?:boolean;nativeDelta?:boolean;basePixels?:Uint8ClampedArray;deltaPixels?:Uint8ClampedArray;deltaRegion?:RasterRegion;seeded?:boolean;compactReplies?:boolean;blendSample?:BlendSampleSource;reuseSurfaces?:boolean;stroke?:Stroke;pointDelta?:Point[];resetPoints?:boolean;reuseBitmap?:boolean;final?:boolean};
 const worker=self as unknown as {onmessage:(e:MessageEvent<Message>)=>void;postMessage:(data:unknown,transfer?:Transferable[])=>void};
 let surfaceMode:boolean|undefined;
 let token=0,base:OffscreenCanvas|undefined,target:OffscreenCanvas|undefined,region:RasterRegion|undefined;
@@ -81,6 +81,10 @@ worker.onmessage=async({data:j})=>{
   if(j.pointDelta){
    if(!j.stroke)throw Error('Missing stroke metadata');
    const {points:_points,...metadata}=j.stroke;
+   if(j.reuseBitmap&&activeStrokeToken===j.token&&activeStroke){
+    if(metadata.nature&&activeStroke.nature?.bitmap)metadata.nature={...metadata.nature,bitmap:activeStroke.nature.bitmap};
+    if(activeStroke.dbBitmap)metadata.dbBitmap=activeStroke.dbBitmap;
+   }
    const reset=!!j.resetPoints||!activeStroke||activeStrokeToken!==j.token||activeStroke.id!==j.stroke.id;
    let current:Stroke;
    if(reset)current={...metadata,points:[]};

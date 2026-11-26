@@ -1,9 +1,42 @@
+import {bitmapBlendModes,bitmapMaxTips,bitmapSelections,type BitmapBlendMode,type BitmapTipSelection} from '../core/bitmapBrush';
+import {importInWorker} from '../core/brushImport/client';
+import {useRef,useState} from 'react';
 import {natureFlags,natureNumbers,type NatureSettings} from '../core/natureBrush';
 import {ExactRange} from './ExactRange';
 
 const percent=new Set(['scatter','sizeJitter','density','spacing','opacityJitter','grain']);
 export function NatureBrushSettings({settings,change}:{settings:NatureSettings;change:(settings:NatureSettings)=>void}){
+ const [alpha,setAlpha]=useState<'auto'|'luminance'|'alpha'>('auto');
+ const [notice,setNotice]=useState('');
+ const [busy,setBusy]=useState(false);
+ const settingsRef=useRef(settings);settingsRef.current=settings;
+ const bitmap=settings.bitmap;
+ async function images(files:File[],grain:boolean){
+  setBusy(true);setNotice('');
+  try{
+   const assets=await Promise.all(files.slice(0,grain?1:bitmapMaxTips).map(file=>importInWorker(file,grain?'luminance':alpha,()=>{})));
+   const tips=assets.flatMap(a=>a[0]?.tips??[]);
+   if(!tips.length)return;
+   const current=settingsRef.current,settingsBitmap=current.bitmap??{version:1 as const,roundnessJitter:0,countJitter:0,bothAxes:true,textureMode:'multiply' as const,tips};
+   change({...current,grain:grain&&current.grain===0?.5:current.grain,bitmap:grain?{...settingsBitmap,grain:tips[0]}:{...settingsBitmap,tips}});
+  }catch(error){setNotice(error instanceof Error?error.message:'The image could not be loaded.');}
+  finally{setBusy(false);}
+ }
  return <div className="nature-brush-settings">
+  <label className="studio-select">Image mask<select aria-label="Image mask" value={alpha} onChange={e=>setAlpha(e.target.value as typeof alpha)}><option value="auto">Auto</option><option value="luminance">Dark paint</option><option value="alpha">Use alpha</option></select></label>
+  <label className="texture-import-button">Tip images<input type="file" aria-label="Tip images" multiple accept=".png,.jpg,.jpeg" disabled={busy} onChange={e=>{const files=Array.from(e.target.files??[]);e.target.value='';if(files.length)void images(files,false);}}/></label>
+  {notice&&<p role="alert">{notice}</p>}
+  {bitmap&&<>
+   <p className="hint">{bitmap.tips.length} bitmap {bitmap.tips.length===1?'tip':'tips'}</p>
+   <button type="button" onClick={()=>change({...settings,bitmap:undefined})}>Use procedural tip</button>
+   <label className="studio-select">Tip selection<select value={bitmap.selection??'random'} onChange={e=>change({...settings,bitmap:{...bitmap,selection:e.target.value as BitmapTipSelection}})}>{bitmapSelections.map(value=><option key={value}>{value}</option>)}</select></label>
+   <ExactRange name="Roundness jitter" min={0} max={100} unit="%" value={Math.round(bitmap.roundnessJitter*100)} set={value=>change({...settings,bitmap:{...bitmap,roundnessJitter:value/100}})}/>
+   <ExactRange name="Count jitter" min={0} max={100} unit="%" value={Math.round(bitmap.countJitter*100)} set={value=>change({...settings,bitmap:{...bitmap,countJitter:value/100}})}/>
+   <label className="onion-check"><input type="checkbox" checked={bitmap.bothAxes} onChange={e=>change({...settings,bitmap:{...bitmap,bothAxes:e.target.checked}})}/>Scatter on both axes</label>
+   <label className="texture-import-button">Grain image<input type="file" aria-label="Grain image" accept=".png,.jpg,.jpeg" disabled={busy} onChange={e=>{const files=Array.from(e.target.files??[]);e.target.value='';if(files.length)void images(files,true);}}/></label>
+   {bitmap.grain&&<button type="button" onClick={()=>change({...settings,bitmap:{...bitmap,grain:undefined}})}>Remove grain image</button>}
+   <label className="studio-select">Texture blend mode<select value={bitmap.textureMode} onChange={e=>change({...settings,bitmap:{...bitmap,textureMode:e.target.value as BitmapBlendMode}})}>{bitmapBlendModes.map(value=><option key={value}>{value}</option>)}</select></label>
+  </>}
   {natureNumbers.filter(([id])=>id!=='seed').map(([id,label,min,max])=>{
    const scale=percent.has(id)?100:1;
    const unit=id==='rotation'?'°':id==='scale'?'×':scale===100||['hue','saturation','brightness'].includes(id)?'%':undefined;

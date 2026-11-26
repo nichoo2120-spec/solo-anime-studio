@@ -1,3 +1,4 @@
+import {bitmapAtlases,secondaryBitmapTip,type BitmapAtlas} from './bitmapTips';
 import type {Stroke} from '../core/model';
 import type {NatureSettings} from '../core/natureBrush';
 import type {DualMode} from '../core/brushShape';
@@ -9,7 +10,7 @@ import {widthResponse,opacityResponse} from './pressureChannels';
 import type {RasterRegion} from './liveRaster';
 
 type Geometry=ReturnType<typeof strokeGeometry>;
-const tau=Math.PI*2,angles=72,stride=7;
+const tau=Math.PI*2,angles=72,stride=8;
 const cos=Float64Array.from({length:angles},(_,i)=>Math.cos(i*tau/angles));
 const sin=Float64Array.from({length:angles},(_,i)=>Math.sin(i*tau/angles));
 const angleBucket=(angle:number)=>((Math.round(angle*angles/tau)%angles)+angles)%angles;
@@ -23,9 +24,9 @@ class Dabs{
   const more=new Float64Array(2**Math.ceil(Math.log2(count))*stride);
   more.set(this.values);this.values=more;
  }
- push(x:number,y:number,w:number,h:number,angle:number,alpha:number,color:number){
+ push(x:number,y:number,w:number,h:number,angle:number,alpha:number,color:number,tip=0){
   const i=this.length;
-  const v=this.values;v[i]=x;v[i+1]=y;v[i+2]=w;v[i+3]=h;v[i+4]=angle;v[i+5]=alpha;v[i+6]=color;
+  const v=this.values;v[i]=x;v[i+1]=y;v[i+2]=w;v[i+3]=h;v[i+4]=angle;v[i+5]=alpha;v[i+6]=color;v[i+7]=tip;
   this.length+=stride;
  }
 }
@@ -61,14 +62,15 @@ class NaturePlanner{
  private paletteSettings?:NatureSettings;
  private paletteColor='';
  private responseKey='';
- private atlas?:HTMLCanvasElement;
+ private atlas?:HTMLCanvasElement|BitmapAtlas[];
+ private paletteSize=0;
  palette(s:Stroke){
-  if(this.paletteSettings===s.nature&&this.paletteColor===s.color&&this.atlas)return this.atlas;
-  this.paletteSettings=s.nature;this.paletteColor=s.color;
-  return this.atlas=naturePalette(s.nature!,s.color);
+  if(this.paletteSettings===s.nature&&this.paletteColor===s.color&&this.paletteSize===s.size&&this.atlas)return this.atlas;
+  this.paletteSettings=s.nature;this.paletteColor=s.color;this.paletteSize=s.size;
+  return this.atlas=s.nature!.bitmap?bitmapAtlases(s.nature!,s.color,s.size):naturePalette(s.nature!,s.color);
  }
  plan(s:Stroke,g:Geometry,out:NaturePlan){
-  const n=s.nature!,samples=paintSamples(g,Math.max(.18,Math.min(.65,s.size*.004))),{points,arc,total}=samples;
+  const n=s.nature!,bitmap=n.bitmap,samples=paintSamples(g,Math.max(.18,Math.min(.65,s.size*.004))),{points,arc,total}=samples;
   out.main.length=out.dual.length=0;
   if(!points.length||n.density===0)return;
   const key=s.pressure?`${s.response}:${s.pressureCurve?.map(p=>p.x+','+p.y).join(';')??''}`:'';
@@ -103,13 +105,29 @@ class NaturePlanner{
     const pt=raw[rawIndex] as typeof raw[number]&{az?:number;alt?:number};
     turn+=(pt.az??0)*Math.PI/180;lean+=1.5*(1-clamp((pt.alt??90)/90));
    }
-   for(let k=0;k<n.count;k++){
+   const count=bitmap?n.count-Math.round((n.count-1)*bitmap.countJitter*natureNoise(n.seed,dab,13)):n.count;
+   for(let k=0;k<count;k++){
     const i=dab*12+k;
     if((included||k>0||dab>0)&&natureNoise(n.seed,i,0)>n.density)continue;
-    const offset=n.scatter*s.size,xx=x+(natureNoise(n.seed,i,1)*2-1)*offset,yy=y+(natureNoise(n.seed,i,2)*2-1)*offset;
-    const size=Math.max(.5,Math.round(s.size*width*taper*(1+(natureNoise(n.seed,i,3)*2-1)*n.sizeJitter)*4)/4);
+    const offset=n.scatter*s.size,dx=(natureNoise(n.seed,i,1)*2-1)*offset,dy=(natureNoise(n.seed,i,2)*2-1)*offset;
+    const xx=x+(bitmap&&!bitmap.bothAxes?-Math.sin(theta)*dx:dx),yy=y+(bitmap&&!bitmap.bothAxes?Math.cos(theta)*dx:dy);
+    const rand=natureNoise(n.seed,i,3);
+    const factor=bitmap?Math.max(bitmap.minSize??.01,1-rand*n.sizeJitter):1+(rand*2-1)*n.sizeJitter;
+    const size=Math.max(.5,Math.round(s.size*width*taper*factor*4)/4);
     const angle=angleBucket(turn+(natureNoise(n.seed,i,4)*2-1)*jitter),alpha=clamp(level*(1-n.opacityJitter*natureNoise(n.seed,i,5)));
-    if(alpha>0){out.main.push(xx,yy,size*sx*lean*(n.flipX&&natureNoise(n.seed,i,6)<.5?-1:1),size*sy*(n.flipY&&natureNoise(n.seed,i,7)<.5?-1:1),angle,alpha,Math.floor(natureNoise(n.seed,i,8)*naturePaletteSize));included=true;}
+    let tip=0,round=1;
+    if(bitmap){
+     const bins=bitmap.tips.length;
+     if(bins>1)switch(bitmap.selection){
+      case 'sequence':tip=(dab*n.count+k)%bins;break;
+      case 'pressure':tip=Math.min(bins-1,Math.floor(pressure*bins));break;
+      case 'direction':tip=Math.min(bins-1,Math.floor(((theta+tau)%tau)/tau*bins));break;
+      case 'velocity':tip=Math.min(bins-1,Math.floor(clamp(speed)*bins));break;
+      default:tip=Math.floor(natureNoise(n.seed,i,12)*bins);
+     }
+     round=Math.max(.05,bitmap.minRoundness??0,1-bitmap.roundnessJitter*natureNoise(n.seed,i,14));
+    }
+    if(alpha>0){out.main.push(xx,yy,size*sx*lean*(n.flipX&&natureNoise(n.seed,i,6)<.5?-1:1),size*sy*round*(n.flipY&&natureNoise(n.seed,i,7)<.5?-1:1),angle,alpha,Math.floor(natureNoise(n.seed,i,8)*naturePaletteSize),tip);included=true;}
    }
   }
   if(!s.dbTip)return;
@@ -140,11 +158,14 @@ function inside(v:Float64Array,i:number,clip?:RasterRegion){
  const radius=reach(v,i),x=v[i],y=v[i+1];
  return x+radius>=clip.x&&y+radius>=clip.y&&x-radius<=clip.x+clip.width&&y-radius<=clip.y+clip.height;
 }
-function paintMain(ctx:CanvasRenderingContext2D,list:Dabs,atlas:HTMLCanvasElement,clip?:RasterRegion,x=0,y=0){
+function paintMain(ctx:CanvasRenderingContext2D,list:Dabs,atlas:HTMLCanvasElement|BitmapAtlas[],clip?:RasterRegion,x=0,y=0){
  const m=ctx.getTransform(),v=list.values,alpha=ctx.globalAlpha,res=natureTipPixels;
  for(let i=0;i<list.length;i+=stride)if(inside(v,i,clip)){
   matrix(ctx,m,v,i,x,y);ctx.globalAlpha=alpha*v[i+5];
-  ctx.drawImage(atlas,v[i+6]*res,0,res,res,-.5,-.5,1,1);
+  if(Array.isArray(atlas)){
+   const stamp=atlas[v[i+7]],p=stamp.pixels;
+   ctx.drawImage(stamp.canvas,(stamp.colors===1?0:v[i+6])*p,0,p,p,-.5,-.5,1,1);
+  }else ctx.drawImage(atlas,v[i+6]*res,0,res,res,-.5,-.5,1,1);
  }
  ctx.setTransform(m);ctx.globalAlpha=alpha;
 }
@@ -165,7 +186,7 @@ const fit=(c:HTMLCanvasElement|undefined,w:number,h:number)=>{
  if(c.width<w)c.width=Math.ceil(w/64)*64;if(c.height<h)c.height=Math.ceil(h/64)*64;
  return c;
 };
-function paint(ctx:CanvasRenderingContext2D,s:Stroke,plan:NaturePlan,atlas:HTMLCanvasElement,clip?:RasterRegion){
+function paint(ctx:CanvasRenderingContext2D,s:Stroke,plan:NaturePlan,atlas:HTMLCanvasElement|BitmapAtlas[],clip?:RasterRegion){
  if(!s.dbTip){paintMain(ctx,plan.main,atlas,clip);return;}
  const bounds=empty();include(bounds,plan.main,0);
  const m=ctx.getTransform().inverse(),cw=ctx.canvas.width,ch=ctx.canvas.height;
@@ -179,12 +200,15 @@ function paint(ctx:CanvasRenderingContext2D,s:Stroke,plan:NaturePlan,atlas:HTMLC
  a.resetTransform();b.resetTransform();a.clearRect(0,0,w,h);b.clearRect(0,0,w,h);
  paintMain(a,plan.main,atlas,area,x,y);
  const transform=b.getTransform(),v=plan.dual.values,tip=s.dbTip;
+ const bitmap=s.dbBitmap?secondaryBitmapTip(s.dbBitmap):undefined;
+ const bw=bitmap?bitmap.width/Math.max(bitmap.width,bitmap.height):0,bh=bitmap?bitmap.height/Math.max(bitmap.width,bitmap.height):0;
  const secondary=s.dbNatureTip?secondaryNatureAtlas(s.dbNatureTip,s.dbTexture??0):undefined;
- const tips=Array.from({length:4},(_,i)=>paintingNib(tip,s.dbHardness??.7,s.dbTexture??0,i,0));
+ const tips=bitmap?undefined:Array.from({length:4},(_,i)=>paintingNib(tip,s.dbHardness??.7,s.dbTexture??0,i,0));
  for(let i=0;i<plan.dual.length;i+=stride)if(inside(v,i,area)){
-  matrix(b,transform,v,i,x,y);const nib=tips[v[i+6]];
-  if(secondary)b.drawImage(secondary,0,0,natureTipPixels,natureTipPixels,-.5,-.5,1,1);
-  else b.drawImage(nib.canvas,nib.x,nib.y,nib.w,nib.h);
+  matrix(b,transform,v,i,x,y);
+  if(bitmap)b.drawImage(bitmap,-bw*.5,-bh*.5,bw,bh);
+  else if(secondary)b.drawImage(secondary,0,0,natureTipPixels,natureTipPixels,-.5,-.5,1,1);
+  else {const nib=tips![v[i+6]];b.drawImage(nib.canvas,nib.x,nib.y,nib.w,nib.h);}
  }
  b.resetTransform();
  const image=a.getImageData(0,0,w,h),main=image.data,mask=b.getImageData(0,0,w,h).data;

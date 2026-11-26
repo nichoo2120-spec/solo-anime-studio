@@ -1,3 +1,4 @@
+import {readBitmapLibrary,smallBrushPreferences,writeBitmapLibrary} from '../core/brushImport/library';
 import {StrokeWidthEditor} from './StrokeWidthEditor';
 import {createPortal} from 'react-dom';
 import {MirrorControls} from './MirrorControls';
@@ -61,7 +62,7 @@ import {replayTrace} from '../engine/diagnosticReplay';
 import {BrushStudio} from './BrushStudio';
 import {ExactRange} from './ExactRange';
 import {VectorStudio,type VectorDefaults} from './VectorStudio';
-import {activePreset,activeInputPreset,restoreBrushLibrary,updatePreset,customBrushes,mergeCustomBrushes,type BrushLibrary} from '../core/brushes';
+import {activePreset,activeInputPreset,restoreBrushLibrary,updatePreset,portableCustomBrushes,mergeCustomBrushes,type BrushLibrary} from '../core/brushes';
 import {canBrushBlend} from '../core/brushBlend';
 import {vectorSvg,type VectorLine} from '../engine/vector';
 import {toolRegistry,allTools} from './icons';
@@ -198,7 +199,7 @@ export function App(){
  /** v0.5.240 Paint / Blend switch (default key J) for the active paint brush. */
  const toggleBrushBlend=()=>{if(toolIntent.current!=='brush')chooseTool('brush');setBrushLibrary(old=>{const q=activePreset(old,false);if(!canBrushBlend(q.settings)){const name=q.name;queueMicrotask(()=>setMessage(name+' already blends colours.'));return old;}const on=!q.settings.bbEnabled,name=q.name;queueMicrotask(()=>setMessage(on?'Blend mode: '+name+' now blends colours (no paint).':'Paint mode: '+name+' paints again.'));return updatePreset(old,q.id,{...q.settings,bbEnabled:on});});};
  /** v0.5.241 Saved projects and backups carry the user's custom brushes (only when there are some). */
- const withCustomBrushes=(p:Project):Project=>{const list=customBrushes(libraryIntent.current);if(!list.length)return p.customBrushes===undefined?p:{...p,customBrushes:undefined};return {...p,customBrushes:list.map(b=>({id:b.id,name:b.name,category:b.category,family:b.family,custom:true,defaults:b.defaults,settings:b.settings}))};};
+ const withCustomBrushes=(p:Project):Project=>{const list=portableCustomBrushes(libraryIntent.current);if(!list.length)return p.customBrushes===undefined?p:{...p,customBrushes:undefined};return {...p,customBrushes:list.map(b=>({id:b.id,name:b.name,category:b.category,family:b.family,custom:true,pack:b.pack,defaults:b.defaults,settings:b.settings}))};};
  const setBrush=(next:Partial<BrushSettings>)=>setBrushLibrary(old=>{const p=activePreset(old,toolIntent.current==='eraser');return updatePreset(old,p.id,{...p.settings,...next});});
  const setDrawingColor=(color:string)=>setBrushLibrary(old=>{const p=activePreset(old);return updatePreset(old,p.id,{...p.settings,color});});
  const [vectorId,setVectorId]=useState<string|null>(null),[smoothingActive,setSmoothingActive]=useState(false),[postAmount,setPostAmount]=useState(50);
@@ -334,7 +335,24 @@ export function App(){
  useEffect(()=>{writePreference('xsheet-side',xsheetSide);writePreference('xsheet-width',xsheetWidth);},[xsheetSide,xsheetWidth]);
  useEffect(()=>{writePreference('fill-settings',fillSettings);if(engine.current)engine.current.fillSettings=fillSettings;},[fillSettings]);
  useEffect(()=>{writePreference('shortcuts',shortcuts);},[shortcuts]);
- useEffect(()=>{writePreference('brush-library',brushLibrary);},[brushLibrary]);
+ const [bitmapLibraryReady,setBitmapLibraryReady]=useState(false);
+ useEffect(()=>{
+  let active=true;
+  const initial=libraryIntent.current;
+  void readBitmapLibrary().then(saved=>{
+   if(!active||!saved?.presets.length)return;
+   const current=libraryIntent.current,recovered=new Map(saved.presets.map(p=>[p.id,p]));
+   const presets=current.presets.map(p=>{const old=recovered.get(p.id);recovered.delete(p.id);return old??p;});
+   setBrushLibrary(restoreBrushLibrary({...current,brushId:current===initial?saved.selected??current.brushId:current.brushId,presets:[...presets,...recovered.values()]}));
+  }).then(()=>{if(active)setBitmapLibraryReady(true);}).catch(()=>{if(active)notify('The imported brush library could not be opened.');});
+  return()=>{active=false;};
+ },[]);
+ useEffect(()=>{
+  writePreference('brush-library',smallBrushPreferences(brushLibrary));
+  if(!bitmapLibraryReady)return;
+  const save=setTimeout(()=>{void writeBitmapLibrary(brushLibrary).catch(()=>notify('The imported brush library could not be saved.'));},350);
+  return()=>clearTimeout(save);
+ },[brushLibrary,bitmapLibraryReady]);
  useEffect(()=>{writePreference('onion-settings',onionSettings);engine.current?.onion.setSettings(onionSettings);},[onionSettings]);
  useEffect(()=>{writePreference('vector-settings-solid-ink',vectorDefaults);if(engine.current)Object.assign(engine.current.vectors,vectorDefaults);},[vectorDefaults]);
  useEffect(()=>{

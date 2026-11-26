@@ -1,3 +1,4 @@
+import {importedCategory} from './bitmapBrush';
 import {natureCategory,validNatureStroke,type NatureControls} from './natureBrush';
 import type {InkEdgeControls} from './inkTip';
 import {isInkAntialiasing,supportsInkTip} from './inkTip';
@@ -271,7 +272,7 @@ export function validateProject(value:unknown):Project {
  }
  if(p.audio!==undefined&&!validateSceneAudio(p.audio))throw Error('Invalid scene audio.');
  if(!validateMotionPlanning(p))throw Error('Invalid motion/timing notes.');
- if(p.customBrushes!==undefined&&(!Array.isArray(p.customBrushes)||p.customBrushes.length>100||!p.customBrushes.every((b:any)=>b&&typeof b==='object'&&b.custom===true&&typeof b.id==='string'&&b.id.length<=80&&typeof b.name==='string'&&b.name.length<=60&&['Pencil','Ink','Paint','Eraser',natureCategory].includes(b.category)&&b.settings&&typeof b.settings==='object'&&!Array.isArray(b.settings))))throw Error('Invalid custom brushes.');
+ if(p.customBrushes!==undefined&&(!Array.isArray(p.customBrushes)||p.customBrushes.length>100||!p.customBrushes.every((b:any)=>b&&typeof b==='object'&&b.custom===true&&typeof b.id==='string'&&b.id.length<=80&&typeof b.name==='string'&&b.name.length<=(b.category===importedCategory?512:60)&&['Pencil','Ink','Paint','Eraser',natureCategory,importedCategory].includes(b.category)&&b.settings&&typeof b.settings==='object'&&!Array.isArray(b.settings))))throw Error('Invalid custom brushes.');
  if(p.camera!==undefined){if(!validateSceneCamera(p.camera))throw Error('Invalid scene camera.');p.camera=pruneCameraDepth(p.camera,ids);}
  if(!ids.has(p.activeLayerId)||!p.settings||typeof p.settings.guides!=='boolean')throw Error('Invalid document settings.');
  return p as Project;

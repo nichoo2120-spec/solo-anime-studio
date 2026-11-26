@@ -1,3 +1,4 @@
+import {validBitmapDynamics,type BitmapDynamics} from './bitmapBrush';
 export const natureCategory='Texture / Nature' as const;
 export const naturePresets=[
  ['grass-short','Short grass','#769b46','#425f2f'],
@@ -53,7 +54,7 @@ export const natureFlags=[
  ['flipX','Random flip X'],
  ['flipY','Random flip Y'],
 ] as const;
-export type NatureSettings=Record<typeof natureNumbers[number][0],number>&Record<typeof natureFlags[number][0],boolean>&{tip:NatureTip;second:string};
+export type NatureSettings=Record<typeof natureNumbers[number][0],number>&Record<typeof natureFlags[number][0],boolean>&{tip:NatureTip;second:string;bitmap?:BitmapDynamics};
 export type NatureControls={natureVersion?:1;nature?:NatureSettings};
 const hex=(v:unknown):v is string=>typeof v==='string'&&/^#[\da-f]{6}$/i.test(v);
 const numeric=(v:unknown,min:number,max:number,d:number)=>typeof v==='number'&&Number.isFinite(v)?Math.max(min,Math.min(max,v)):d;
@@ -66,13 +67,14 @@ export function natureSettings(tip:NatureTip,raw?:Partial<NatureSettings>):Natur
  for(const [key,,min,max] of natureNumbers){const value=numeric(raw[key],min,max,result[key]);result[key]=key==='count'||key==='seed'?Math.round(value):value;}
  for(const [key] of natureFlags)if(typeof raw[key]==='boolean')result[key]=raw[key];
  if(hex(raw.second))result.second=raw.second;
+ if(validBitmapDynamics(raw.bitmap))result.bitmap=raw.bitmap;
  return result;
 }
 export function validNatureStroke(o:Record<string,unknown>){
  if(o.natureVersion===undefined&&o.nature===undefined)return true;
  if(o.natureVersion!==1||o.stampVersion!==1||o.tool!=='brush'||o.nativeMixVersion!==undefined||o.silkBlendVersion!==undefined)return false;
  const data=o.nature as Partial<NatureSettings>|undefined;
- if(!data||!isNatureTip(data.tip)||!hex(data.second))return false;
+ if(!data||!isNatureTip(data.tip)||!hex(data.second)||data.bitmap!==undefined&&!validBitmapDynamics(data.bitmap))return false;
  for(const [key,,min,max] of natureNumbers){
   const v=data[key];if(typeof v!=='number'||!Number.isFinite(v)||v<min||v>max||(key==='count'||key==='seed')&&!Number.isInteger(v))return false;
  }

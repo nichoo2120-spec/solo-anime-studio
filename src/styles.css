@@ -770,3 +770,8 @@
 .nature-seed input { width: 100%; }
 .nature-quick-list > summary { cursor: pointer; }
 .nature-quick-list .paint-tip-picker { max-height: 245px; overflow: auto; }
+.brush-import-actions{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.brush-import-actions select{min-width:0}
+.brush-import-error{color:#f4aea8;font-size:11px;white-space:pre-line;overflow-wrap:anywhere}
+.brush-import-progress{display:grid;gap:4px;margin-bottom:8px;overflow-wrap:anywhere}
+.brush-import-progress progress{width:100%}
