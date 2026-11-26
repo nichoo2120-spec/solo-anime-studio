@@ -19,7 +19,7 @@ try{
   const {compositePaintStroke,strokeRasterBounds}=await import('/src/engine/paintCompositing.ts');
   const {LiveBlendWorker}=await import('/src/engine/LiveBlendWorker.ts');
   // Silk Blend (v0.5.238) is a blender itself, not a brush the old Mix mode is applied to.
-  const presets=stockPresets.filter(p=>p.category!=='Eraser'&&!isRetiredBlendPresetId(p.id)&&p.settings.brushKind!=='silk-blend');
+  const presets=stockPresets.filter(p=>!p.settings.nature&&p.category!=='Eraser'&&!isRetiredBlendPresetId(p.id)&&p.settings.brushKind!=='silk-blend');
   const make=(w=740,h=190)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
   const scene=()=>{const c=make(),ctx=c.getContext('2d');ctx.fillStyle='#ef1529';ctx.fillRect(10,24,240,142);ctx.fillStyle='#1246cd';ctx.fillRect(250,24,240,142);return c;};
   const sheet=make(1500,90+presets.length*155),sc=sheet.getContext('2d');sc.fillStyle='white';sc.fillRect(0,0,sheet.width,sheet.height);sc.fillStyle='#17242e';sc.font='bold 24px sans-serif';sc.fillText(phase==='before'?'v0.5.178: actual Mix output':'Candidate: actual Mix output',20,32);sc.font='16px sans-serif';sc.fillText('Input paint on transparent layer',20,65);sc.fillText('Mix dragged red → blue → empty paper; selected colour is GREEN',760,65);

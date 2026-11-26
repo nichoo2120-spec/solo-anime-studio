@@ -57,6 +57,8 @@ export function blendStyleFor(s:BlendTip):BlendStyle{
   tip=s.mixBlend>=.99?s.mixTipB:s.mixTipA;
  }
  if(tip.startsWith('water-')||tip==='wash'||tip.startsWith('wash-')||kind.startsWith('watercolor'))return 'water';
+ if(kind.startsWith('nature-water-'))return 'water';
+ if(kind.startsWith('nature-'))return 'texture';
  if(kind.startsWith('graphite-')||/(pencil|crayon|charcoal)/i.test(kind))return 'pencil';
  if(kind.startsWith('dry-')||kind==='dry'||tip==='chalk')return 'dry';
  if(INKS.includes(kind)||/^(ink|pen)(-|$)/i.test(kind))return 'ink';

@@ -8,6 +8,9 @@
  *   and scatter) and combines the two by a blend mode, like Photoshop.
  * - Everything is a pure function of the saved stroke, so live == reload.
  */
+import {drawNatureStroke,natureExtent} from './natureRaster';
+import type {NatureTip} from '../core/natureBrush';
+import {secondaryNatureAtlas,natureTipPixels} from './natureTips';
 import type {Point,Stroke} from '../core/model';
 import type {DualMode} from '../core/brushShape';
 import {paintingNib,erodePaintingGrain,paintHash} from './paintingTips';
@@ -26,6 +29,7 @@ const fit=(c:Canvasish|undefined,w:number,h:number)=>{if(!c)return make(w,h);if(
 export type StampDab={x:number;y:number;rx:number;ry:number;angle:number;level:number;index:number};
 /** The largest half-extent of a stamp relative to the brush size (bounds padding). */
 export function stampExtent(s:Stroke){
+ if(s.natureVersion===1)return natureExtent(s);
  const sx=s.tsScaleX??1,sy=(s.tsScaleY??1)*(s.tsRoundness??1),main=Math.max(sx,sy)*.75;
  if(s.brushBlendVersion===4||s.brushBlendVersion===6){
   const tilt=s.tsTilt?2.5:1;
@@ -80,9 +84,10 @@ export function dualDabs(s:Stroke,samples:PaintSamples):StampDab[]{
  }
  return out;
 }
-function stamp(ctx:CanvasRenderingContext2D,dabs:StampDab[],tip:Parameters<typeof paintingNib>[0],hardness:number,texture:number,ox:number,oy:number){
+function stamp(ctx:CanvasRenderingContext2D,dabs:StampDab[],tip:Parameters<typeof paintingNib>[0],hardness:number,texture:number,ox:number,oy:number,nature?:NatureTip){
+ const atlas=nature?secondaryNatureAtlas(nature,texture):undefined;
  for(const d of dabs){if(d.level<=0)continue;const nib=paintingNib(tip,hardness,texture,d.index&3,0);
-  ctx.setTransform(1,0,0,1,0,0);ctx.translate(d.x-ox,d.y-oy);ctx.rotate(d.angle);ctx.scale(d.rx*2,d.ry*2);ctx.globalAlpha=d.level;ctx.drawImage(nib.canvas,nib.x,nib.y,nib.w,nib.h);}
+  ctx.setTransform(1,0,0,1,0,0);ctx.translate(d.x-ox,d.y-oy);ctx.rotate(d.angle);ctx.scale(d.rx*2,d.ry*2);ctx.globalAlpha=d.level;if(atlas){const p=natureTipPixels;ctx.drawImage(atlas,0,0,p,p,-.5,-.5,1,1);}else ctx.drawImage(nib.canvas,nib.x,nib.y,nib.w,nib.h);}
  ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;
 }
 const combine=(mode:DualMode,a:number,b:number,amount:number)=>{
@@ -122,6 +127,7 @@ export function stampChange(before:StampDab[],after:StampDab[]):RasterRegion|und
 const touches=(d:StampDab,box:RasterRegion)=>{const e=dabReach(d);return d.x+e>=box.x&&d.x-e<=box.x+box.width&&d.y+e>=box.y&&d.y-e<=box.y+box.height;};
 export function drawStampStroke(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnType<typeof strokeGeometry>,clip?:RasterRegion,given?:StampPlan):RasterRegion|undefined{
  // Work in document space; the context's transform is applied when drawing.
+ if(s.natureVersion===1){drawNatureStroke(ctx,s,g,clip);return clip;}
  const m=ctx.getTransform(),inv=m.inverse(),corners=[[0,0],[ctx.canvas.width,0],[0,ctx.canvas.height],[ctx.canvas.width,ctx.canvas.height]].map(([x,y])=>({x:inv.a*x+inv.c*y+inv.e,y:inv.b*x+inv.d*y+inv.f}));
  const vl=Math.floor(Math.min(...corners.map(c=>c.x))),vt=Math.floor(Math.min(...corners.map(c=>c.y))),vr=Math.ceil(Math.max(...corners.map(c=>c.x))),vb=Math.ceil(Math.max(...corners.map(c=>c.y)));
  const full=stampBounds(s,1e7,1e7,g);let x0=Math.max(full.x,vl),y0=Math.max(full.y,vt),x1=Math.min(full.x+full.width,vr),y1=Math.min(full.y+full.height,vb);
@@ -134,8 +140,8 @@ export function drawStampStroke(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnTy
  stamp(ac,dabs,s.stampTip,s.stampHardness??.7,s.stampTexture??0,box.x,box.y);
  if(s.dbTip){
   const B=surfaceB=fit(surfaceB,box.width,box.height),bc=B.getContext('2d',{willReadFrequently:true})!;bc.clearRect(0,0,box.width,box.height);
-  stamp(bc,dual,s.dbTip,s.dbHardness??.7,s.dbTexture??0,box.x,box.y);
-  if((s.dbTexture??0)>0)erodePaintingGrain(bc,s.dbTip,(s.dbTexture??0)*.8,box.x,box.y,box.width,box.height);
+  stamp(bc,dual,s.dbTip,s.dbHardness??.7,s.dbTexture??0,box.x,box.y,s.dbNatureTip);
+  if(!s.dbNatureTip&&(s.dbTexture??0)>0)erodePaintingGrain(bc,s.dbTip,(s.dbTexture??0)*.8,box.x,box.y,box.width,box.height);
   const ai=ac.getImageData(0,0,box.width,box.height),bi=bc.getImageData(0,0,box.width,box.height),a=ai.data,b=bi.data,mode=s.dbMode??'multiply',amount=s.dbAmount??1;
   for(let i=3;i<a.length;i+=4){if(!a[i])continue;a[i]=Math.round(255*combine(mode,a[i]/255,b[i]/255,amount));}
   ac.putImageData(ai,0,0);

@@ -111,7 +111,7 @@ worker.onmessage=async({data:j})=>{
    if(!nativeMask||nativeMask.width!==target.width||nativeMask.height!==target.height){nativeMask=new OffscreenCanvas(target.width,target.height);nativeStrokeRaster??=new LiveStrokeRaster();}
    nativeStrokeRaster??=new LiveStrokeRaster();
    const maskContext=nativeMask.getContext('2d')! as unknown as CanvasRenderingContext2D;
-   if(j.final){nativeStrokeRaster.reset();maskContext.reset();drawStroke(maskContext,s,'final',currentGeometry());}
+   if(j.final&&s.natureVersion!==1){nativeStrokeRaster.reset();maskContext.reset();drawStroke(maskContext,s,'final',currentGeometry());}
    else nativeStrokeRaster.paint(maskContext,s,currentGeometry());
    const changed=applyBrushBlendLive(tc,nativeMask as unknown as HTMLCanvasElement,s,bc,!!j.final,s.points,nativeStrokeRaster.lastRegion);
    const updated=finiteRegion(changed??{x:0,y:0,width:1,height:1},target.width,target.height,()=>({x:0,y:0,width:1,height:1}));

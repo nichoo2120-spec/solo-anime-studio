@@ -1,3 +1,4 @@
+import {natureTipFromKind,natureSettings,type NatureControls} from './natureBrush';
 import {silkStrokeMetadata,type SilkBlendControls} from './silkBlend';
 import {brushBlendMetadata,type BrushBlendSettings} from './brushBlend';
 import {brushShapeMetadata,type BrushShapeSettings} from './brushShape';
@@ -58,9 +59,15 @@ function paintStrokeMetadata(s:InkFlowControls&WatercolorControls&ColoringContro
 
 
 /** Ink Paint capture and preview opt in to the versioned edge renderer. */
-export function brushStrokeMetadata(s:InkFlowControls&WatercolorControls&ColoringControls&DryBristleControls&TipMixControls&SilkBlendControls&BrushBlendSettings&BrushShapeSettings&{brushKind?:string;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;textureStrength?:number;stabilization?:number;pressureFlow?:boolean;mixColors?:boolean;nativeMixEnabled?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number},inkPaint=false):Partial<ReturnType<typeof paintStrokeMetadata>>&SilkBlendControls&InkEdgeControls&{pressureOpacity?:false}{
+export function brushStrokeMetadata(s:NatureControls&InkFlowControls&WatercolorControls&ColoringControls&DryBristleControls&TipMixControls&SilkBlendControls&BrushBlendSettings&BrushShapeSettings&{brushKind?:string;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;textureStrength?:number;stabilization?:number;pressureFlow?:boolean;mixColors?:boolean;nativeMixEnabled?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number},inkPaint=false):Partial<ReturnType<typeof paintStrokeMetadata>>&SilkBlendControls&InkEdgeControls&NatureControls&{pressureOpacity?:false}{
  const silk=silkStrokeMetadata(s);
  if(silk.silkBlendVersion)return {...silk,tipSpacing:s.tipSpacing};
+ const natureTip=natureTipFromKind(s.brushKind);
+ if(natureTip)return {
+  ...brushBlendMetadata(s),stampVersion:1,stampTip:'soft-round',...brushShapeMetadata(s),
+  engineVersion:10,liveRefinementVersion:3,natureVersion:1,nature:natureSettings(natureTip,s.nature),
+  flow:s.flow,pressureFlow:s.pressureFlow,
+ };
  if(inkPaint&&!s.bbEnabled&&!s.nativeMixEnabled&&supportsInkTip(s.brushKind)){
   // Isolate Ink Paint from stamp, watercolor and pigment transport routing.
   return {

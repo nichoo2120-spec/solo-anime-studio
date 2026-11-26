@@ -52,7 +52,7 @@ export const DualBrushPanel=memo(function DualBrushPanel({settings:s,patch,libra
  const [name,setName]=useState('');
  if(!canShapeBrush(s))return <p className="hint">This brush is a blender and keeps its own tip.</p>;
  const d=shapeDefaults,on=!!s.dbEnabled,choices=library.presets.filter(p=>p.category!=='Eraser'&&canShapeBrush(p.settings));
- const pick=(p:BrushPreset|undefined)=>{if(!p)return;const t=brushStampTip(p.settings);patch({dbBrushId:p.id,dbBrushName:p.name.slice(0,60),dbTip:t.tip,dbHardness:t.hardness,dbTexture:t.texture,dbEnabled:true});};
+ const pick=(p:BrushPreset|undefined)=>{if(!p)return;const t=brushStampTip(p.settings);patch({dbBrushId:p.id,dbBrushName:p.name.slice(0,60),dbTip:t.tip,dbNatureTip:p.settings.nature?.tip,dbHardness:t.hardness,dbTexture:p.settings.nature?.grain??t.texture,dbEnabled:true});};
  const mode:DualMode=isDualMode(s.dbMode)?s.dbMode:'multiply';
  return <div className="brush-shape-panel" role="group" aria-label="Dual brush settings">
   <label className="check-row"><span>Dual brush (merge two brushes)</span><input aria-label="Use dual brush" type="checkbox" checked={on} onChange={e=>{if(e.target.checked&&!s.dbTip)pick(choices.find(p=>p.settings.brushTip==='chalk')??choices[0]);else patch({dbEnabled:e.target.checked});}}/></label>
