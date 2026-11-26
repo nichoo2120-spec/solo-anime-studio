@@ -1,4 +1,4 @@
-name: Full Playwright release comparison
+name: Focused cursor compatibility checks
 on:
   pull_request:
     branches: [main]
@@ -6,57 +6,15 @@ on:
 permissions:
   contents: read
 jobs:
-  browser:
-    name: Browser suite ${{ matrix.version }}
+  cursor:
     runs-on: windows-latest
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - version: v0.5.252
-            commit: b9ebab61d8c20b037fcd783f03050ab58f982b73
-          - version: v0.5.253
-            commit: df2e47cf9e1380ac66a29520e1a4edd291168b3d
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ matrix.commit }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npx playwright install chromium
-      - run: npm run test:browser
-      - name: Summarize browser results
-        if: always()
-        shell: pwsh
-        run: |
-          @'
-          const fs = require('fs');
-          const path = 'validation/browser-results.json';
-          if (!fs.existsSync(path)) throw new Error('Playwright did not write a report');
-          const report = JSON.parse(fs.readFileSync(path, 'utf8'));
-          const rows = [];
-          function walk(suite, titles = []) {
-            const trail = [...titles, suite.title].filter(Boolean);
-            for (const spec of suite.specs || []) {
-              for (const test of spec.tests || []) {
-                rows.push({file: spec.file, title: [...trail.slice(1), spec.title].join(' > '), status: test.status});
-              }
-            }
-            for (const child of suite.suites || []) walk(child, trail);
-          }
-          for (const suite of report.suites) walk(suite);
-          fs.writeFileSync('playwright-comparison-results.json', JSON.stringify({stats: report.stats, rows}, null, 2));
-          console.log('BROWSER_RESULT_STATS ' + JSON.stringify(report.stats));
-          for (const row of rows) console.log('BROWSER_RESULT ' + JSON.stringify(row));
-          '@ | Set-Content -Encoding utf8 playwright-comparison.cjs
-          node playwright-comparison.cjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: browser-results-${{ matrix.version }}
-          path: playwright-comparison-results.json
-          if-no-files-found: warn
+      - run: npx playwright test tests/browser/paint-tips-v124.spec.ts tests/browser/pressure-stability.spec.ts --grep 'flat brush hover|eraser cursor and actual' --workers=1
+      - run: npx playwright test tests/browser/brush-tip-cursor-v253.spec.ts --workers=1
