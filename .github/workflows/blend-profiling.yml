@@ -1,21 +1,43 @@
-name: Large Blend profiling
+name: Large blend profiling
 on:
   pull_request:
     branches: [main]
-    paths: ['.github/workflows/blend-profiling.yml']
-permissions:
-  contents: read
 jobs:
   profile:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-      - run: npx playwright test tests/browser/large-blend-v254.spec.ts --workers=1
-        env:
-          BLEND_BASELINE_ONLY: '1'
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npx playwright test tests/browser/large-blend-v254.spec.ts --reporter=line
+  validate:
+    runs-on: windows-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx tsc -b
+      - run: npx vitest run
+      - run: npm run build
+  browser:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npx playwright test --shard=${{ matrix.shard }}/6 --grep-invert "v254" --reporter=line

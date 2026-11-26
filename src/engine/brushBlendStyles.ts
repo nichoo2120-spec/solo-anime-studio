@@ -1,4 +1,4 @@
-import {BlendDabBatch,BlendPatchRaster,largeBlendSpacing,type DabBounds} from './blendDabBatch';
+import {BlendDabBatch,BlendPatchRaster,blendPaperField,blendPigmentPower,largeBlendSpacing,type DabBounds} from './blendDabBatch';
 /** v0.5.242 Blend mode v2: every brush family blends in its own style.
  *
  * In plain words:
@@ -33,7 +33,7 @@ import {stampExtent} from './stampBrush';
 
 type Ctx=CanvasRenderingContext2D;
 export const emptyBlendMask=new Uint8Array(TILE*TILE);
-export interface BlendMask{tile(tx:number,ty:number):Uint8Array;prepare?(bounds:DabBounds):void}
+export interface BlendMask{tile(tx:number,ty:number):Uint8Array;spans?(tile:Uint8Array):Uint8Array|undefined;prepare?(bounds:DabBounds):void}
 export type BlendSnapshot={data:Uint8ClampedArray;x:number;y:number;width:number;height:number};
 const clamp01=(v:number)=>v<0?0:v>1?1:v;
 const ease=(a:number,b:number,v:number)=>{const t=v<=a?0:v>=b?1:(v-a)/(b-a);return t*t*(3-2*t);};
@@ -41,6 +41,15 @@ const fade=(t:number)=>t*t*(3-2*t);
 const hash=(x:number,y:number,seed:number)=>{let h=Math.imul(x|0,374761393)^Math.imul(y|0,668265263)^Math.imul(seed|0,2246822519);h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return (h>>>0)/4294967295;};
 function valueNoise(x:number,y:number,seed:number){const ix=Math.floor(x),iy=Math.floor(y),fx=fade(x-ix),fy=fade(y-iy),a=hash(ix,iy,seed),b=hash(ix+1,iy,seed),c=hash(ix,iy+1,seed),d=hash(ix+1,iy+1,seed);return a+(b-a)*fx+(c-a)*fy+(a-b-c+d)*fx*fy;}
 function noise1(x:number,seed:number){const ix=Math.floor(x),t=fade(x-ix),a=hash(ix,0,seed),b=hash(ix+1,0,seed);return a+(b-a)*t;}
+/** Directional grain repeats its integer hash samples across a dab. */
+function cachedDirection(seed:number){
+ const offset=64,values=new Float64Array(193);
+ for(let i=0;i<values.length;i++)values[i]=hash(i-offset,0,seed);
+ return (x:number)=>{
+  const cell=Math.floor(x),i=cell+offset,a=values[i],b=values[i+1];
+  return a+(b-a)*fade(x-cell);
+ };
+}
 function strokeSeed(id:string){let h=2166136261;for(let i=0;i<id.length;i++){h^=id.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
 const NEG_LN=new Float32Array(1025);for(let i=0;i<=1024;i++)NEG_LN[i]=-Math.log(Math.max(1/255,i/1024));
 const negLn=(v:number)=>{const x=(v<0?0:v>1?1:v)*1024,i=Math.floor(x),f=x-i;return i>=1024?NEG_LN[1024]:NEG_LN[i]+(NEG_LN[i+1]-NEG_LN[i])*f;};
@@ -99,16 +108,21 @@ export class BrushBlendGestureV2{
  private readonly patchRaster?:BlendPatchRaster;
  private readonly fallTable?:Float32Array;
  private readonly crisp:boolean;
+ private readonly optimized:boolean;
+ private readonly paperNoise?:(x:number,y:number)=>number;
+ private readonly directionalNoise?: (x:number)=>number;
+ private readonly fineDirectionalNoise?: (x:number)=>number;
  private readonly pickupBase:number;
  private readonly dragLength:number;
  private readonly stampRadius:number;
  private readonly shapeMainScale:number;
  dabs=0;
  constructor(private readonly s:Stroke,width:number,height:number,read:Ctx,private mask:BlendMask,private readonly sample:BlendSnapshot|undefined,carry:Float32Array|undefined,private readonly sampleAt:(src:BlendSnapshot,x:number,y:number,out:Float32Array,o:number)=>void,private readonly v3?:BlendV3Settings,private readonly v4=false,private readonly transformScale=1){
-  const fast=s.blendRasterVersion===1;
+  const fast=s.blendRasterVersion!==undefined;
+  this.optimized=s.blendRasterVersion===2;
   this.batch=fast?new BlendDabBatch():undefined;
-  this.patchRaster=fast?new BlendPatchRaster(s.size):undefined;
-  this.surface=new SilkSurface(width,height,read,fast?(s.size>200?4:2):1);
+  this.patchRaster=fast?new BlendPatchRaster(s.size,this.optimized):undefined;
+  this.surface=new SilkSurface(width,height,read,fast?(s.size>200?4:2):1,this.optimized);
   const hex=/^#[\da-f]{6}$/i.test(s.color)?s.color:'#000000';
   const modeWet=this.v3?modeWetness[this.v3.mode]:1;
   this.p={amount:clamp01(s.bbAmount??.85),pickup:clamp01(s.bbPickup??.5),wet:clamp01(s.bbWetness??.4)*modeWet,mix:clamp01(s.bbMix??.6),flow:clamp01(s.bbFlow??.6),stretch:clamp01(s.bbStretch??.45),load:clamp01(s.bbPaintLoad??0),pressure:s.bbPressure!==false,protect:!!s.bbProtectAlpha,
@@ -116,6 +130,16 @@ export class BrushBlendGestureV2{
   const v6=s.brushBlendVersion===6;
   this.style=v6?effectiveBlendStyle(s.bbStyle??'soft',s.bbRenderStyle):s.bbStyle??'soft';
   this.prof=blendProfiles[this.style];this.seed=strokeSeed(s.id);
+  if(this.optimized&&this.v3?.textureKeep){
+   const seed=this.seed;
+   if(this.style==='dry'){
+    this.paperNoise=(x,y)=>valueNoise(x*.55,y*.55,seed&255);
+    this.directionalNoise=cachedDirection(seed&1023);
+    this.fineDirectionalNoise=cachedDirection((seed>>4)&1023);
+   }else if(this.style==='pencil'){
+    this.paperNoise=(x,y)=>valueNoise(x*.85,y*.85,seed&255)*.7+valueNoise(x*.27,y*.27,(seed>>8)&255)*.3;
+   }else if(this.style==='oil')this.directionalNoise=cachedDirection(seed&1023);
+  }
   if(v6){
    // The paint raster already carries paint flow and tip coverage. Normalize
    // the separate blend controls around their default values.
@@ -329,12 +353,14 @@ export class BrushBlendGestureV2{
   const tooth=waterProfile?.tooth?Math.min(1,grainKeep/.6):0;
   const coverage=.3+.45*(settings?1:pr)*(.5+.5*P.flow),covGain=(style==='air'?2.6:style==='water'?2.2:1)/255;
   const patch=this.patchRaster?.prepare(T,left,top,right,bottom,x,y,inv,PATCH,this.crisp);
-  const reduced=patch?.pixels,shift=patch?.shift??0,stride=patch?.stride??0;
+  const reduced=patch?.pixels,colours=patch?.colours,shift=patch?.shift??0,stride=patch?.stride??0;
   for(let ty=Math.floor(top/TILE);ty*TILE<bottom;ty++)for(let tx=Math.floor(left/TILE);tx*TILE<right;tx++){
    const coverageMask=this.v4?this.mask.tile(tx,ty):undefined;
    if(coverageMask===emptyBlendMask)continue;
    const t=this.surface.tile(tx,ty);if(!t)continue;
    const m=coverageMask??this.mask.tile(tx,ty);
+   const spans=this.optimized?this.mask.spans?.(m):undefined;
+   const paper=this.paperNoise?blendPaperField(t,TILE,this.paperNoise):undefined;
    if(water)this.waterFields(t);
    const wetField=t.wet;
    const x0=Math.max(left,t.x),x1=Math.min(right,t.x+t.w),y0=Math.max(top,t.y),y1=Math.min(bottom,t.y+t.h),f=t.f,changed=t.changed;let any=false;
@@ -342,7 +368,8 @@ export class BrushBlendGestureV2{
     const reducedRow=((py-top)>>shift)*stride;
     const rowV=Math.max(0,Math.min(PATCH-1,(dy+1)*.5*PATCH-.5));
     const rowIndex=this.crisp?Math.round(rowV):Math.min(PATCH-2,Math.floor(rowV));
-    for(let px=x0;px<x1;px++){
+    const row=py-t.y, first=spans?Math.max(x0,t.x+spans[row*2]):x0,last=spans?Math.min(x1,t.x+spans[row*2+1]):x1;
+    for(let px=first;px<last;px++){
      const dx=(px+.5-x)*inv,d2=dx*dx+dy2;if(d2>=1)continue;const c=(py-t.y)*TILE+px-t.x,cov=m[c];if(!cov)continue;
      let d=Math.sqrt(d2);
      if(water){d*=this.v3?1-wetFront*(.35+.65*t.cloud![c]):1+wetFront*t.cloud![c];if(d>=1)continue;if(wetField){const wc=ease(0,.75,1-d);if(wc>wetField[c])wetField[c]=wc;}}
@@ -352,11 +379,11 @@ export class BrushBlendGestureV2{
      // instead of lifting faint texels into a round, soft dab. Legacy strokes
      // retain the previous mask lift byte-for-byte.
      let a=alpha*familyFall*(this.v3?cov/255:Math.sqrt(Math.min(1,cov*covGain)));
-     if(style==='dry'){const across=dx*-dirY+dy*dirX,bristle=noise1(across*15+((seed>>16)&63),seed&1023),grain=valueNoise(px*.55,py*.55,seed&255),mm=grain*.4+bristle*.6,th=1-coverage,cc=clamp01((mm-th+.08)/.16),grainAlpha=cc*cc*(3-2*cc)*(.7+.6*noise1(across*46+((seed>>8)&63),(seed>>4)&1023));a*=this.v3?1+(grainAlpha-1)*this.v3.textureKeep:grainAlpha;}
-     else if(style==='pencil'){const g=valueNoise(px*.85,py*.85,seed&255)*.7+valueNoise(px*.27,py*.27,(seed>>8)&255)*.3,grainAlpha=.2+.8*clamp01((g-.18)/.5);a*=this.v3?1+(grainAlpha-1)*this.v3.textureKeep:grainAlpha;}
+     if(style==='dry'&&(!this.optimized||grainKeep>0)){const across=dx*-dirY+dy*dirX,rough=across*15+((seed>>16)&63),fine=across*46+((seed>>8)&63),bristle=this.directionalNoise?this.directionalNoise(rough):noise1(rough,seed&1023),grain=paper?paper[c]:valueNoise(px*.55,py*.55,seed&255),mm=grain*.4+bristle*.6,th=1-coverage,cc=clamp01((mm-th+.08)/.16),grainAlpha=cc*cc*(3-2*cc)*(.7+.6*(this.fineDirectionalNoise?this.fineDirectionalNoise(fine):noise1(fine,(seed>>4)&1023)));a*=this.v3?1+(grainAlpha-1)*this.v3.textureKeep:grainAlpha;}
+     else if(style==='pencil'&&(!this.optimized||grainKeep>0)){const g=paper?paper[c]:valueNoise(px*.85,py*.85,seed&255)*.7+valueNoise(px*.27,py*.27,(seed>>8)&255)*.3,grainAlpha=.2+.8*clamp01((g-.18)/.5);a*=this.v3?1+(grainAlpha-1)*this.v3.textureKeep:grainAlpha;}
      else if(style==='texture'&&this.v4)a*=1-(1-cov/255)*.55*this.v3!.textureKeep;
      else if(style==='texture'){const g=valueNoise(px*.33,py*.33,seed&255)*.6+valueNoise(px*.11,py*.11,(seed>>8)&255)*.4,grainAlpha=.2+.8*clamp01((g-.3)/.35);a*=this.v3?1+(grainAlpha-1)*this.v3.textureKeep:grainAlpha;}
-     else if(style==='oil'){const across=dx*-dirY+dy*dirX,grainAlpha=.62+.38*noise1(across*9+((seed>>16)&63),seed&1023);a*=this.v3?1+(grainAlpha-1)*this.v3.textureKeep:grainAlpha;}
+     else if(style==='oil'&&(!this.optimized||grainKeep>0)){const across=dx*-dirY+dy*dirX,position=across*9+((seed>>16)&63),grainAlpha=.62+.38*(this.directionalNoise?this.directionalNoise(position):noise1(position,seed&1023));a*=this.v3?1+(grainAlpha-1)*this.v3.textureKeep:grainAlpha;}
      else if(this.material&&water){
       const cloud=t.cloud![c],grain=t.grain![c];
       // Wet pigment travels farther into the mask and collects on the paper
@@ -370,6 +397,20 @@ export class BrushBlendGestureV2{
      else if(this.v3&&(!this.v4||!this.material)&&this.v3.textureKeep>0){const grain=valueNoise(px*.24,py*.24,seed&1023);a*=1+(grain-.5)*.18*this.v3.textureKeep;}
      if(a<=1e-5)continue;if(a>1)a=1;
      const position=reducedRow+((px-left)>>shift)*4;
+     if(colours){
+      const ta=reduced![position+3];
+      if(ta<.5)continue;
+      const o=c*4,pa=f[o+3],na=protect?pa:pa+(Math.max(pa,ta)-pa)*(water?Math.min(1,a*(1+this.waterSpread*.8)):a);
+      if(na<.5)continue;
+      const inP=pa>=.5?1/pa:0;
+      const edgeShade=!water&&!this.crisp&&this.v3!.edgeDarkness?1-this.v3!.edgeDarkness*.14*ease(.68,.99,d):1;
+      for(let ch=0;ch<3;ch++){
+       const tc=colours[position+ch],pc=pa>=.5?f[o+ch]*inP:tc;
+       f[o+ch]=(pc+(tc-pc)*a)*na*edgeShade;
+      }
+      f[o+3]=na;changed[c]=1;any=true;
+      continue;
+     }
      const cu=reduced?0:Math.max(0,Math.min(PATCH-1,(dx+1)*.5*PATCH-.5));
      const iu=reduced?0:this.crisp?Math.round(cu):Math.min(PATCH-2,Math.floor(cu)),iv=rowIndex;
      const fu=reduced||this.crisp?0:cu-iu,fv=this.crisp?0:rowV-iv,k00=(iv*PATCH+iu)*4,k10=this.crisp?k00:k00+4,k01=this.crisp?k00:k00+PATCH*4,k11=this.crisp?k00:k01+4;
@@ -390,7 +431,7 @@ export class BrushBlendGestureV2{
   }
  }
  private bytes(t:Tile,target:Uint8ClampedArray){
-  const {w,h,f,orig,changed}=t,amount=this.p.amount,water=this.water;const edgeOn=!!water&&(water.pool!==0||water.edgeAlpha!==0);// v0.5.243: no edge pass when the edge is off
+  const {w,h,f,orig,changed}=t,amount=this.p.amount,water=this.water,power=this.optimized?blendPigmentPower:Math.pow;const edgeOn=!!water&&(water.pool!==0||water.edgeAlpha!==0);// v0.5.243: no edge pass when the edge is off
   for(let j=0;j<h;j++)for(let i=0;i<w;i++){
    const k=(j*w+i)*4,c=j*TILE+i;
    if(!changed[c]){target[k]=orig[k];target[k+1]=orig[k+1];target[k+2]=orig[k+2];target[k+3]=orig[k+3];continue;}
@@ -403,7 +444,7 @@ export class BrushBlendGestureV2{
     // settles in clouds and paper grain. It deepens the existing colour only.
     const wv=t.wet[c],bank=edgeOn?ease(.04,.5,wv)*(1-ease(.45,.97,wv)):0,am=amount;
     let kk=1+(water.pool*bank+(this.v4?0:water.cloud*(t.cloud![c]-.5)*2*wv+water.grain*(t.grain![c]-.5)*2*wv))*am;kk=kk<.8?.8:kk>1.7?1.7:kk;
-    target[k]=Math.round(255*Math.pow(Math.min(1,r*m/255),kk));target[k+1]=Math.round(255*Math.pow(Math.min(1,g*m/255),kk));target[k+2]=Math.round(255*Math.pow(Math.min(1,b*m/255),kk));
+    target[k]=Math.round(255*power(Math.min(1,r*m/255),kk));target[k+1]=Math.round(255*power(Math.min(1,g*m/255),kk));target[k+2]=Math.round(255*power(Math.min(1,b*m/255),kk));
     const edgeAlpha=this.v4&&this.p.protect?0:water.edgeAlpha;
     target[k+3]=Math.round(Math.min(255,a*(1+edgeAlpha*bank*am)));continue;
    }

@@ -152,7 +152,7 @@ test('large Blend stays within the frame and pen-up budgets on the drawing threa
   const label=`${row.style} ${row.size}px`;
   expect(row.worker,label).toBe(true);
   expect(row.frames,label).toBeGreaterThan(32);
-  expect(row.version,label).toBe(row.size>64?1:0);
+  expect(row.version,label).toBe(row.size>64?2:0);
   if(row.size===300){
    expect.soft(row.p95,label+' frame work').toBeLessThanOrEqual(16);
    expect.soft(row.release,label+' pointer-up dispatch').toBeLessThanOrEqual(50);

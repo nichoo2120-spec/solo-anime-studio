@@ -113,3 +113,104 @@ test('profiles each Blend family and style on a 1920 × 1080 canvas',async({page
   }
  }
 });
+
+test('large Blend preserves responsive input, a canonical worker result and exact undo',async({page})=>{
+ test.skip(baselineOnly,'Production input comparison runs with both raster versions.');
+ test.setTimeout(210_000);
+ await page.goto('/');
+ const rows=await page.evaluate(async()=>{
+  const load=(path:string)=>import(path);
+  const {newProject,activeLayer}=await load('/src/core/model.ts');
+  const {DocumentStore}=await load('/src/core/history.ts');
+  const {StudioEngine}=await load('/src/engine/StudioEngine.ts');
+  const {LayerRenderer}=await load('/src/engine/renderer.ts');
+  const {stockPresets}=await load('/src/core/brushes.ts');
+  const width=1920,height=1080;
+  const frame=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+  const rows=[];
+  const styles=[
+   ['Normal','soft-paint','auto'],['Watercolor','water-flat','auto'],['Oil','flat','auto'],
+   ['Airbrush','color-air','auto'],['Pencil','hb','auto'],['Ink','g-pen','auto'],
+   ['Marker','marker','auto'],['Texture','color-texture','auto'],['Dry brush','dry','auto'],
+   ['Soft blur','soft-paint','blur'],['Wet','soft-paint','wet'],['Smudge','soft-paint','smudge'],['Dry','soft-paint','dry'],
+   ...['soft','wet','smudge','dry'].map(mode=>['Silk '+mode,'silk-blend','silk',mode]),
+  ];
+  for(const size of [300,500])for(const [style,id,renderStyle,silkMode] of styles)for(const version of [1,2]){
+   const project=newProject('Blend latency',width,height);
+   const paint=(x:number,color:string)=>({
+    id:color,kind:'stroke',tool:'brush',size:550,pressure:false,response:1,opacity:1,color,
+    points:[{x,y:160,p:1},{x,y:920,p:1}],
+   });
+   activeLayer(project).operations=[paint(510,'#eb3131'),paint(1090,'#145adc')];
+   const store=new DocumentStore(project),host=document.createElement('div'),canvas=document.createElement('canvas');
+   host.style.cssText='position:fixed;inset:0';canvas.style.cssText='display:block;width:1920px;height:1080px';
+   host.append(canvas);document.body.append(host);
+   let held=false;canvas.setPointerCapture=()=>{held=true;};canvas.hasPointerCapture=()=>held;canvas.releasePointerCapture=()=>{held=false;};
+   const engine=new StudioEngine(canvas,store,()=>{}),pins=stockPresets.find((p:{id:string})=>p.id===id).settings;
+   try{
+    engine.setView({x:0,y:0,zoom:1,rotation:0});
+    engine.setInput('brush',{...pins,size,bbEnabled:true,bbRenderStyle:renderStyle,silkMode,pressureWidth:false});
+    await frame();await frame();
+    const stamp=(type:string,x:number,coalesced?:number[])=>{
+     const event=(x:number)=>new PointerEvent(type,{pointerId:7,isPrimary:true,button:0,buttons:type==='pointerup'?0:1,
+      pointerType:'pen',clientX:x,clientY:525+Math.sin(x*.012)*22,pressure:.73});
+     const last=event(x);
+     if(coalesced)Object.defineProperty(last,'getCoalescedEvents',{value:()=>coalesced.map(event)});
+     canvas.dispatchEvent(last);
+    };
+    const cost:number[]=[],render=engine.render.bind(engine);
+    let undoAt:number|undefined,undo=0;
+    engine.render=()=>{
+     const t=performance.now();
+     render();
+     if(engine.drawing)cost.push(performance.now()-t);
+     if(undoAt!==undefined){undo=performance.now()-undoAt;undoAt=undefined;}
+    };
+    stamp('pointerdown',424);
+    const selectedVersion=engine.stroke.blendRasterVersion;
+    engine.stroke.blendRasterVersion=version;
+    for(let i=1;i<=18;i++){
+     const x=424+i*39;
+     stamp('pointermove',x,[x-26,x-13,x]);
+     await frame();
+    }
+    const t=performance.now();stamp('pointerup',1138);const penUp=performance.now()-t;
+    const painted=store.getSnapshot(),operation=activeLayer(painted).operations.at(-1);
+    await engine.renderer.whenSettled();
+    const settled=performance.now()-t;
+    const canonical=new LayerRenderer(false);
+    const sample=(renderer:any,project:any)=>renderer.get(activeLayer(project),project).getContext('2d').getImageData(535,400,500,236).data as Uint8ClampedArray;
+    let parity=0,undoMismatch=0;
+    if(version===2){
+     const a=sample(engine.renderer,painted),b=sample(canonical,painted);
+     parity=a.reduce((n,v,i)=>n+Number(v!==b[i]),0);
+    }
+    undoAt=performance.now();engine.historyNavigation('undo');
+    await frame();if(undoAt!==undefined)await frame();
+    if(version===2){
+     const restored=store.getSnapshot(),a=sample(engine.renderer,restored),b=sample(canonical,project);
+     undoMismatch=a.reduce((n,v,i)=>n+Number(v!==b[i]),0);
+    }
+    canonical.clear();
+    cost.sort((a,b)=>a-b);
+    rows.push({style,size,version,selectedVersion,stored:operation.blendRasterVersion,worker:engine.blendWorker.available(),
+     frame:cost[Math.ceil(cost.length*.95)-1],frames:cost.length,penUp,settled,undo,parity,undoMismatch});
+   }finally{engine.dispose();host.remove();}
+  }
+  return rows;
+ });
+ for(const row of rows){
+  console.log('BLEND_V254_INPUT '+JSON.stringify(row));
+  if(row.version!==2)continue;
+  const id=row.style+' '+row.size;
+  expect.soft(row.selectedVersion,id).toBe(2);
+  expect.soft(row.stored,id).toBe(2);
+  expect.soft(row.worker,id).toBe(true);
+  expect.soft(row.frames,id).toBeGreaterThan(12);
+  expect.soft(row.parity,id+' worker/replay bytes').toBe(0);
+  expect.soft(row.undoMismatch,id+' undo bytes').toBe(0);
+  expect.soft(row.frame,id+' main-thread frame').toBeLessThanOrEqual(16);
+  expect.soft(row.penUp,id+' pen-up handler').toBeLessThanOrEqual(50);
+  expect.soft(row.undo,id+' undo to display').toBeLessThanOrEqual(50);
+ }
+});

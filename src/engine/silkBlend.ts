@@ -1,4 +1,4 @@
-import {BlendDabBatch,BlendPatchRaster,largeBlendSpacing,type DabBounds} from './blendDabBatch';
+import {BlendDabBatch,BlendPatchRaster,blendPaperField,blendPigmentPower,largeBlendSpacing,type DabBounds} from './blendDabBatch';
 /** v0.5.238 Silk Blend renderer (new brush, written from scratch).
  *
  * How it works, in plain words:
@@ -19,7 +19,7 @@ import type {SilkMode} from '../core/silkBlend';
 import {paintNoise} from './paintingTips';
 
 export const TILE=64,PATCH=20,CELLS=PATCH*PATCH;
-export type Tile={x:number;y:number;w:number;h:number;f:Float32Array;orig:Uint8ClampedArray;changed:Uint8Array;dirty:boolean;touched:boolean;wet?:Float32Array;cloud?:Float32Array;grain?:Float32Array;pickup?:Float32Array;pickupEpoch?:Uint32Array;output?:Uint8ClampedArray};
+export type Tile={x:number;y:number;w:number;h:number;f:Float32Array;orig:Uint8ClampedArray;changed:Uint8Array;dirty:boolean;touched:boolean;wet?:Float32Array;cloud?:Float32Array;grain?:Float32Array;pickup?:Float32Array;pickupEpoch?:Uint32Array;output?:Uint8ClampedArray;paper?:Float64Array};
 
 /** Lazily loaded premultiplied float copy of the source layer, 64 px tiles. */
 export class SilkSurface{
@@ -33,7 +33,7 @@ export class SilkSurface{
  private sourceX=0;
  private sourceY=0;
 
- constructor(readonly width:number,readonly height:number,private readonly read:CanvasRenderingContext2D,private readonly pickupScale=1){this.cols=Math.ceil(width/TILE);this.rows=Math.ceil(height/TILE);}
+ constructor(readonly width:number,readonly height:number,private readonly read:CanvasRenderingContext2D,private readonly pickupScale=1,private readonly reuseUpload=false){this.cols=Math.ceil(width/TILE);this.rows=Math.ceil(height/TILE);}
  tile(tx:number,ty:number):Tile|undefined{
   if(tx<0||ty<0||tx>=this.cols||ty>=this.rows)return undefined;
   const key=ty*this.cols+tx;if(key===this.lastKey)return this.last;
@@ -127,7 +127,14 @@ export class SilkSurface{
   const box=union(this.batchBounds(all),previous);
   if(!box)return undefined;
   const {x,y,width,height}=box,right=x+width,bottom=y+height;
-  if(!this.upload||this.upload.width!==width||this.upload.height!==height)this.upload=ctx.createImageData(width,height);
+  if(this.reuseUpload){
+   if(!this.upload||this.upload.width<width||this.upload.height<height){
+    const grow=(needed:number,limit:number)=>Math.min(limit,2**Math.ceil(Math.log2(needed)));
+    this.upload=ctx.createImageData(grow(Math.max(width,this.upload?.width??0),this.width),grow(Math.max(height,this.upload?.height??0),this.height));
+   }
+  }else if(!this.upload||this.upload.width!==width||this.upload.height!==height){
+   this.upload=ctx.createImageData(width,height);
+  }
   const img=this.upload;
   // A winding stroke can leave holes between dirty tiles on the final
   // upload. Seed those from the same immutable source as the ordinary tiles.
@@ -161,7 +168,7 @@ export class SilkSurface{
  /** Unpremultiplied bytes for putImageData. Untouched pixels keep their exact
   * original bytes, so a Silk stroke never nudges pixels it did not paint. */
  bytes(t:Tile,target:Uint8ClampedArray,water?:WaterFinish){
-  const {w,h,f,orig,changed}=t;
+  const {w,h,f,orig,changed}=t,power=this.reuseUpload?blendPigmentPower:Math.pow;
   for(let j=0;j<h;j++)for(let i=0;i<w;i++){
    const k=(j*w+i)*4,c=j*TILE+i;
    if(!changed[c]){target[k]=orig[k];target[k+1]=orig[k+1];target[k+2]=orig[k+2];target[k+3]=orig[k+3];continue;}
@@ -174,7 +181,7 @@ export class SilkSurface{
     // it never adds a new hue.
     const w=t.wet[c],bank=water.pool!==0||water.edgeAlpha!==0?ease(.04,.5,w)*(1-ease(.45,.97,w)):0;// v0.5.243: skip the edge pass when off
     let kk=1+water.pool*bank+water.cloud*(t.cloud![c]-.5)*2*w+water.grain*(t.grain![c]-.5)*2*w;kk=kk<.8?.8:kk>1.7?1.7:kk;
-    target[k]=Math.round(255*Math.pow(Math.min(1,f[o]*m/255),kk));target[k+1]=Math.round(255*Math.pow(Math.min(1,f[o+1]*m/255),kk));target[k+2]=Math.round(255*Math.pow(Math.min(1,f[o+2]*m/255),kk));
+    target[k]=Math.round(255*power(Math.min(1,f[o]*m/255),kk));target[k+1]=Math.round(255*power(Math.min(1,f[o+1]*m/255),kk));target[k+2]=Math.round(255*power(Math.min(1,f[o+2]*m/255),kk));
     target[k+3]=Math.round(Math.min(255,a*(1+water.edgeAlpha*bank)));continue;
    }
    target[k]=Math.round(f[o]*m);target[k+1]=Math.round(f[o+1]*m);target[k+2]=Math.round(f[o+2]*m);target[k+3]=Math.round(a);
@@ -225,10 +232,10 @@ export class SilkGesture{
  private readonly mode:SilkMode;private tune:ModeTuning;private readonly seed:number;
  dabs=0;
  constructor(private readonly s:Stroke,width:number,height:number,read:CanvasRenderingContext2D){
-  const fast=s.blendRasterVersion===1;
+  const fast=s.blendRasterVersion!==undefined;
   this.batch=fast?new BlendDabBatch():undefined;
   this.patchRaster=fast?new BlendPatchRaster(s.size):undefined;
-  this.surface=new SilkSurface(width,height,read,fast?(s.size>200?4:2):1);
+  this.surface=new SilkSurface(width,height,read,fast?(s.size>200?4:2):1,s.blendRasterVersion===2);
   this.mode=s.silkMode??'soft';this.tune=tuning(this.mode,clamp01(s.silkWetness??.35));this.seed=strokeSeed(s.id);
   if(s.silkBlendVersion===2&&this.mode==='wet'){
    // v0.5.239 watercolor Wet. Saved v1 Wet strokes keep the v0.5.238 path above.
@@ -239,7 +246,19 @@ export class SilkGesture{
    this.water={pool:str*(.35+.65*wet)*.3*ek,cloud:(.05+.1*wet)*(.4+.6*str),grain:clamp01(s.silkTexture??0)*.18,edgeAlpha:str*(.12+.18*wet)*ek};
    this.cloudSize=Math.max(12,s.size*.35);this.blurPasses=1+Math.round(wet*2);
   }
+  if(s.blendRasterVersion===2){
+   if((s.silkTexture??0)>0){
+    const seed=this.seed;
+    this.paperNoise=(x,y)=>valueNoise(x*.55,y*.55,seed&255)*.6+valueNoise(x*.17,y*.17,(seed>>8)&255)*.4;
+   }
+   if(!this.water){
+    this.falloffSquared=new Float32Array(8193);
+    for(let i=0;i<=8192;i++)this.falloffSquared[i]=this.tune.falloff(Math.sqrt(i/8192));
+   }
+  }
  }
+ private paperNoise?: (x:number,y:number)=>number;
+ private falloffSquared?:Float32Array;
  private water?:WaterFinish;private cloudSize=12;private blurPasses=1;
  /** Coherent watercolor fields for one tile (stroke seed, canvas coordinates): a
   * domain-warped broad "cloud" like the watercolor brush's pigment variation,
@@ -397,6 +416,7 @@ export class SilkGesture{
   for(let ty=Math.floor(top/TILE);ty*TILE<bottom;ty++)for(let tx=Math.floor(left/TILE);tx*TILE<right;tx++){
    const t=this.surface.tile(tx,ty);if(!t)continue;
    if(water)this.waterFields(t);
+   const paper=this.paperNoise?blendPaperField(t,TILE,this.paperNoise):undefined;
    const x0=Math.max(left,t.x),x1=Math.min(right,t.x+t.w),y0=Math.max(top,t.y),y1=Math.min(bottom,t.y+t.h),f=t.f,changed=t.changed;let any=false;
    for(let py=y0;py<y1;py++){const dy=(py+.5-y)*inv,dy2=dy*dy;if(dy2>=1)continue;
     const reducedRow=((py-top)>>shift)*stride;
@@ -409,16 +429,19 @@ export class SilkGesture{
       const c=(py-t.y)*TILE+px-t.x,edge=Math.sqrt(d2)*(1+wetFront*t.cloud![c]);if(edge>=1)continue;
       const cov=ease(0,.75,1-edge);if(cov>t.wet![c])t.wet![c]=cov;
       a=alpha*falloff(edge);changed[c]=1;any=true;
-     }else a=alpha*falloff(Math.sqrt(d2));
+     }else a=alpha*(this.falloffSquared?this.falloffSquared[(d2*8192+.5)|0]:falloff(Math.sqrt(d2)));
      if(tex>0){
-      const grain=valueNoise(px*.55,py*.55,seed&255)*.6+valueNoise(px*.17,py*.17,(seed>>8)&255)*.4;
+      const grain=paper?paper[(py-t.y)*TILE+px-t.x]:valueNoise(px*.55,py*.55,seed&255)*.6+valueNoise(px*.17,py*.17,(seed>>8)&255)*.4;
       if(dry){const across=dx*-dirY+dy*dirX,bristle=noise1(across*15+((seed>>16)&63),seed&1023),m=grain*.45+bristle*.55,th=1-coverage,c=clamp01((m-th+.09)/.18);a*=1-tex*(1-c*c*(3-2*c));}
       else a*=1-tex*.6*(1-grain);
      }
      if(a<=1e-5)continue;
      const position=reducedRow+((px-left)>>shift)*4;
      const o=((py-t.y)*TILE+px-t.x)*4;
-     for(let c=0;c<4;c++)f[o+c]+=(reduced[position+c]-f[o+c])*a;
+     f[o]+=(reduced[position]-f[o])*a;
+     f[o+1]+=(reduced[position+1]-f[o+1])*a;
+     f[o+2]+=(reduced[position+2]-f[o+2])*a;
+     f[o+3]+=(reduced[position+3]-f[o+3])*a;
      changed[o>>2]=1;any=true;
     }
    }

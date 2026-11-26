@@ -52,15 +52,17 @@ export class BlendPatchRaster {
  private indices:Uint8Array;
  private fractions:Float32Array;
  pixels:Float32Array;
+ colours?:Float64Array;
  stride=0;
  readonly shift:number;
 
- constructor(size:number){
+ constructor(size:number,private readonly normalize=false){
   this.shift=size>200?2:1;
   const side=Math.ceil((size*1.35+12)/(1<<this.shift));
   this.indices=new Uint8Array(side);
   this.fractions=new Float32Array(side);
   this.pixels=new Float32Array(side*side*4);
+  if(normalize)this.colours=new Float64Array(this.pixels.length);
  }
 
  ensure(width:number,height:number){
@@ -69,7 +71,10 @@ export class BlendPatchRaster {
    this.indices=new Uint8Array(cols);
    this.fractions=new Float32Array(cols);
   }
-  if(cols*rows*4>this.pixels.length)this.pixels=new Float32Array(cols*rows*4);
+  if(cols*rows*4>this.pixels.length){
+   this.pixels=new Float32Array(cols*rows*4);
+   if(this.normalize)this.colours=new Float64Array(this.pixels.length);
+  }
  }
 
  prepare(target:Float32Array,left:number,top:number,right:number,bottom:number,x:number,y:number,inv:number,patch:number,nearest:boolean){
@@ -95,6 +100,42 @@ export class BlendPatchRaster {
     }
    }
   }
+  if(this.colours){
+   for(let i=0;i<rows*this.stride;i+=4){
+    const alpha=this.pixels[i+3],reciprocal=alpha>=.5?1/alpha:0;
+    this.colours[i]=this.pixels[i]*reciprocal;
+    this.colours[i+1]=this.pixels[i+1]*reciprocal;
+    this.colours[i+2]=this.pixels[i+2]*reciprocal;
+   }
+  }
   return this;
  }
+}
+
+const pigmentSteps=512,gammaSteps=256;
+let pigmentPower:Float32Array|undefined;
+
+/** Approximate the wet finish to sub-byte precision. Interpolate pigment
+ * between adjacent samples, with less than one displayed level of gamma error. */
+export function blendPigmentPower(pigment:number,gamma:number){
+ if(gamma===1)return pigment;
+ if(!pigmentPower){
+  const table=new Float32Array((pigmentSteps+1)*(gammaSteps+1));
+  for(let y=0;y<=gammaSteps;y++){
+   const power=.8+.9*y/gammaSteps;
+   for(let x=0;x<=pigmentSteps;x++)table[y*(pigmentSteps+1)+x]=(x/pigmentSteps)**power;
+  }
+  pigmentPower=table;
+ }
+ const u=pigment*pigmentSteps,x=Math.min(pigmentSteps-1,Math.floor(u));
+ const row=Math.round((gamma-.8)/.9*gammaSteps)*(pigmentSteps+1),a=pigmentPower[row+x],b=pigmentPower[row+x+1];
+ return a+(b-a)*(u-x);
+}
+
+export function blendPaperField(tile:{x:number;y:number;w:number;h:number;paper?:Float64Array},size:number,noise:(x:number,y:number)=>number){
+ if(tile.paper)return tile.paper;
+ const values=new Float64Array(size*size);
+ for(let y=0;y<tile.h;y++)for(let x=0;x<tile.w;x++)values[y*size+x]=noise(x+tile.x,y+tile.y);
+ tile.paper=values;
+ return values;
 }
