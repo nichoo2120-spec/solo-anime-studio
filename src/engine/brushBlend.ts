@@ -30,6 +30,7 @@ type Readable={getContext(kind:'2d',options?:unknown):unknown;width:number;heigh
 class MaskReader{
  private tiles=new Map<number,Uint8Array>();
  private batchData?:ImageData;
+ private rowSpans=new WeakMap<Uint8Array,Uint8Array>();
  private batchX=0;
  private batchY=0;
  invalidate(bounds?:RasterRegion){
@@ -57,21 +58,38 @@ class MaskReader{
   for(let ty=startY;ty<endY;ty++)for(let tx=startX;tx<endX;tx++)this.tile(tx,ty);
   this.batchData=undefined;
  }
- constructor(private readonly ctx:Ctx,private readonly ox:number,private readonly oy:number,private readonly width:number,private readonly height:number){}
+ constructor(private readonly ctx:Ctx,private readonly ox:number,private readonly oy:number,private readonly width:number,private readonly height:number,private readonly trackSpans=false){}
 
+ spans(tile:Uint8Array){return this.rowSpans.get(tile);}
  tile(tx:number,ty:number){
   const key=ty*65536+tx;let t=this.tiles.get(key);
   if(!t){t=emptyBlendMask;const x=tx*TILE,y=ty*TILE,w=Math.min(TILE,this.width-x),h=Math.min(TILE,this.height-y);
    const sx=x-this.ox,sy=y-this.oy,cw=this.ctx.canvas.width,ch=this.ctx.canvas.height;
    const ix=Math.max(0,sx),iy=Math.max(0,sy),iw=Math.min(cw,sx+w)-ix,ih=Math.min(ch,sy+h)-iy;
    if(iw>0&&ih>0){
+    let spans:Uint8Array|undefined;
     const batch=this.batchData;
     const d=batch?.data??this.ctx.getImageData(ix,iy,iw,ih).data;
     const stride=batch?.width??iw,offset=batch?(iy-this.batchY)*stride+ix-this.batchX:0;
-    for(let j=0;j<ih;j++)for(let i=0;i<iw;i++){
-     const alpha=d[(offset+j*stride+i)*4+3];if(!alpha)continue;
-     if(t===emptyBlendMask)t=new Uint8Array(TILE*TILE);
-     t[(iy-sy+j)*TILE+ix-sx+i]=alpha;
+    for(let j=0;j<ih;j++){
+     const row=iy-sy+j,origin=ix-sx,source=(offset+j*stride)*4+3;
+     let first=TILE,last=0;
+     for(let i=0;i<iw;i++){
+      const alpha=d[source+i*4];if(!alpha)continue;
+      if(t===emptyBlendMask){
+       t=new Uint8Array(TILE*TILE);
+       if(this.trackSpans){
+        spans=new Uint8Array(TILE*2);
+        for(let y=0;y<TILE;y++)spans[y*2]=TILE;
+        this.rowSpans.set(t,spans);
+       }
+      }
+      const column=origin+i;
+      t[row*TILE+column]=alpha;
+      if(first===TILE)first=column;
+      last=column+1;
+     }
+     if(spans){spans[row*2]=first;spans[row*2+1]=last;}
     }
    }
    this.tiles.set(key,t);}
@@ -263,7 +281,7 @@ const union=(a:RasterRegion|undefined,b:RasterRegion|undefined)=>{if(!a)return b
  * holds the brush's own final stroke raster at (maskX, maskY). */
 export function renderBrushBlend(ctx:Ctx,mask:Readable,s:Stroke,maskX=0,maskY=0,read?:Ctx,previous?:RasterRegion):RasterRegion|undefined{
  if(s.opacity<=0||!s.points.length)return undefined;
- const W=ctx.canvas.width,H=ctx.canvas.height,reader=new MaskReader(mask.getContext('2d') as Ctx,maskX,maskY,W,H);
+ const W=ctx.canvas.width,H=ctx.canvas.height,reader=new MaskReader(mask.getContext('2d') as Ctx,maskX,maskY,W,H,s.blendRasterVersion===2);
  const g=gestureFor(s,W,H,read??ctx,reader);g.advance(blendPath(s));return g.flush(ctx,true,previous);
 }
 
@@ -277,11 +295,16 @@ function gestureFor(s:Stroke,W:number,H:number,read:Ctx,reader:MaskReader):AnyGe
 }
 let live:{id:string;target:unknown;gesture:AnyGesture;mask?:MaskReader;source?:Readable}|undefined;
 export function resetBrushBlend(){live=undefined;}
+export function brushBlendNeedsDab(ctx:Ctx,s:Stroke){
+ const current=live;
+ return !current||current.id!==s.id||current.target!==ctx.canvas||
+  !(current.gesture instanceof BrushBlendGestureV3)||current.gesture.needsDab(s.points);
+}
 export function applyBrushBlendLive(ctx:Ctx,mask:Readable,s:Stroke,base:Readable,final:boolean,livePath:Point[],maskDirty?:RasterRegion):RasterRegion|undefined{
  if(s.opacity<=0||!s.points.length)return undefined;
  const read=base.getContext('2d') as Ctx,W=ctx.canvas.width,H=ctx.canvas.height;
  if(final){
-  if(s.blendRasterVersion===1){
+  if(s.blendRasterVersion!==undefined){
    const previous=live&&live.id===s.id&&live.target===ctx.canvas?live.gesture.surface.batchBounds(true):undefined;
    live=undefined;
    return renderBrushBlend(ctx,mask,s,0,0,read,previous);
@@ -291,8 +314,8 @@ export function applyBrushBlendLive(ctx:Ctx,mask:Readable,s:Stroke,base:Readable
  }
  let restored:RasterRegion|undefined;
  if(live&&(live.id!==s.id||live.target!==ctx.canvas||live.gesture.pointCount>livePath.length)){if(live.id===s.id&&live.target===ctx.canvas)restored=live.gesture.restore(ctx);live=undefined;}
- const previous=s.blendRasterVersion===1&&live?.source===mask?live.mask:undefined;
- const reader=previous??new MaskReader(mask.getContext('2d') as Ctx,0,0,W,H);
+ const previous=s.blendRasterVersion!==undefined&&live?.source===mask?live.mask:undefined;
+ const reader=previous??new MaskReader(mask.getContext('2d') as Ctx,0,0,W,H,s.blendRasterVersion===2);
  previous?.invalidate(maskDirty);
  if(!live)live={id:s.id,target:ctx.canvas,gesture:gestureFor(s,W,H,read,reader),mask:reader,source:mask};
  else{live.gesture.setMask(reader);live.mask=reader;live.source=mask;}

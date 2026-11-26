@@ -8,7 +8,7 @@ export const workerBlendEligible=(s:Pick<Stroke,'tool'|'coloringEngine'|'colorin
 export type NativeMixSeed={mask:HTMLCanvasElement;paint:HTMLCanvasElement;box:{x:number;y:number;w:number;h:number};tiles:Map<string,{x:number;y:number;w:number;h:number}>};
 export type BlendBaseline={pixels:Uint8ClampedArray;region:RasterRegion;seed?:NativeMixSeed};
 export type BlendDelta={mask:HTMLCanvasElement;patch:HTMLCanvasElement;tiles:Map<string,{x:number;y:number;w:number;h:number}>;revision:number;final?:boolean;group?:BlendBaseline;support?:RasterRegion;dirty?:RasterRegion;box?:{x:number;y:number;w:number;h:number}};
-type Reply={maskData?:Uint8ClampedArray;paintData?:Uint8ClampedArray;token:number;serial:number;deltaMask?:ImageBitmap;deltaPaint?:ImageBitmap;tiles?:{x:number;y:number;w:number;h:number}[];support?:RasterRegion;bitmap?:ImageBitmap;region?:RasterRegion;final?:boolean;error?:string};
+type Reply={unchanged?:true;maskData?:Uint8ClampedArray;paintData?:Uint8ClampedArray;token:number;serial:number;deltaMask?:ImageBitmap;deltaPaint?:ImageBitmap;tiles?:{x:number;y:number;w:number;h:number}[];support?:RasterRegion;bitmap?:ImageBitmap;region?:RasterRegion;final?:boolean;error?:string};
 type Job={token:number;id:string;ownershipBase?:BlendBaseline;source:HTMLCanvasElement;signature:string;ready:boolean;inFlight:boolean;queued?:{stroke:Stroke;final:boolean};geometry?:unknown;pointsRef?:Point[];pointCount:number;bitmapSent?:boolean;lastPoint?:Point;resolve?:(surface:HTMLCanvasElement|undefined)=>void;timer?:ReturnType<typeof setTimeout>};
 
 /** Keep the existing browser Canvas pigment calculations off the input thread.
@@ -82,6 +82,7 @@ export class LiveBlendWorker{
  private receive(reply:Reply){
   const j=this.job;if(!j||reply.token!==j.token){reply.bitmap?.close();reply.deltaMask?.close();reply.deltaPaint?.close();return;}
   if(j.timer)clearTimeout(j.timer);j.timer=undefined;j.inFlight=false;
+  if(reply.unchanged){this.flush(j);return;}
   if(reply.error||!reply.bitmap||!reply.region){reply.bitmap?.close();reply.deltaMask?.close();reply.deltaPaint?.close();this.fail();return;}
   const r=reply.region;let displayRegion=r;
   if(this.delta){const oldBox=this.delta.box;if((!reply.deltaMask||!reply.deltaPaint)&&(!reply.maskData||!reply.paintData)||!reply.tiles){reply.bitmap?.close();reply.deltaMask?.close();reply.deltaPaint?.close();this.fail();return;}
