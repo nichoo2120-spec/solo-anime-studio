@@ -18,6 +18,11 @@ export const naturePresets=[
  ['water-ripples','Water ripples','#89dcdf','#358da9'],
  ['water-sparkle','Sea sparkle','#ffffec','#9de7ef'],
  ['water-crest','Wave crest','#b8f3ee','#399eb2'],
+ ['flowers','Flowers','#ec99a9','#ebc682'],
+ ['wood-grain','Bark / wood grain','#bf9675','#735546'],
+ ['dirt-soil','Dirt / soil','#ad845e','#7d694f'],
+ ['snow','Snow','#f4faff','#bbd8f5'],
+ ['stars','Stars','#fff4d0','#bad7ff'],
 ] as const;
 export type NatureTip=typeof naturePresets[number][0];
 export const isNatureTip=(value:unknown):value is NatureTip=>naturePresets.some(([id])=>id===value);
@@ -55,8 +60,8 @@ const numeric=(v:unknown,min:number,max:number,d:number)=>typeof v==='number'&&N
 
 export function natureSettings(tip:NatureTip,raw?:Partial<NatureSettings>):NatureSettings{
  const preset=naturePresets.find(([id])=>id===tip)!;
- const grass=tip.startsWith('grass'),cloud=tip.startsWith('cloud'),water=tip.startsWith('water');
- const result:NatureSettings={tip,second:preset[3],scatter:grass?.14:cloud?.23:.32,count:tip==='foliage-clump'||cloud?1:2,sizeJitter:.35,rotation:grass?12:water||cloud?9:75,hue:8,saturation:12,brightness:14,density:.85,spacing:tip==='grass-edge'?.23:.34,opacityJitter:.25,grain:cloud?.09:.18,scale:1,seed:1250+naturePresets.indexOf(preset),follow:false,mix:!tip.includes('foam')&&!tip.includes('highlight'),flipX:true,flipY:false};
+ const grass=tip.startsWith('grass'),cloud=tip.startsWith('cloud'),water=tip.startsWith('water'),bark=tip==='wood-grain';
+ const result:NatureSettings={tip,second:preset[3],scatter:grass?.14:bark?.08:cloud?.23:.32,count:tip==='foliage-clump'||cloud||bark?1:2,sizeJitter:.35,rotation:grass?12:bark?6:water||cloud?9:75,hue:8,saturation:12,brightness:14,density:.85,spacing:tip==='grass-edge'?.23:.34,opacityJitter:.25,grain:cloud?.09:.18,scale:1,seed:1250+naturePresets.indexOf(preset),follow:false,mix:!tip.includes('foam')&&!tip.includes('highlight'),flipX:true,flipY:false};
  if(!raw)return result;
  for(const [key,,min,max] of natureNumbers){const value=numeric(raw[key],min,max,result[key]);result[key]=key==='count'||key==='seed'?Math.round(value):value;}
  for(const [key] of natureFlags)if(typeof raw[key]==='boolean')result[key]=raw[key];

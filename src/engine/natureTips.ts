@@ -124,6 +124,44 @@ function generate(tip:NatureTip){
   c.fillStyle=gray(178);c.beginPath();c.moveTo(.06,.69);c.bezierCurveTo(.34,.72,.35,.12,.73,.21);c.bezierCurveTo(.94,.27,.90,.46,.68,.42);c.bezierCurveTo(.55,.38,.56,.62,.92,.65);c.quadraticCurveTo(.54,.85,.06,.69);c.fill();
   c.beginPath();c.moveTo(.14,.66);c.bezierCurveTo(.35,.62,.38,.21,.68,.22);c.quadraticCurveTo(.89,.23,.81,.38);c.strokeStyle='#fff';c.lineWidth=.052;c.lineCap='round';c.stroke();
   for(let i=0;i<7;i++)ellipse(c,.59+random(i,1)*.30,.09+random(i,2)*.13,.012,.014,248);
+ }else if(tip==='flowers'){
+  for(let i=0;i<6;i++){
+   const x=.17+i%3*.30+random(i,1)*.06,y=.25+Math.floor(i/3)*.40+random(i,2)*.07,r=.055+random(i,3)*.05;
+   leaf(c,x-r,y+r*.9,r*.95,r*.47,-.6,false,151);
+   for(let j=0;j<5;j++){
+    const a=j*Math.PI*2/5+random(i,5)*.8;
+    ellipse(c,x+Math.cos(a)*r,y+Math.sin(a)*r,r*.66,r*.48,226+Math.floor(j*5.8),a);
+   }
+   ellipse(c,x,y,r*.45,r*.45,149);
+   ellipse(c,x-r*.09,y-r*.10,r*.24,r*.24,233);
+  }
+ }else if(tip==='wood-grain'){
+  for(let i=0;i<13;i++){
+   const x=.08+i*.069,y=.03+random(i,2)*.24,h=.54+random(i,3)*.35;
+   c.beginPath();c.moveTo(x,y);c.bezierCurveTo(x+.15,y+h*.18,x-.13,y+h*.57,x+.014,y+h);
+   c.lineCap='round';c.lineWidth=.012+random(i,4)*.031;c.strokeStyle=gray(106+Math.floor(random(i,5)*136));c.stroke();
+  }
+  for(let i=0;i<4;i++){
+   c.beginPath();c.ellipse(.54,.48,.031+i*.025,.076+i*.037,.21,0,Math.PI*2);
+   c.strokeStyle=gray(128+i*29);c.lineWidth=.014;c.stroke();
+  }
+ }else if(tip==='dirt-soil'){
+  for(let i=0;i<100;i++){
+   const x=.07+random(i,1)*.86,y=.11+random(i,2)*.78,r=.004+random(i,4)**2*.036;
+   polygon(c,90+Math.floor(random(i,3)*164),x-r,y-r*.12,x-r*.35,y-r*.62,x+r*.68,y-r*.45,x+r,y+r*.30,x,y+r*.77);
+  }
+ }else if(tip==='snow'){
+  for(let i=0;i<25;i++){
+   const x=.08+random(i,3)*.84,y=.08+random(i,4)*.84,r=.012+random(i,5)**2*.08;
+   if(i%5===0)fog(c,x,y,r*1.45,r*1.45,235);
+   else ellipse(c,x,y,r,r*.87,216+i%4*12);
+  }
+ }else if(tip==='stars'){
+  for(let i=0;i<29;i++){
+   const x=.09+random(i,1)*.82,y=.09+random(i,2)*.82,r=.006+random(i,3)**3*.064;
+   if(i%4===0)sparkle(c,x,y,r*1.45,r*1.65,255);
+   else ellipse(c,x,y,r,r,155+Math.floor(random(i,5)*100));
+  }
  }
  return c.getImageData(0,0,pixels,pixels);
 }

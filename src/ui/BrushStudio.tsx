@@ -26,6 +26,7 @@ function Slider(props:ExactRangeProps){return <ExactRange {...props} live/>;}
 export const BrushStudio=memo(function BrushStudio({library,eraser,onChange,notify,blendShortcut}:{library:BrushLibrary;eraser:boolean;blendShortcut?:string;onChange:(library:BrushLibrary|((old:BrushLibrary)=>BrushLibrary))=>void;notify:(message:string)=>void}){
  const preset=activePreset(library,eraser),s=preset.settings,inputPreset=activeInputPreset(library,eraser);
  const [settingsCollapsed,setSettingsCollapsed]=useState(false),[helpOpen,setHelpOpen]=useState(false),[helpText,setHelpText]=useState(''),[settingsOpen,setSettingsOpen]=useState(false),[settingsSection,setSettingsSection]=useState('width');
+ useEffect(()=>{if(!s.nature&&settingsSection==='texture')setSettingsSection('tip');},[s.nature,settingsSection]);
  const settingsPanel=useRef<HTMLElement>(null),settingsTrigger=useRef<HTMLButtonElement>(null),sectionRefs=useRef<Record<string,HTMLElement|null>>({});
  const closeSettings=()=>{setSettingsOpen(false);settingsTrigger.current?.focus();};
  const sections=[['width','Stroke width'],['smoothing','Smoothing'],['taper','Taper'],['pressure','Pen pressure'],['tip','Tip & texture'],...(s.nature?[['texture','Texture'] as const]:[]),['paint','Paint'],['blend','Blend'],['shape','Tip shape'],['dual','Dual brush'],['mine','My brushes'],['advanced','Advanced']] as const;

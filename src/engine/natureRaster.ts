@@ -1,4 +1,5 @@
 import type {Stroke} from '../core/model';
+import type {NatureSettings} from '../core/natureBrush';
 import type {DualMode} from '../core/brushShape';
 import {natureCanvas,natureNoise,naturePalette,secondaryNatureAtlas,naturePaletteSize,natureTipPixels} from './natureTips';
 import {paintingNib} from './paintingTips';
@@ -17,9 +18,13 @@ const clamp=(v:number)=>Math.max(0,Math.min(1,v));
 class Dabs{
  values=new Float64Array(stride*64);
  length=0;
+ reserve(count:number){
+  if(count*stride<=this.values.length)return;
+  const more=new Float64Array(2**Math.ceil(Math.log2(count))*stride);
+  more.set(this.values);this.values=more;
+ }
  push(x:number,y:number,w:number,h:number,angle:number,alpha:number,color:number){
   const i=this.length;
-  if(i===this.values.length){const more=new Float64Array(i*2);more.set(this.values);this.values=more;}
   const v=this.values;v[i]=x;v[i+1]=y;v[i+2]=w;v[i+3]=h;v[i+4]=angle;v[i+5]=alpha;v[i+6]=color;
   this.length+=stride;
  }
@@ -53,17 +58,19 @@ function enclosing(bounds:Bounds,limit:RasterRegion):RasterRegion|undefined{
 class NaturePlanner{
  private rawArc=new Float64Array(128);
  private pressure=new Float64Array(1025);
- private previous?:Stroke;
+ private paletteSettings?:NatureSettings;
+ private paletteColor='';
  private responseKey='';
  private atlas?:HTMLCanvasElement;
  palette(s:Stroke){
-  if(this.previous===s&&this.atlas)return this.atlas;
-  this.previous=s;return this.atlas=naturePalette(s.nature!,s.color);
+  if(this.paletteSettings===s.nature&&this.paletteColor===s.color&&this.atlas)return this.atlas;
+  this.paletteSettings=s.nature;this.paletteColor=s.color;
+  return this.atlas=naturePalette(s.nature!,s.color);
  }
  plan(s:Stroke,g:Geometry,out:NaturePlan){
   const n=s.nature!,samples=paintSamples(g,Math.max(.18,Math.min(.65,s.size*.004))),{points,arc,total}=samples;
   out.main.length=out.dual.length=0;
-  if(!points.length)return;
+  if(!points.length||n.density===0)return;
   const key=s.pressure?`${s.response}:${s.pressureCurve?.map(p=>p.x+','+p.y).join(';')??''}`:'';
   if(s.pressure&&key!==this.responseKey){
    for(let i=0;i<=1024;i++)this.pressure[i]=pressureResponse((i/1024)**s.response,s.pressureCurve);
@@ -77,6 +84,7 @@ class NaturePlanner{
   }
   const sx=(s.tsScaleX??1)*(s.tsFlipX?-1:1),sy=(s.tsScaleY??1)*(s.tsRoundness??1)*(s.tsFlipY?-1:1);
   const begin=(s.tsAngle??0)*Math.PI/180,jitter=n.rotation*Math.PI/180,baseStep=Math.max(.75,s.size*n.spacing);
+  out.main.reserve((Math.floor(total/baseStep)+2)*n.count);
   let segment=1,rawIndex=0,dab=0,included=false;
   for(let distance=0;distance<=total;distance+=baseStep,dab++){
    while(segment<points.length-1&&arc[segment]<distance)segment++;
@@ -97,7 +105,7 @@ class NaturePlanner{
    }
    for(let k=0;k<n.count;k++){
     const i=dab*12+k;
-    if((included||k>0||dab>0)&&natureNoise(n.seed,i,0)>n.density||n.density===0)continue;
+    if((included||k>0||dab>0)&&natureNoise(n.seed,i,0)>n.density)continue;
     const offset=n.scatter*s.size,xx=x+(natureNoise(n.seed,i,1)*2-1)*offset,yy=y+(natureNoise(n.seed,i,2)*2-1)*offset;
     const size=Math.max(.5,Math.round(s.size*width*taper*(1+(natureNoise(n.seed,i,3)*2-1)*n.sizeJitter)*4)/4);
     const angle=angleBucket(turn+(natureNoise(n.seed,i,4)*2-1)*jitter),alpha=clamp(level*(1-n.opacityJitter*natureNoise(n.seed,i,5)));
@@ -106,6 +114,7 @@ class NaturePlanner{
   }
   if(!s.dbTip)return;
   const size=s.size*(s.dbScale??.45),spacing=Math.max(.75,size*(s.dbSpacing??.25)),scatter=s.size*(s.dbScatter??0),count=s.dbCount??1;
+  out.dual.reserve((Math.floor(total/spacing)+2)*count);
   segment=1;dab=0;
   for(let distance=0;distance<=total;distance+=spacing,dab++){
    while(segment<points.length-1&&arc[segment]<distance)segment++;
@@ -118,7 +127,7 @@ class NaturePlanner{
    }
   }
  }
- reset(){this.previous=undefined;this.atlas=undefined;}
+ reset(){this.paletteSettings=undefined;this.paletteColor='';this.atlas=undefined;}
 }
 
 function matrix(ctx:CanvasRenderingContext2D,m:DOMMatrix,v:Float64Array,i:number,x:number,y:number){
