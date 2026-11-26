@@ -202,7 +202,6 @@ test('large Blend preserves responsive input, a canonical worker result and exac
   }
   return rows;
  });
- expect(rows.filter(row=>row.version===2).some(row=>row.skipped>0)).toBe(true);
  for(const row of rows){
   console.log('BLEND_V254_INPUT '+JSON.stringify(row));
   if(row.version!==2)continue;
@@ -217,6 +216,45 @@ test('large Blend preserves responsive input, a canonical worker result and exac
   expect.soft(row.penUp,id+' pen-up handler').toBeLessThanOrEqual(50);
   expect.soft(row.undo,id+' undo to display').toBeLessThanOrEqual(50);
  }
+});
+
+
+test('large Blend skips worker mask work between brush contacts',async({page})=>{
+ test.skip(baselineOnly,'The unchanged-worker response requires raster version 2.');
+ await page.goto('/');
+ const states=await page.evaluate(async()=>{
+  const load=(path:string)=>import(path);
+  const {LiveBlendWorker}=await load('/src/engine/LiveBlendWorker.ts');
+  const {stockPresets}=await load('/src/core/brushes.ts');
+  const {brushStrokeMetadata}=await load('/src/core/paintTips.ts');
+  const brush={...stockPresets.find((p:{id:string})=>p.id==='soft-paint').settings,bbEnabled:true};
+  const stroke={...brush,...brushStrokeMetadata(brush),id:'sub-dab-preview',kind:'stroke',tool:'brush',
+   size:300,pressure:false,blendRasterVersion:2,points:[{x:220,y:185,p:1}]};
+  const source=Object.assign(document.createElement('canvas'),{width:720,height:420});
+  const ctx=source.getContext('2d')!;
+  ctx.fillStyle='#c33164';ctx.fillRect(0,0,360,420);
+  ctx.fillStyle='#235bbc';ctx.fillRect(360,0,360,420);
+  const worker=new LiveBlendWorker(()=>{});
+  const replies:{unchanged?:boolean;final?:boolean;bitmap?:ImageBitmap;error?:string}[]=[];
+  const receive=worker.receive.bind(worker);
+  worker.receive=(reply:typeof replies[number])=>{replies.push(reply);receive(reply);};
+  const preview=async (geometry:number)=>{
+   const expected=replies.length+1,deadline=performance.now()+5000;
+   worker.preview(stroke,source,geometry);
+   while(replies.length<expected&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,15));
+   const reply=replies[expected-1];
+   return reply?.error??(reply?.unchanged?'unchanged':reply?.bitmap?'painted':'missing');
+  };
+  try{
+   const initial=await preview(1);
+   stroke.points.push({x:226,y:185,p:1});
+   const short=await preview(2);
+   stroke.points.push({x:450,y:191,p:1});
+   const extended=await preview(3);
+   return [initial,short,extended];
+  }finally{worker.dispose();}
+ });
+ expect(states).toEqual(['painted','unchanged','painted']);
 });
 
 
