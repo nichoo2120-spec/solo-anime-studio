@@ -147,6 +147,16 @@ function buffer(canvas:HTMLCanvasElement,w:number,h:number,read=false){
  ctx.clearRect(0,0,w,h);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='low';return ctx;
 }
 
+/** One document sampling matrix shared by cropped and full source canvases. */
+function drawCrop(ctx:Ctx,source:CanvasSource,sourceX:number,sourceY:number,x:number,y:number,width:number,height:number,scale=1){
+ const left=Math.max(0,x-sourceX),top=Math.max(0,y-sourceY);
+ const right=Math.min(source.width,x-sourceX+width*scale),bottom=Math.min(source.height,y-sourceY+height*scale);
+ if(right<=left||bottom<=top)return false;
+ const w=right-left,h=bottom-top;
+ ctx.drawImage(source,left,top,w,h,(left+sourceX-x)/scale,(top+sourceY-y)/scale,w/scale,h/scale);
+ return true;
+}
+
 /** Samples a continuous document-aligned pigment grid in premultiplied alpha.
  * Transparent paper cannot add black or reduce the opacity of existing paint. */
 function sampleGrid(image:ImageData,x:number,y:number,out:Float64Array){
@@ -203,7 +213,7 @@ export function renderCharacterBlend(ctx:Ctx,mask:CanvasSource,s:Stroke,points:r
  const cw=Math.ceil((x1+kernel*3+2-gx)/scale),ch=Math.ceil((y1+kernel*3+2-gy)/scale);
  const inCtx=buffer(pickup??=make(),cw,ch,true),out=buffer(field??=make(),cw,ch);
  const source=sample?sampleCanvas(sample):read.canvas;
- inCtx.drawImage(source,((sample?.x??0)-gx)/scale,((sample?.y??0)-gy)/scale,source.width/scale,source.height/scale);
+ drawCrop(inCtx,source,sample?.x??0,sample?.y??0,gx,gy,cw,ch,scale);
  const image=blur===1?undefined:inCtx.getImageData(0,0,cw,ch),picked=new Float64Array(4),reservoir=new Float64Array(4),blurSample=new Float64Array(4);
  const mix=s.bbMix??.55,drag=s.bbStretch??.45,load=s.bbPaintLoad??0,flow=s.bbFlow??.6;
  const hold=s.size*(.12+drag*1.5+(s.bbColorCarry??.6)*.45)/Math.max(.01,s.bbPickup??.5);
@@ -273,7 +283,7 @@ export function renderCharacterBlend(ctx:Ctx,mask:CanvasSource,s:Stroke,points:r
  target.drawImage(field,0,0,cw,ch,gx-x,gy-y,cw*scale,ch*scale);
  target.globalCompositeOperation='destination-in';
  // Gate every changed pixel using the original, full-resolution alpha.
- target.drawImage(mask,maskX-x,maskY-y);
+ if(!drawCrop(target,mask,maskX,maskY,x,y,w,h))target.clearRect(0,0,w,h);
  if(texture>0&&blur<1&&style!=='air'){
   const noise=target.createPattern(paperAlpha(),'repeat');
   if(noise){
