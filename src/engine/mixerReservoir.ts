@@ -1,0 +1,98 @@
+import type {Point,Stroke} from '../core/model';
+
+/** The pickup image follows the nib. All four channels are linear and premultiplied. */
+const side=24, pickup=new Float32Array(side*side*4), sample=new Float32Array(4), loadedImage=new Float32Array(side*side*4);
+const linear=Float32Array.from({length:256},(_,i)=>{
+ const x=i/255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4;
+});
+const encoded=Uint8Array.from({length:4097},(_,i)=>{
+ const x=i/4096;return Math.round(255*(x<=.0031308?12.92*x:1.055*x**(1/2.4)-.055));
+});
+const clamp=(x:number)=>Math.min(1,Math.max(0,x));
+function sampleLinear(bytes:Uint8ClampedArray,w:number,h:number,x:number,y:number,out:Float32Array){
+ x=Math.max(0,Math.min(w-1,x));y=Math.max(0,Math.min(h-1,y));
+ const left=Math.floor(x),top=Math.floor(y),fx=x-left,fy=y-top;
+ out.fill(0);
+ for(let j=0;j<2;j++)for(let i=0;i<2;i++){
+  const k=(Math.min(h-1,top+j)*w+Math.min(w-1,left+i))*4;
+  const a=bytes[k+3]/255*(i?fx:1-fx)*(j?fy:1-fy);
+  for(let c=0;c<3;c++)out[c]+=a*linear[bytes[k+c]];
+  out[3]+=a;
+ }
+}
+let coverage=new Float32Array(0),field:ImageData|undefined;
+export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke,points:readonly Point[],
+ originX:number,originY:number,pitch:number,extent:number,carry?:Float32Array){
+ const {width:w,height:h,data:src}=input;
+ if(!field||field.width!==w||field.height!==h)field=ctx.createImageData(w,h);
+ if(coverage.length<w*h)coverage=new Float32Array(w*h);
+ coverage.fill(-1,0,w*h);field.data.fill(0);pickup.fill(0);
+ const output=field.data,rgb=parseInt(s.color.slice(1),16);
+ const loaded=[linear[rgb>>16&255],linear[rgb>>8&255],linear[rgb&255]];
+ const capacity=s.bbCapacity??.45,drag=s.bbStretch??.5,flow=s.bbFlow??.6;
+ const wet=s.bbWetness??.5,mix=s.bbMix??.5;
+ const spacing=Math.max(.5,s.size*Math.max(.025,Math.min(.15,s.tipSpacing??.08)));
+ let total=0;for(let i=1;i<points.length;i++)total+=Math.hypot(points[i].x-points[i-1].x,points[i].y-points[i-1].y);
+ let segment=1,start=0;
+ for(let distance=0;;distance=Math.min(total,distance+spacing)){
+  let a=points[Math.max(0,segment-1)],b=points[segment]??a;
+  let length=Math.hypot(b.x-a.x,b.y-a.y);
+  while(segment<points.length-1&&start+length<distance){
+   start+=length;segment++;a=b;b=points[segment];length=Math.hypot(b.x-a.x,b.y-a.y);
+  }
+  const t=length?clamp((distance-start)/length):0,p=a.p+(b.p-a.p)*t;
+  const cx=(a.x+(b.x-a.x)*t-originX)/pitch-.5,cy=(a.y+(b.y-a.y)*t-originY)/pitch-.5;
+  const dx=length?(b.x-a.x)/length:1,dy=length?(b.y-a.y)/length:0;
+  const r=Math.max(1,extent/pitch),moisture=wet*(s.pressure&&s.bbPressureWet?p:1);
+  const localMix=mix*(s.pressure&&s.bbPressureMix?p:1);
+  const refill=1-Math.exp(-spacing*(s.bbPickup??.5)*moisture/Math.max(1,s.size*(.18+drag)));
+  for(let v=0;v<side;v++)for(let u=0;u<side;u++){
+   const k=(v*side+u)*4;
+   sampleLinear(src,w,h,cx+(u/(side-1)-.5)*2*r,cy+(v/(side-1)-.5)*2*r,sample);
+   if(!distance){
+    for(let c=0;c<4;c++)loadedImage[k+c]=s.bbSolidLoad||!sample[3]?(c===3?1:loaded[c]):sample[c];
+   }
+   if(!distance&&carry){
+    const n=Math.round(v*7/(side-1))*8+Math.round(u*7/(side-1)),alpha=carry[n*4+3]/255;
+    for(let c=0;c<3;c++)pickup[k+c]=linear[Math.round(carry[n*4+c])]*alpha;
+    pickup[k+3]=alpha;
+   }
+   const charge=distance||carry?refill:1;
+   for(let c=0;c<4;c++)pickup[k+c]+=(sample[c]-pickup[k+c])*charge;
+  }
+  const tail=s.bbTaper??.12,fadeLength=Math.max(1,s.size*(.3+capacity*5));
+  const charge=(s.bbPaintLoad??0)*Math.exp(-distance/fadeLength);
+  const entry=total&&tail?Math.min(1,(distance+s.size*.15)/(s.size*(.15+tail))):1;
+  const exit=total&&tail?Math.min(1,(total-distance+s.size*.15)/(s.size*(.15+tail))):1;
+  const width=entry*exit,reach=r*width;
+  for(let y=Math.max(0,Math.floor(cy-reach));y<=Math.min(h-1,Math.ceil(cy+reach));y++){
+   for(let x=Math.max(0,Math.floor(cx-reach));x<=Math.min(w-1,Math.ceil(cx+reach));x++){
+    const nx=(x-cx)/reach,ny=(y-cy)/reach,d=nx*nx+ny*ny;
+    if(d>=1)continue;
+    const index=y*w+x,k=index*4,score=1-d;
+    if(score<=coverage[index])continue;
+    coverage[index]=score;
+    const u=clamp(nx*.5+.5)*(side-1),v=clamp(ny*.5+.5)*(side-1);
+    const u0=Math.floor(u),v0=Math.floor(v),fx=u-u0,fy=v-v0;
+    const offset=Math.min(distance/pitch,r*drag*.65);
+    sampleLinear(src,w,h,x-dx*offset,y-dy*offset,sample);
+    const dragged=clamp(localMix*moisture),paint=charge*(1-localMix);
+    for(let c=0;c<4;c++){
+     const row=v0*side,row1=Math.min(side-1,v0+1)*side,u1=Math.min(side-1,u0+1);
+     const top=pickup[(row+u0)*4+c]*(1-fx)+pickup[(row+u1)*4+c]*fx;
+     const bottom=pickup[(row1+u0)*4+c]*(1-fx)+pickup[(row1+u1)*4+c]*fx;
+     sample[c]=(top*(1-fy)+bottom*fy)*(1-dragged)+sample[c]*dragged;
+     const loadTop=loadedImage[(row+u0)*4+c]*(1-fx)+loadedImage[(row+u1)*4+c]*fx;
+     const loadBottom=loadedImage[(row1+u0)*4+c]*(1-fx)+loadedImage[(row1+u1)*4+c]*fx;
+     sample[c]=sample[c]*(1-paint)+(loadTop*(1-fy)+loadBottom*fy)*paint;
+    }
+    const alpha=sample[3];if(alpha<=0)continue;
+    for(let c=0;c<3;c++)output[k+c]=encoded[Math.round(4096*clamp(sample[c]/alpha))];
+    const dry=1-moisture*.6*(1-capacity)*(1-Math.exp(-distance/fadeLength));
+    output[k+3]=Math.round(255*alpha*flow*width*dry*Math.min(1,score*8));
+   }
+  }
+  if(distance>=total)break;
+ }
+ return field;
+}

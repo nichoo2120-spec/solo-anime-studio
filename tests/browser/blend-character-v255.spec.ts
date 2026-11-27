@@ -140,7 +140,7 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
  for(const row of result.cases){
   const label=row.id+' '+row.size;
   console.log('BLEND_V255_PIXELS '+JSON.stringify(row));
-  expect.soft(row.version??row.silk,label).toBe(row.silk?2:8);
+  expect.soft(row.version??row.silk,label).toBe(row.silk?2:9);
   expect.soft(row.outside,label+' writes outside the brush mask').toBe(0);
   expect.soft(row.longest,label+' uninterrupted hard axis edge').toBeLessThanOrEqual(25);
   expect.soft(row.seamRatio,label+' 64 px seams').toBeLessThan(2.2);
@@ -169,7 +169,7 @@ test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay respon
   const {stockPresets}=await load('/src/core/brushes.ts');
   const frame=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
   const results=[];
-  for(const size of [300,500])for(const id of ids){
+  for(const size of [130,300,500])for(const id of ids){
    const project=newProject('Blend character performance',1920,1080);
    const paint=(x:number,color:string)=>({id:color,kind:'stroke',tool:'brush',size:550,pressure:false,response:1,opacity:1,color,
     points:[{x,y:160,p:1},{x,y:920,p:1}]});
@@ -197,19 +197,20 @@ test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay respon
     await engine.renderer.whenSettled();
     engine.historyNavigation('undo');await frame();await frame();
     const timings:number[]=[],render=engine.render.bind(engine);
-    let undo=0,undoStart=0,previews=0,reusedFinal=false;
+    let undo=0,undoStart=0,previews=0,reusedFinal=false,firstInput=0,firstPixel=0,ready=false;
     const receive=engine.blendWorker.receive.bind(engine.blendWorker);
     engine.blendWorker.receive=(reply:{bitmap?:ImageBitmap;final?:boolean;unchanged?:boolean})=>{
-     if(reply.bitmap&&!reply.final&&engine.drawing)previews++;
+     if(reply.bitmap&&!reply.final&&engine.drawing){previews++;ready=true;}
      if(reply.final)reusedFinal=!!reply.unchanged;
      receive(reply);
     };
     engine.render=()=>{
      const start=performance.now();render();
+     if(ready&&firstInput&&!firstPixel)firstPixel=performance.now()-firstInput;
      if(engine.drawing)timings.push(performance.now()-start);
      if(undoStart){undo=performance.now()-undoStart;undoStart=0;}
     };
-    send('pointerdown',434);
+    firstInput=performance.now();send('pointerdown',434);
     for(let j=1;j<=18;j++){const x=434+j*32;send('pointermove',x,[x-21,x-11,x]);await frame();}
     const start=performance.now();
     send('pointerup',1010);const dispatch=performance.now()-start;
@@ -222,7 +223,7 @@ test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay respon
     const restored=pixels(engine.renderer,store.getSnapshot()),original=pixels(recorder,project);
     const undoParity=restored.reduce((n,v,i)=>n+Number(v!==original[i]),0);
     timings.sort((a,b)=>a-b);
-    results.push({id,size,version:op.brushBlendVersion,previews,reusedFinal,frames:timings.length,
+    results.push({id,size,version:op.brushBlendVersion,previews,reusedFinal,firstPixel,frames:timings.length,
      p95:timings[Math.ceil(timings.length*.95)-1],dispatch,exact,undo,parity,undoParity});
    }finally{engine.dispose();recorder.clear();host.remove();}
   }
@@ -231,9 +232,10 @@ test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay respon
  for(const r of rows){
   const label=r.id+' '+r.size;
   console.log('BLEND_V255_TIMING '+JSON.stringify(r));
-  expect.soft(r.version,label).toBe(8);
+  expect.soft(r.version,label).toBe(9);
   expect.soft(r.frames,label).toBeGreaterThanOrEqual(15);
   expect.soft(r.previews,label).toBeGreaterThan(0);
+  expect.soft(r.firstPixel,label+' first input to composited preview').toBeLessThanOrEqual(1000/60);
   expect.soft(r.parity,label+' worker vs replay').toBe(0);
   expect.soft(r.undoParity,label+' restored original').toBe(0);
   expect.soft(r.p95,label+' p95').toBeLessThanOrEqual(16);

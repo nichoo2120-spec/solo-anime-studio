@@ -14,7 +14,7 @@ describe('five coloring brushes and physical nibs',()=>{
   const mix=stockPresets.find(preset=>preset.id==='blend-mix')!;
   const {bbEnabled:_enabled,...shape}=mix.settings;
   activeLayer(p).operations=[{...shape,...brushStrokeMetadata(mix.settings),id:'mix-test',kind:'stroke',tool:'brush',points:[{x:137,y:170,p:.5}]}];
-  expect(validateProject(JSON.parse(JSON.stringify(p))).layers.find(layer=>layer.id===p.activeLayerId)!.operations[0]).toMatchObject({brushBlendVersion:8,colorNib:'bristle',bbBlur:.03});
+  expect(validateProject(JSON.parse(JSON.stringify(p))).layers.find(layer=>layer.id===p.activeLayerId)!.operations[0]).toMatchObject({brushBlendVersion:9,colorNib:'bristle',bbBlur:.03});
  });
  it('rejects mismatched or invalid coloring metadata',()=>{
   const settings=coloring[0].settings,s:Stroke={...settings,...brushStrokeMetadata(settings),id:'s',kind:'stroke',tool:'brush',points:[{x:20,y:20,p:1}]},p=newProject();for(const patch of [{coloringEngine:undefined},{coloringEngine:2},{colorNib:'rake'},{colorNibFollow:1},{colorSeed:-1},{colorSeed:.5},{brushTip:'soft-round'}]){activeLayer(p).operations=[{...s,...patch} as Stroke];expect(()=>validateProject(p)).toThrow();}

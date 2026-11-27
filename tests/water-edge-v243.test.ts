@@ -1,3 +1,4 @@
+import {silkStrokeMetadata} from '../src/core/silkBlend';
 // v0.5.243 (owner pt88u): no dark wet edge on new watercolor / Silk Wet / Blend
 // strokes; only the stock "Watercolor Edge" brush keeps it (Edge darkness).
 import {describe,it,expect} from 'vitest';
@@ -28,7 +29,7 @@ const line=(x0:number,x1:number,y:number,n=60)=>Array.from({length:n},(_,i)=>{co
 function mask(points:Point[],r=26){const m=surface(W,H);for(let y=0;y<H;y++)for(let x=0;x<W;x++){for(const p of points)if(Math.hypot(x-p.x,y-p.y)<r){m.data[(y*W+x)*4+3]=255;break;}}return m;}
 function make(id:string,extra:Record<string,unknown>={},patch:Partial<Stroke>={}):Stroke{
  const p=stockPresets.find(p=>p.id===id)!;const settings={...p.settings,...extra};const {bbEnabled:_b,...plain}=settings as Record<string,unknown>;
- const metadata=brushStrokeMetadata(settings as never);
+ const metadata=id==='silk-blend'?silkStrokeMetadata(settings):brushStrokeMetadata(settings as never);
  return {...plain,...metadata,id:'edge-'+id,kind:'stroke',tool:'brush',color:'#00ff00',size:60,opacity:1,pressure:true,response:1,points:line(40,380,100),...patch} as Stroke;
 }
 /** Mean luminance change per row across the stroke (columns 80..340):
@@ -46,7 +47,7 @@ describe('water edge v0.5.243',()=>{
  it('new strokes of every normal watercolor brush, Silk Wet and Blend watercolor save Edge darkness 0; only Watercolor Edge keeps it',()=>{
   const water=stockPresets.filter(p=>isNewWatercolorTip(p.settings.brushTip));
   expect(water.map(p=>p.id)).toEqual(['water-smooth','water-rough','water-wet','water-flat','water-gradient','water-edge']);
-  for(const p of water){const s=make(p.id),b=make(p.id,{bbEnabled:true});const want=p.id==='water-edge'?1:0;expect(s.edgeDarkness,p.id).toBe(want);expect(b.edgeDarkness,p.id+' blend').toBe(want);expect(b.brushBlendVersion).toBe(8);expect(b.bbEdgeDarkness).toBe(p.id==='water-smooth'?.14:want);}
+  for(const p of water){const s=make(p.id),b=make(p.id,{bbEnabled:true});const want=p.id==='water-edge'?1:0;expect(s.edgeDarkness,p.id).toBe(want);expect(b.edgeDarkness,p.id+' blend').toBe(want);expect(b.brushBlendVersion).toBe(9);expect(b.bbEdgeDarkness).toBe(p.id==='water-smooth'?.14:want);}
   expect(stockPresets.find(p=>p.id==='water-edge')!.name).toBe('Watercolor Edge');
   expect(make('silk-blend',silkWet).edgeDarkness).toBe(0);
   expect(make('silk-blend',{silkMode:'soft'}).edgeDarkness).toBeUndefined();

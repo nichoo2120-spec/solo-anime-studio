@@ -229,8 +229,8 @@ test('pen-down captures Blend settings independently of ordinary Paint pressure'
   ]);
  });
  expect(result).toEqual([
-  [8,1,false,'linear',true,true,true,.1],
-  [8,1.6,true,'firm',true,true,true,.1],
+  [9,1,false,'linear',true,true,true,.1],
+  [9,1.6,true,'firm',true,true,true,.1],
   [null,null,null,null,true,true,true,.1],
  ]);
 });

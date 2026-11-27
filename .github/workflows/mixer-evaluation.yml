@@ -1,0 +1,33 @@
+name: Mixer validation
+on: [push]
+jobs:
+  test:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [build, before, after, pixels, latency, browser1, browser2, browser3, browser4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - if: matrix.suite == 'before'
+        run: git checkout f2328198a875748e73721bc178ca63d0c9ddb926 -- src
+      - if: matrix.suite == 'build'
+        run: |
+          npx tsc -b
+          if ($LASTEXITCODE) {exit $LASTEXITCODE}
+          npm test -- --maxWorkers=2
+          if ($LASTEXITCODE) {exit $LASTEXITCODE}
+          npm run build
+      - if: matrix.suite == 'before' || matrix.suite == 'after'
+        run: npx playwright test tests/browser/mixer-profile-v257.spec.ts
+      - if: matrix.suite == 'pixels'
+        run: npx playwright test tests/browser/shared-blend-v256.spec.ts tests/browser/blend-character-v255.spec.ts --grep-invert "300 px"
+      - if: matrix.suite == 'latency'
+        run: npx playwright test tests/browser/blend-character-v255.spec.ts --grep "300 px"
+      - if: startsWith(matrix.suite,'browser')
+        run: npx playwright test --shard=${{ matrix.suite == 'browser1' && '1' || matrix.suite == 'browser2' && '2' || matrix.suite == 'browser3' && '3' || '4' }}/4

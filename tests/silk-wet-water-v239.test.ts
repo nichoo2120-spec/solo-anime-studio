@@ -32,7 +32,7 @@ function scene(kind:'split'|'edge'|'stripes'='split'){
 const silk=stockPresets.find(p=>p.id==='silk-blend')!;
 function stroke(mode:SilkMode,points:Point[],patch:Partial<Stroke>={}):Stroke{
  const settings={...silk.settings,silkMode:mode,silkTexture:mode==='dry'?.65:0};
- return {...settings,...brushStrokeMetadata(settings),id:'silk-'+mode,kind:'stroke',tool:'brush',color:'#00ff00',size:60,opacity:1,pressure:true,response:1,points,...patch} as Stroke;
+ return {...settings,...silkStrokeMetadata(settings),id:'silk-'+mode,kind:'stroke',tool:'brush',color:'#00ff00',size:60,opacity:1,pressure:true,response:1,points,...patch} as Stroke;
 }
 const line=(x0:number,x1:number,y:number,n=60,p=(t:number)=>.4+.6*Math.sin(t*Math.PI))=>Array.from({length:n},(_,i)=>{const t=i/(n-1);return {x:x0+(x1-x0)*t,y,p:p(t)};});
 const hash=(d:Uint8ClampedArray)=>{let h=2166136261;for(let i=0;i<d.length;i++){h^=d[i];h=Math.imul(h,16777619);}return h>>>0;};

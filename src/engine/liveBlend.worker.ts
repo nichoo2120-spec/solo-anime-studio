@@ -112,7 +112,7 @@ worker.onmessage=async({data:j})=>{
   }else if(isBrushBlendVersion(s.brushBlendVersion)&&s.tool==='brush'){
    // Version 7 previews use the canonical curve and compositing. If release
    // contains no new samples, the displayed bitmap is already the saved result.
-   const character=(s.brushBlendVersion===7||s.brushBlendVersion===8);
+   const character=(s.brushBlendVersion===7||(s.brushBlendVersion===8||s.brushBlendVersion===9));
    const previewKey=character&&!deltaBase&&!s.nature?.bitmap&&!s.dbBitmap&&s.bbSample!=='all'?JSON.stringify({...s,worldStroke:undefined}):undefined;
    if(j.final&&previewKey&&previewKey===characterPreviewKey){
     worker.postMessage({token:j.token,serial:j.serial,unchanged:true,final:true});

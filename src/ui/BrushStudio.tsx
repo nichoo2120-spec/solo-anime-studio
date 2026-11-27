@@ -78,7 +78,7 @@ export const BrushStudio=memo(function BrushStudio({library,eraser,onChange,noti
  const mixPatch=(p:TipMixControls)=>patch({mixTipA:mixA,mixTipB:mixB,mixBlend:s.mixBlend??.5,...p});
  const curve=s.pressureCurve??linearPressure;
  const imported=preset.category===importedCategory;
- const defaults=s.bbEnabled?['blend/Blend strength','blend/Blend Strength','blend/Blend style']:
+ const defaults=s.bbEnabled?['blend/Wet','blend/Load','blend/Mixer mix','blend/Flow','blend/Mixer preset','blend/Blend strength','blend/Blend style']:
   s.nature?['nature/Density','nature/Scatter amount','nature/Seed']:
   watercolor?['paint/Water amount',s.brushTip==='water-wet'?'paint/Edge bleeding':'paint/Edge softness']:
   dry?['texture/Paper grain strength','texture/Scatter']:

@@ -1,3 +1,4 @@
+import {mixerPresets,mixerRecipe} from '../core/mixerBrush';
 import {BrushSettingInput,BrushSettingSelect} from './BrushQuickSettings';
 import {memo,useEffect,useRef} from 'react';
 import {ExactRange} from './ExactRange';
@@ -79,6 +80,15 @@ export const BrushBlendSettingsPanel=memo(function BrushBlendSettingsPanel({sett
   <BrushBlendToggle settings={s} patch={patch} shortcut={shortcut}/>
   {!s.bbEnabled?<p className="hint">Switch to Blend to adjust this brush’s blending. Its family look stays <strong>{blendStyleNames[style]}</strong>.</p>:<>
    <BlendPreview settings={s}/>
+   <label className="studio-select">Mixer preset<BrushSettingSelect aria-label="Mixer preset" value={mixerPresets.find(([,w,l,m,f])=>w===values.bbWetness&&l===values.bbCapacity&&m===values.bbMix&&f===values.bbFlow)?.[0]??''} onChange={e=>{const recipe=mixerRecipe(e.target.value);if(recipe)patch(recipe);}}><option value="">Custom</option>{mixerPresets.map(([name])=><option key={name}>{name}</option>)}</BrushSettingSelect></label>
+   <ExactRange live name="Wet" value={pct(values.bbWetness,.5)} unit="%" set={v=>patch({bbWetness:v/100})}/>
+   <ExactRange live name="Load" min={1} value={pct(values.bbCapacity,.45)} unit="%" set={v=>patch({bbCapacity:v/100})}/>
+   <ExactRange live name="Mix" settingId="Mixer mix" value={pct(values.bbMix,.5)} unit="%" set={v=>patch({bbMix:v/100})}/>
+   <ExactRange live name="Flow" value={pct(values.bbFlow,.6)} unit="%" set={v=>patch({bbFlow:v/100})}/>
+   <ExactRange live name="Mixer taper" value={pct(values.bbTaper,.12)} unit="%" set={v=>patch({bbTaper:v/100})}/>
+   {([['bbReload','Load brush after each stroke'],['bbPressureWet','Pressure controls Wet'],['bbPressureMix','Pressure controls Mix'],['bbSolidLoad','Load solid colours only']] as const).map(([key,name])=><label className="check-row" key={key}><span>{name}</span><BrushSettingInput type="checkbox" aria-label={name} checked={values[key]} onChange={e=>patch({[key]:e.target.checked})}/></label>)}
+   <label className="check-row"><span>Sample All Layers</span><BrushSettingInput type="checkbox" aria-label="Sample All Layers" checked={values.bbSample==='all'} onChange={e=>patch({bbSample:e.target.checked?'all':'layer'})}/></label>
+   <div className="silk-presets"><button type="button" onClick={()=>patch({bbPaintLoad:1,bbLoadToken:Date.now()})}>Load brush</button><button type="button" onClick={()=>patch({bbPaintLoad:0,bbLoadToken:Date.now(),bbClean:true})}>Clean brush</button></div>
    <label className="studio-select">Blend style<BrushSettingSelect aria-label="Blend style" value={values.bbRenderStyle} onChange={e=>patch({bbRenderStyle:e.target.value as BlendRenderStyle})}>{Object.entries(blendRenderStyles).map(([key,name])=><option key={key} value={key}>{name}</option>)}</BrushSettingSelect></label>
    {values.bbRenderStyle==='silk'?<SilkBlendPanel settings={s} patch={patch} reset={resetSilk}/>:<>
    <label className="studio-select">Blend mode<BrushSettingSelect aria-label="Blend mode" value={mode} onChange={e=>patch({bbMode:e.target.value as BlendMode})}>{blendModes.map(m=><option key={m} value={m}>{m[0].toUpperCase()+m.slice(1)}</option>)}</BrushSettingSelect></label>
