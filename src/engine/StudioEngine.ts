@@ -218,7 +218,7 @@ export class StudioEngine {
   if(last&&target)this.lastBlendEnd={layer:target.layer,x:last.x,y:last.y,r:Math.max(1,stroke.size*.5)};
   if(stroke.bbSample!=='all'||!page||!stroke.points.length)return stroke;
   const path=blendPath(stroke),scale=blendTransformScale(stroke);
-  const pad=stroke.brushBlendVersion===7?characterBlendReadReach(stroke,scale):
+  const pad=(stroke.brushBlendVersion===7||stroke.brushBlendVersion===8)?characterBlendReadReach(stroke,scale):
    Math.ceil((isMaterialBrushBlendVersion(stroke.brushBlendVersion)?brushBlendV4Reach(stroke)*scale:stroke.size*.75)+8);let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const p of path){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);}
   // Mirrored copies replay elsewhere on the page, so they keep the whole page.
@@ -583,7 +583,7 @@ export class StudioEngine {
   if(this.tool==='fill'){void this.fill(p);return;}
   const metadata=brushStrokeMetadata(this.tool==='eraser'?{...this.brush,bbEnabled:false}:this.brush,this.tool==='brush');
   const silk=metadata.silkBlendVersion!==undefined;
-  const fastBlend=this.brush.size>64&&(silk||metadata.brushBlendVersion===7);
+  const fastBlend=this.brush.size>64&&(silk||(metadata.brushBlendVersion===7||metadata.brushBlendVersion===8));
   const nativeMix=this.tool==='brush'&&this.brush.nativeMixEnabled&&!silk&&!metadata.natureVersion;
   const workspaceStroke=!silk&&doc.version===6&&!this.mirrorDrawing.enabled&&!this.brush.nativeMixEnabled&&!this.brush.mixColors&&
    supportsSparseStroke({...this.brush,...metadata,tool:this.tool==='eraser'?'eraser':'brush'});

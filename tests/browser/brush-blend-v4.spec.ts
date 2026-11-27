@@ -229,13 +229,13 @@ test('pen-down captures Blend settings independently of ordinary Paint pressure'
   ]);
  });
  expect(result).toEqual([
-  [7,1,false,'linear',false,false,true,.1],
-  [7,1.6,true,'firm',false,false,true,.1],
+  [8,1,false,'linear',true,true,true,.1],
+  [8,1.6,true,'firm',true,true,true,.1],
   [null,null,null,null,true,true,true,.1],
  ]);
 });
 
-test('real stock brush masks keep light-pressure blending strong across families',async({page})=>{
+test('saved v7 stock brush masks keep light-pressure blending strong across families',async({page})=>{
  await page.goto('/');
  const result=await page.evaluate(async()=>{
   const bp='/src/core/brushes.ts',mp='/src/core/paintTips.ts',cp='/src/core/brushBlend.ts',rp='/src/engine/renderer.ts',ep='/src/engine/brushBlend.ts';
@@ -252,7 +252,7 @@ test('real stock brush masks keep light-pressure blending strong across families
    const strengths=[.1,.5,1].map(p=>{
     const stroke={
      ...settings,...brushStrokeMetadata({...settings,bbEnabled:true}),
-     id:'pressure-swatch',kind:'stroke',tool:'brush',pressure:true,size:85,
+     brushBlendVersion:7,id:'pressure-swatch',kind:'stroke',tool:'brush',pressure:true,size:85,
      points:[{x:65,y:100,p,v:.65},{x:345,y:100,p,v:.65}],
     };
     prepareBlendMaskPressure(stroke);

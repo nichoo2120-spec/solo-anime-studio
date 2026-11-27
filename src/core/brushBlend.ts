@@ -15,7 +15,7 @@ export const isBlendMode=(v:unknown):v is BlendMode=>typeof v==='string'&&(blend
 export const blendStyles:readonly BlendStyle[]=['water','dry','pencil','ink','air','oil','marker','texture','soft'];
 export const blendStyleNames:Record<BlendStyle,string>={water:'Watercolor',dry:'Dry brush',pencil:'Pencil',ink:'Ink',air:'Airbrush',oil:'Oil paint',marker:'Marker',texture:'Textured',soft:'Soft paint'};
 export const isBlendStyle=(v:unknown):v is BlendStyle=>typeof v==='string'&&(blendStyles as readonly string[]).includes(v);
-export type BrushBlendVersion=1|2|3|4|5|6|7;
+export type BrushBlendVersion=1|2|3|4|5|6|7|8;
 export const blendPressureCurves=['soft','linear','firm'] as const;
 export type BlendPressureCurve=(typeof blendPressureCurves)[number];
 export const blendRenderStyles={auto:'Auto (brush family)',silk:'Silk',blur:'Soft blur',wet:'Wet',smudge:'Smudge',dry:'Dry'} as const;
@@ -39,7 +39,7 @@ export function effectiveBlendStyle(family:BlendStyle,style:BlendRenderStyle='au
   default:return family;
  }
 }
-export const isMaterialBrushBlendVersion=(v:unknown):v is 4|5|6|7=>v===4||v===5||v===6||v===7;
+export const isMaterialBrushBlendVersion=(v:unknown):v is 4|5|6|7|8=>v===4||v===5||v===6||v===7||v===8;
 export const isBrushBlendVersion=(v:unknown):v is BrushBlendVersion=>v===1||v===2||v===3||isMaterialBrushBlendVersion(v);
 export function watercolorBlendTip(tip:unknown){
  return tip==='water-smooth'||tip==='water-wet'||tip==='water-rough'||tip==='water-flat'?tip:undefined;
@@ -178,7 +178,7 @@ const bounded=(v:unknown,fallback:number,min:number,max:number)=>typeof v==='num
 export function brushBlendMetadata(s:BrushBlendSettings&Shape):BrushBlendControls{
  if(!s.bbEnabled||!canBrushBlend(s)||isSilkBlendActive(s))return {};
  const settings=brushBlendSettingsFor(s);
- return {...settings,brushBlendVersion:7,bbStyle:blendStyleFor(s)};
+ return {...settings,brushBlendVersion:8,bbStyle:blendStyleFor(s)};
 }
 /** Freeze the pressure channels used by the paint-shaped mask at pen-down.
  * An unshaped Blend nib stays close to its selected size at light pressure.
@@ -213,7 +213,7 @@ export function validBrushBlendStroke(o:Record<string,unknown>){
  if(o.brushBlendVersion===1?o.bbStyle!==undefined:!isBlendStyle(o.bbStyle))return false;
  if(o.brushBlendVersion===5&&(o.bbStyle!=='water'||!watercolorBlendTip(o.brushTip)||o.stampVersion===1))return false;
  for(const [key,min,max] of blendLimits){const v=o[key];if(v!==undefined&&(typeof v!=='number'||!Number.isFinite(v)||v<min||v>max))return false;}
- if(o.brushBlendVersion!==7&&o.bbBlur!==undefined)return false;
+ if(o.brushBlendVersion<7&&o.bbBlur!==undefined)return false;
  if(o.brushBlendVersion>=6){
   if(!isBlendPressureCurve(o.bbPressureCurve)||!isBlendRenderStyle(o.bbRenderStyle)||o.bbRenderStyle==='silk'||typeof o.bbStrength!=='number'||typeof o.bbMinPressure!=='number')return false;
  }else if(o.bbPressureCurve!==undefined||o.bbRenderStyle!==undefined||o.bbStrength!==undefined||o.bbMinPressure!==undefined)return false;

@@ -285,7 +285,8 @@ test('replays historical blend strokes byte for byte against the previous releas
    const settings={...stockPresets.find((p:{id:string})=>p.id===id).settings,bbEnabled:true,bbRenderStyle:style,pressureWidth:false};
    const base={...settings,...brushStrokeMetadata(settings),...brushBlendSettingsFor(settings,6),brushBlendVersion:6,bbBlur:undefined,id:'historical-blend-'+id,kind:'stroke',tool:'brush',size:300,points,pressure:false};
    mask.clearRect(0,0,1050,590);drawStroke(mask,base);
-   for(const version of [1,2,3,4,5,6]){
+   for(const version of [1,2,3,4,5,6,7]){
+    if(version===7){mask.clearRect(0,0,1050,590);drawStroke(mask,{...base,brushBlendVersion:7});}
     if(version===5&&!watercolorBlendTip(base.brushTip))continue;
     ctx.clearRect(0,0,1050,590);
     const palette=ctx.createLinearGradient(95,130,918,466);

@@ -41,11 +41,18 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
    else{drawStroke(mask,s);renderBrushBlend(paint,mask.canvas,s);}
    return {s,out:bytes(paint),coverage:s.silkBlendVersion?undefined:bytes(mask)};
   };
-  const cases=[],pairs=[],drag=[],pressure=[];
-  for(const size of [150,400]){
+  const cases=[],pairs=[],drag=[],pressure=[],signatures=new Map<string,Uint8Array>();
+  for(const size of [132,150,400])for(const mode of (size===150?['auto']:['auto','smudge','blur'])){
    const reference=new Map<string,Uint8ClampedArray>();
    for(const preset of presets){
-    const {s,out,coverage}=render(preset,size);
+    const {s,out,coverage}=render(preset,size,points,{bbRenderStyle:mode});
+    if(size===132&&mode==='auto'){
+     const signature=[];
+     for(let y=200;y<490;y+=4)for(let x=180;x<850;x+=4){
+      const i=(y*width+x)*4;signature.push(out[i],out[i+1],out[i+2],out[i+3]);
+     }
+     signatures.set(preset.id,new Uint8Array(signature));
+    }
     const delta=new Uint8Array(width*height);
     let outside=0,longest=0,seamRatio=0;
     let longestEdge:{vertical:boolean;col:number;start:number;end:number}|undefined;
@@ -98,31 +105,42 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
      neighbor+=(Math.abs(delta[i-width]-delta[i-2*width])+Math.abs(delta[i+width]-delta[i]))*.5;
     }
     seamRatio=tile/(neighbor+seamEdges*.025||1);
-    cases.push({id:preset.id,size,version:s.brushBlendVersion,silk:s.silkBlendVersion,outside,longest,longestEdge,seamRatio,...difference(out,before)});
-    if(targetIds.includes(preset.id))reference.set(preset.id,out);
-    if(['blend-mix','water-rough','water-flat'].includes(preset.id)){
-     const reverse=render(preset,size,[...points].reverse()).out;
+    cases.push({id:preset.id,size,mode,version:s.brushBlendVersion,silk:s.silkBlendVersion,outside,longest,longestEdge,seamRatio,...difference(out,before)});
+    if(mode==='auto'&&targetIds.includes(preset.id))reference.set(preset.id,out);
+    if(mode!=='blur'&&['blend-mix','water-rough','water-flat'].includes(preset.id)){
+     const reverse=render(preset,size,[...points].reverse(),{bbRenderStyle:mode}).out;
      let sum=0,n=0;
      for(let x=edge+12;x<edge+70;x++)for(let y=323;y<378;y++){
       const i=(y*width+x)*4;sum+=out[i]-reverse[i];n++;
      }
-     drag.push({id:preset.id,size,directionalRed:sum/n});
+     drag.push({id:preset.id,size,mode,directionalRed:sum/n});
     }
-    if(targetIds.includes(preset.id)){
-     const full=render(preset,size,points.map(p=>({...p,p:1}))).out;
-     pressure.push({id:preset.id,size,difference:difference(out,full),mix:difference(out,before)});
+    if(mode==='auto'&&targetIds.includes(preset.id)){
+     // Isolate the Blend pressure curve. Paint opacity and flow are
+     // intentionally pressure-sensitive in v8, and have independent coverage tests.
+     const neutral={pressureOpacity:false,pressureFlow:false,pressure:false};
+     const half=render(preset,size,points,neutral).out;
+     const full=render(preset,size,points.map(p=>({...p,p:1})),neutral).out;
+     pressure.push({id:preset.id,size,difference:difference(half,full),mix:difference(out,before)});
     }
    }
    for(const [a,first] of reference)for(const [b,second] of reference)if(a<b)pairs.push({a,b,size,...difference(first,second)});
   }
   const mix=stockPresets.find((p:any)=>p.id==='blend-mix');
   const smear=render(mix,150,points,{bbBlur:0}).out,blur=render(mix,150,points,{bbBlur:1}).out;
-  return {cases,pairs,drag,pressure,blurDifference:difference(smear,blur)};
+  const nearDuplicates=[];
+  for(const [a,first] of signatures)for(const [b,second] of signatures)if(a<b){
+   let delta=0,n=0;
+   for(let i=0;i<first.length;i++){const d=Math.abs(first[i]-second[i]);delta+=d;if(d)n++;}
+   if(!n||delta/first.length<.01)nearDuplicates.push([a,b]);
+  }
+  return {cases,pairs,drag,pressure,nearDuplicates,blurDifference:difference(smear,blur)};
  },targetIds);
+ expect.soft(result.nearDuplicates,'all preset pairs on the edge fixture').toEqual([]);
  for(const row of result.cases){
   const label=row.id+' '+row.size;
   console.log('BLEND_V255_PIXELS '+JSON.stringify(row));
-  expect.soft(row.version??row.silk,label).toBe(row.silk?2:7);
+  expect.soft(row.version??row.silk,label).toBe(row.silk?2:8);
   expect.soft(row.outside,label+' writes outside the brush mask').toBe(0);
   expect.soft(row.longest,label+' uninterrupted hard axis edge').toBeLessThanOrEqual(25);
   expect.soft(row.seamRatio,label+' 64 px seams').toBeLessThan(2.2);
@@ -213,7 +231,7 @@ test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay respon
  for(const r of rows){
   const label=r.id+' '+r.size;
   console.log('BLEND_V255_TIMING '+JSON.stringify(r));
-  expect.soft(r.version,label).toBe(7);
+  expect.soft(r.version,label).toBe(8);
   expect.soft(r.frames,label).toBeGreaterThanOrEqual(15);
   expect.soft(r.previews,label).toBeGreaterThan(0);
   expect.soft(r.parity,label+' worker vs replay').toBe(0);
