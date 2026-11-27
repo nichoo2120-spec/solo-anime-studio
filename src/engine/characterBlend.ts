@@ -192,11 +192,100 @@ function blendFootprint(s:Stroke,transformScale:number){
 /** A saved all-layers sample must retain the same source halo as the worker. */
 export function characterBlendReadReach(s:Stroke,transformScale:number){
  const {pad,kernel}=blendFootprint(s,transformScale);
+ if(s.brushBlendVersion===8)return Math.ceil(sharedReach(s,transformScale)+kernel*3+2);
  return pad+Math.ceil(kernel*3)+8;
+}
+
+function sharedReach(s:Stroke,scale:number){
+ const extent=s.stampVersion===1?stampExtent(s):1.5;
+ return Math.ceil(s.size*scale*(Math.max(extent,1.5)+.65)+8);
+}
+
+let sharedMask:HTMLCanvasElement|undefined, sharedSource:HTMLCanvasElement|undefined;
+let sharedColor:HTMLCanvasElement|undefined, sharedBlur:HTMLCanvasElement|undefined;
+
+/** Coverage comes entirely from the ordinary Paint raster. The field stores
+ * pigment in premultiplied form so bilinear filtering preserves transparent edges. */
+function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Point[],
+ maskX:number,maskY:number,read:Ctx,previous:RasterRegion|undefined,sample:BlendSnapshot|undefined,carry:Float32Array|undefined,scale:number){
+ const {blur,kernel,wet}=blendFootprint(s,scale),size=s.size*scale,pad=sharedReach(s,scale);
+ let left=Infinity,right=-Infinity,top=Infinity,bottom=-Infinity;
+ for(const p of points){left=Math.min(left,p.x);right=Math.max(right,p.x);top=Math.min(top,p.y);bottom=Math.max(bottom,p.y);}
+ const x=Math.max(0,Math.floor(left-pad)),y=Math.max(0,Math.floor(top-pad));
+ const w=Math.min(ctx.canvas.width,Math.ceil(right+pad))-x,h=Math.min(ctx.canvas.height,Math.ceil(bottom+pad))-y;
+ if(w<=0||h<=0){restoreRegion(ctx,read,previous);return previous;}
+ const pitch=size>200?4:size>64?2:1,halo=Math.ceil(3*kernel+2);
+ const gx=Math.floor((x-halo)/pitch)*pitch,gy=Math.floor((y-halo)/pitch)*pitch;
+ const cw=Math.ceil((x+w+halo-gx)/pitch),ch=Math.ceil((y+h+halo-gy)/pitch);
+ const source=sample?sampleCanvas(sample):read.canvas;
+ const input=buffer(sharedSource??=make(),cw,ch,true);
+ drawCrop(input,source,sample?.x??0,sample?.y??0,gx,gy,cw,ch,pitch);
+ const color=buffer(sharedColor??=make(),cw,ch,true);
+ if(blur<1){
+  const coverage=buffer(sharedMask??=make(),cw,ch,true);
+  drawCrop(coverage,mask,maskX,maskY,gx,gy,cw,ch,pitch);
+  const weight=coverage.getImageData(0,0,cw,ch).data, pixels=input.getImageData(0,0,cw,ch);
+  const result=color.createImageData(cw,ch),data=result.data;
+  const sampleAt=new Float64Array(4),picked=new Float64Array(4),tank=new Float64Array(4);
+  if(carry)for(let i=0;i<carry.length;i++)tank[i%4]+=carry[i]/(carry.length/4)/(i%4===3?255:1);
+  const radius=Math.max(1,size*.5/pitch),drag=s.bbStretch??.5;
+  const spacing=Math.max(.5,size*Math.max(.025,Math.min(.12,s.tipSpacing??.08)));
+  const transport=1-(s.bbMix??.5),load=s.bbPaintLoad??0;
+  const rgb=parseInt(s.color.slice(1),16),paint=[rgb>>16&255,rgb>>8&255,rgb&255];
+  forDabs(points,spacing,p=>{
+   const cx=(p.x-gx)/pitch,cy=(p.y-gy)/pitch,offset=Math.min(p.distance/pitch,radius*(.25+drag));
+   picked.fill(0);let sum=0;
+   for(let j=-2;j<=2;j++)for(let i=-2;i<=2;i++){
+    const u=cx+i*radius*.34,v=cy+j*radius*.34,ix=Math.floor(u),iy=Math.floor(v);
+    if(ix<0||ix>=cw||iy<0||iy>=ch)continue;
+    const a=weight[(iy*cw+ix)*4+3];if(!a)continue;
+    sampleGrid(pixels,u-p.dx*offset*.5,v-p.dy*offset*.5,sampleAt);
+    for(let c=0;c<4;c++)picked[c]+=a*sampleAt[c];sum+=a;
+   }
+   if(sum)for(let c=0;c<4;c++)picked[c]/=sum;
+   const pickup=!tank[3]?1:1-Math.exp(-p.step*(s.bbPickup??.5)/Math.max(1,size*(.12+drag+(s.bbColorCarry??.5))));
+   for(let c=0;c<4;c++)tank[c]=lerp(tank[c],picked[c],pickup);
+   const reach=pad/pitch;
+   for(let v=Math.max(0,Math.floor(cy-reach));v<Math.min(ch,cy+reach);v++)for(let u=Math.max(0,Math.floor(cx-reach));u<Math.min(cw,cx+reach);u++){
+    const k=(v*cw+u)*4;if(!weight[k+3])continue;
+    const distance=Math.hypot(u+.5-cx,v+.5-cy);
+    if(distance>=reach)continue;
+    sampleGrid(pixels,u+.5-p.dx*offset,v+.5-p.dy*offset,sampleAt);
+    const alpha=lerp(tank[3],sampleAt[3],transport);
+    if(alpha<=0&&!load)continue;
+    const influence=data[k+3]?ease(1-distance/reach)*Math.min(1,p.step/(radius*pitch*.3)):1;
+    for(let c=0;c<3;c++){
+     const pigment=lerp(tank[c],sampleAt[c],transport)/Math.max(.0001,alpha);
+     data[k+c]=lerp(data[k+c],lerp(pigment,paint[c],load),influence);
+    }
+    data[k+3]=lerp(data[k+3],255*lerp(alpha,1,load),influence);
+   }
+  });
+  color.putImageData(result,0,0);
+ }
+ if(blur>0){
+  const filtered=buffer(sharedBlur??=make(),cw,ch);
+  filtered.save();filtered.filter='blur('+Math.max(.5,(kernel||size*(.035+.08*wet))/pitch)+'px)';
+  filtered.drawImage(sharedSource,0,0,cw,ch,0,0,cw,ch);filtered.restore();
+  color.globalAlpha=blur;color.drawImage(sharedBlur,0,0,cw,ch,0,0,cw,ch);color.globalAlpha=1;
+ }
+ const target=buffer(patch??=make(),w,h);
+ target.drawImage(sharedColor,0,0,cw,ch,gx-x,gy-y,cw*pitch,ch*pitch);
+ target.globalCompositeOperation='destination-in';
+ if(!drawCrop(target,mask,maskX,maskY,x,y,w,h))target.clearRect(0,0,w,h);
+ target.globalCompositeOperation='source-over';
+ const dirty=previous?{x:Math.min(x,previous.x),y:Math.min(y,previous.y),
+ width:Math.max(x+w,previous.x+previous.width)-Math.min(x,previous.x),
+ height:Math.max(y+h,previous.y+previous.height)-Math.min(y,previous.y)}:{x,y,width:w,height:h};
+ restoreRegion(ctx,read,dirty);
+ ctx.save();ctx.globalAlpha=clamp(s.opacity*(s.bbAmount??1)*(s.bbStrength??1));
+ ctx.globalCompositeOperation=s.bbProtectAlpha?'source-atop':'source-over';
+ ctx.drawImage(patch,0,0,w,h,x,y,w,h);ctx.restore();return dirty;
 }
 
 export function renderCharacterBlend(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Point[],
  maskX:number,maskY:number,read:Ctx=ctx,previous?:RasterRegion,sample?:BlendSnapshot,carry?:Float32Array,transformScale=1):RasterRegion|undefined{
+ if(s.brushBlendVersion===8)return renderPaintMasked(ctx,mask,s,points,maskX,maskY,read,previous,sample,carry,transformScale);
  const {style,mode,wet,blur,radius,filteredBlur,gaussian,localBlur,kernel,reach,pad}=blendFootprint(s,transformScale);
  const softness=s.bbSoftness??.5,water=style==='water',gradient=s.brushTip==='water-gradient';
  const rough=s.brushTip==='water-rough',flat=s.brushTip==='water-flat';

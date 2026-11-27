@@ -68,10 +68,10 @@ export function brushStrokeMetadata(s:NatureControls&InkFlowControls&WatercolorC
   engineVersion:10,liveRefinementVersion:3,natureVersion:1,nature:natureSettings(natureTip,s.nature),
   flow:s.flow,pressureFlow:s.pressureFlow,
  };
- if(inkPaint&&!s.bbEnabled&&!s.nativeMixEnabled&&supportsInkTip(s.brushKind)){
+ if(inkPaint&&!s.nativeMixEnabled&&supportsInkTip(s.brushKind)){
   // Isolate Ink Paint from stamp, watercolor and pigment transport routing.
   return {
-   ...inkTipMetadata(s),engineVersion:10,liveRefinementVersion:s.brushKind==='technical'&&!s.inkTipVersion&&!s.inkProfileVersion?2:3,
+   ...brushBlendMetadata(s),...inkTipMetadata(s),engineVersion:10,liveRefinementVersion:s.brushKind==='technical'&&!s.inkTipVersion&&!s.inkProfileVersion?2:3,
    ...(s.inkProfileVersion===1?{inkProfileVersion:1 as const,inkProfile:s.inkProfile?.map(p=>({...p})),inkProfileLength:s.inkProfileLength??180}:{}),
    ...(isFlowInk(s.brushKind)&&s.inkFlowAmount!==undefined?{inkFlowVersion:1 as const,inkFlowAmount:s.inkFlowAmount,inkFlowLength:s.inkFlowLength??160}:{}),
    pressureOpacity:false,
