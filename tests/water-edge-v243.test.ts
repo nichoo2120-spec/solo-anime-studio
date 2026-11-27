@@ -47,7 +47,7 @@ describe('water edge v0.5.243',()=>{
  it('new strokes of every normal watercolor brush, Silk Wet and Blend watercolor save Edge darkness 0; only Watercolor Edge keeps it',()=>{
   const water=stockPresets.filter(p=>isNewWatercolorTip(p.settings.brushTip));
   expect(water.map(p=>p.id)).toEqual(['water-smooth','water-rough','water-wet','water-flat','water-gradient','water-edge']);
-  for(const p of water){const s=make(p.id),b=make(p.id,{bbEnabled:true});const want=p.id==='water-edge'?1:0;expect(s.edgeDarkness,p.id).toBe(want);expect(b.edgeDarkness,p.id+' blend').toBe(want);expect(b.brushBlendVersion).toBe(9);expect(b.bbEdgeDarkness).toBe(p.id==='water-smooth'?.14:want);}
+  for(const p of water){const s=make(p.id),b=make(p.id,{bbEnabled:true});const want=p.id==='water-edge'?1:0;expect(s.edgeDarkness,p.id).toBe(want);expect(b.edgeDarkness,p.id+' blend').toBe(want);expect(b.brushBlendVersion).toBe(10);expect(b.bbEdgeDarkness).toBe(p.id==='water-smooth'?.14:want);}
   expect(stockPresets.find(p=>p.id==='water-edge')!.name).toBe('Watercolor Edge');
   expect(make('silk-blend',silkWet).edgeDarkness).toBe(0);
   expect(make('silk-blend',{silkMode:'soft'}).edgeDarkness).toBeUndefined();

@@ -53,7 +53,7 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
   const t=length?clamp((distance-start)/length):0,p=a.p+(b.p-a.p)*t;
   const cx=(a.x+(b.x-a.x)*t-originX)/pitch-.5,cy=(a.y+(b.y-a.y)*t-originY)/pitch-.5;
   const dx=length?(b.x-a.x)/length:1,dy=length?(b.y-a.y)/length:0;
-  const contact=wash?Math.sqrt(clamp(p/.4)):p;
+  const contact=wash||s.brushBlendVersion===10?Math.sqrt(clamp(p/.4)):p;
   const r=Math.max(1,extent/pitch),moisture=wet*(s.pressure&&s.bbPressureWet?contact:1);
   const localMix=mix*(s.pressure&&s.bbPressureMix?contact:1);
   const strength=s.pressure&&s.bbPressure?blendPressureFactor(p/.4,s.bbMinPressure??.7,s.bbPressureCurve??'linear'):1;
@@ -71,6 +71,8 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
     pickup[k+3]=alpha;
    }
    const charge=distance||carry?refill:1;
+   // A partial previous load augments the colour already under this nib.
+   const firstCharge=s.brushBlendVersion===10&&!distance&&carry?Math.max(.5,charge):charge;
    for(let c=0;c<4;c++){
     let pigment=pickup[k+c];
     if(wash&&distance){
@@ -80,7 +82,7 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
      const adjacent=(previousPickup[left+c]+previousPickup[right+c]+previousPickup[up+c]+previousPickup[down+c])*.25;
      pigment+=(adjacent-pigment)*moisture*.5;
     }
-    pickup[k+c]=pigment+(sample[c]-pigment)*charge;
+    pickup[k+c]=pigment+(sample[c]-pigment)*firstCharge;
    }
   }
   const tail=s.bbTaper??.12,fadeLength=Math.max(1,s.size*(.3+capacity*5));

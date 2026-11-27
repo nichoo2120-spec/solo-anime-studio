@@ -195,7 +195,7 @@ function blendFootprint(s:Stroke,transformScale:number){
 /** A saved all-layers sample must retain the same source halo as the worker. */
 export function characterBlendReadReach(s:Stroke,transformScale:number){
  const {pad,kernel}=blendFootprint(s,transformScale);
- if((s.brushBlendVersion===8||s.brushBlendVersion===9))return Math.ceil(sharedReach(s,transformScale)+4.2*Math.max(kernel,s.size*transformScale*.12)+2);
+ if((s.brushBlendVersion===8||(s.brushBlendVersion===9||s.brushBlendVersion===10)))return Math.ceil(sharedReach(s,transformScale)+4.2*Math.max(kernel,s.size*transformScale*.12)+2);
  return pad+Math.ceil(kernel*3)+8;
 }
 
@@ -222,7 +222,7 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
  const w=Math.min(ctx.canvas.width,Math.ceil(right+pad))-x,h=Math.min(ctx.canvas.height,Math.ceil(bottom+pad))-y;
  if(w<=0||h<=0){restoreRegion(ctx,read,previous);return previous;}
  const sigma=blur>0?Math.max(.5,(kernel||size*(.035+.08*wet))*(.6+.8*(s.bbSoftness??.5))):0;
- const pitch=s.brushBlendVersion===9?Math.max(1,Math.min(10,Math.floor(size/32))):size>200?4:size>64?2:1,halo=Math.ceil(3*sigma+size*.65+2);
+ const pitch=(s.brushBlendVersion===9||s.brushBlendVersion===10)?Math.max(1,Math.min(10,Math.floor(size/32))):size>200?4:size>64?2:1,halo=Math.ceil(3*sigma+size*.65+2);
  const gx=Math.floor((x-halo)/pitch)*pitch,gy=Math.floor((y-halo)/pitch)*pitch;
  const cw=Math.ceil((x+w+halo-gx)/pitch),ch=Math.ceil((y+h+halo-gy)/pitch);
  const source=sample?sampleCanvas(sample):read.canvas;
@@ -243,7 +243,7 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
   extend('y',Math.max(0,Math.ceil(-gy/pitch)),Math.min(ch,Math.ceil((ctx.canvas.height-gy)/pitch)),ch);
  }
  const color=buffer(sharedColor??=make(),cw,ch,true);
- if(s.brushBlendVersion===9&&blur<1){
+ if((s.brushBlendVersion===9||s.brushBlendVersion===10)&&blur<1){
   const inputPixels=input.getImageData(0,0,cw,ch);
   color.putImageData(mixerField(color,inputPixels,s,points,gx,gy,pitch,pad,carry),0,0);
  }else if(blur<1){
@@ -339,20 +339,20 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
  width:Math.max(x+w,previous.x+previous.width)-Math.min(x,previous.x),
  height:Math.max(y+h,previous.y+previous.height)-Math.min(y,previous.y)}:{x,y,width:w,height:h};
  restoreRegion(ctx,read,dirty);
- ctx.save();ctx.globalAlpha=clamp(s.opacity*(s.bbAmount??1)*(s.bbStrength??1)*(s.brushBlendVersion===9?1:Math.min(1,(s.bbFlow??.6)/.6)));
+ ctx.save();ctx.globalAlpha=clamp(s.opacity*(s.bbAmount??1)*(s.bbStrength??1)*((s.brushBlendVersion===9||s.brushBlendVersion===10)?1:Math.min(1,(s.bbFlow??.6)/.6)));
  ctx.globalCompositeOperation=s.bbProtectAlpha?'source-atop':'source-over';
  ctx.drawImage(patch,0,0,w,h,x,y,w,h);ctx.restore();return dirty;
 }
 
 export function renderCharacterBlend(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Point[],
  maskX:number,maskY:number,read:Ctx=ctx,previous?:RasterRegion,sample?:BlendSnapshot,carry?:Float32Array,transformScale=1):RasterRegion|undefined{
- if(s.brushBlendVersion===9&&s.bbWetness===0){
+ if((s.brushBlendVersion===9||s.brushBlendVersion===10)&&s.bbWetness===0){
   const box=strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height);
   restoreRegion(ctx,read,previous);restoreRegion(ctx,read,box);
   compositePaintStroke(ctx,mask as HTMLCanvasElement,{...s,brushBlendVersion:undefined},maskX,maskY);
   return box;
  }
- if((s.brushBlendVersion===8||s.brushBlendVersion===9))return renderPaintMasked(ctx,mask,s,points,maskX,maskY,read,previous,sample,carry,transformScale);
+ if((s.brushBlendVersion===8||(s.brushBlendVersion===9||s.brushBlendVersion===10)))return renderPaintMasked(ctx,mask,s,points,maskX,maskY,read,previous,sample,carry,transformScale);
  const {style,mode,wet,blur,radius,filteredBlur,gaussian,localBlur,kernel,reach,pad}=blendFootprint(s,transformScale);
  const softness=s.bbSoftness??.5,water=style==='water',gradient=s.brushTip==='water-gradient';
  const rough=s.brushTip==='water-rough',flat=s.brushTip==='water-flat';

@@ -208,7 +208,7 @@ export class StudioEngine {
   if(!isBrushBlendVersion(s.brushBlendVersion))return;
   if(s.tool!=='brush'){for(const k of Object.keys(s))if(k==='brushBlendVersion'||k.startsWith('bb'))delete (s as Record<string,unknown>)[k];return;}
   s.nativeMixVersion=undefined;s.nativeMixPickupVersion=undefined;s.nativeMixAmount=undefined;s.nativeMixPaintLoad=undefined;s.nativeMixRadius=undefined;
-  if(s.brushBlendVersion===9){
+  if((s.brushBlendVersion===9||s.brushBlendVersion===10)){
    const key=this.preset.id;
    if(s.bbReload)s.bbPaintLoad=1;
    else if(s.bbLoadToken){
@@ -227,7 +227,7 @@ export class StudioEngine {
   if(last&&target)this.lastBlendEnd={project:target.project,preset:this.preset.id,layer:target.layer,x:last.x,y:last.y,r:Math.max(1,stroke.size*.5)};
   if(stroke.bbSample!=='all'||!page||!stroke.points.length)return stroke;
   const path=blendPath(stroke),scale=blendTransformScale(stroke);
-  const pad=(stroke.brushBlendVersion===7||(stroke.brushBlendVersion===8||stroke.brushBlendVersion===9))?characterBlendReadReach(stroke,scale):
+  const pad=(stroke.brushBlendVersion===7||(stroke.brushBlendVersion===8||(stroke.brushBlendVersion===9||stroke.brushBlendVersion===10)))?characterBlendReadReach(stroke,scale):
    Math.ceil((isMaterialBrushBlendVersion(stroke.brushBlendVersion)?brushBlendV4Reach(stroke)*scale:stroke.size*.75)+8);let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const p of path){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);}
   // Mirrored copies replay elsewhere on the page, so they keep the whole page.
@@ -259,7 +259,8 @@ export class StudioEngine {
   if(snapshot.liveRefinementVersion===3&&!this.displayInk(snapshot)){
    const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===this.strokeTarget?.layer),bounds=this.pigmentPreviewBounds(snapshot,doc,geometry);
    const sc=this.scratch.getContext('2d')!;
-   if(snapshot.natureVersion===1)this.liveRaster.paint(sc,snapshot,geometry);
+   if(snapshot.brushBlendVersion===10){sc.clearRect(0,0,this.scratch.width,this.scratch.height);drawStroke(sc,snapshot,'final',geometry);}
+   else if(snapshot.natureVersion===1)this.liveRaster.paint(sc,snapshot,geometry);
    else if(bounds){
     sc.clearRect(bounds.x,bounds.y,bounds.width,bounds.height);
     if(bounds.width&&bounds.height)drawModernStroke(sc,snapshot,'final',geometry,bounds);
@@ -592,7 +593,7 @@ export class StudioEngine {
   if(this.tool==='fill'){void this.fill(p);return;}
   const metadata=brushStrokeMetadata(this.tool==='eraser'?{...this.brush,bbEnabled:false}:this.brush,this.tool==='brush');
   const silk=metadata.silkBlendVersion!==undefined;
-  const fastBlend=this.brush.size>64&&(silk||(metadata.brushBlendVersion===7||(metadata.brushBlendVersion===8||metadata.brushBlendVersion===9)));
+  const fastBlend=this.brush.size>64&&(silk||(metadata.brushBlendVersion===7||(metadata.brushBlendVersion===8||(metadata.brushBlendVersion===9||metadata.brushBlendVersion===10))));
   const nativeMix=this.tool==='brush'&&this.brush.nativeMixEnabled&&!metadata.brushBlendVersion&&!silk&&!metadata.natureVersion;
   const workspaceStroke=!silk&&doc.version===6&&!this.mirrorDrawing.enabled&&!this.brush.nativeMixEnabled&&!this.brush.mixColors&&
    supportsSparseStroke({...this.brush,...metadata,tool:this.tool==='eraser'?'eraser':'brush'});
@@ -696,6 +697,11 @@ export class StudioEngine {
     this.strokeDirty=false;livePainted=!this.blendWorker.available()||!!this.strokeMirror;
    }else if(workerBlendEligible(this.stroke)&&this.blendWorker.available()&&!this.strokeMirror){
     this.strokeDirty=false;livePainted=false;
+  }else if(this.stroke.brushBlendVersion===10){
+    const sc=this.scratch.getContext('2d')!;
+    sc.clearRect(0,0,this.scratch.width,this.scratch.height);
+    if(!this.initialPressurePending||this.stroke.points.length>1)drawStroke(sc,this.stroke,'final',finalGeometry(this.stroke));
+    this.strokeDirty=false;livePainted=true;
   }else if(this.displayInk(this.stroke)&&!(this.initialPressurePending&&this.stroke.points.length===1)){this.liveRaster.reset();if(this.diagnostics.enabled)this.diagnostics.observeLive(this.liveTip);}else{const sc=this.scratch.getContext('2d')!;if(!(this.initialPressurePending&&this.stroke.points.length===1)){const start=this.diagnostics.enabled?performance.now():0;this.performance.measure('liveRasterMs',()=>{const pixels=this.liveRaster.paint(sc,this.stroke!,this.liveGeometry!);this.performance.record('liveDirtyPixels',pixels);});if(this.diagnostics.enabled){this.diagnostics.timing('liveRenderMs',performance.now()-start);this.diagnostics.observeLive(this.liveTip);}}else{sc.clearRect(0,0,this.scratch.width,this.scratch.height);this.liveRaster.reset();}}this.strokeDirty=false;livePainted=true;}
   const compositeStarted=this.performance.enabled?performance.now():0;const ctx=this.canvas.getContext('2d')!,nativeDpr=window.devicePixelRatio||1;
   const denseStroke=this.worldOnlyStroke?undefined:this.stroke;

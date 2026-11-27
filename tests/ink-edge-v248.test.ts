@@ -57,7 +57,7 @@ describe('Versioned Paint ink edges',()=>{
   expect(brushStrokeMetadata(settings).inkEdgeVersion).toBeUndefined();
   expect(ink).toMatchObject({inkEdgeVersion:1,inkEdgeSharpness:1,inkAntialiasing:'low',pressureOpacity:false});
   for(const key of ['stampVersion','watercolorEngine','edgeDarkness','mixVersion','brushBlendVersion'])expect(ink).not.toHaveProperty(key);
-  expect(brushStrokeMetadata({...settings,bbEnabled:true},true)).toMatchObject({inkEdgeVersion:1,brushBlendVersion:9});
+  expect(brushStrokeMetadata({...settings,bbEnabled:true},true)).toMatchObject({inkEdgeVersion:1,brushBlendVersion:10});
   expect(brushStrokeMetadata({...settings,nativeMixEnabled:true},true).inkEdgeVersion).toBeUndefined();
   expect(stockPresets.find(p=>p.id==='ink-marker')?.category).toBe('Ink');
   const light=surface(),firm=surface();

@@ -207,10 +207,10 @@ describe('Watercolor Blend v5',()=>{
  it('versions newly created Blend strokes and keeps saved v4 pixels identical',()=>{
   const ids=['water-smooth','water-wet','water-rough','water-flat','water-edge'];
   const metadata=ids.map(id=>brushStrokeMetadata({...stockPresets.find(p=>p.id===id)!.settings,bbEnabled:true}));
-  expect(metadata.map(s=>s.brushBlendVersion)).toEqual([9,9,9,9,9]);
+  expect(metadata.map(s=>s.brushBlendVersion)).toEqual([10,10,10,10,10]);
   expect(ids.map(id=>hash(render(stroke(id,{},4))))).toEqual([2316611864,1919703141,3050506906,3210628171,2682126738]);
   const shaped=stockPresets.find(p=>p.id==='water-flat')!.settings;
-  expect(brushStrokeMetadata({...shaped,bbEnabled:true,tsEnabled:true}).brushBlendVersion).toBe(9);
+  expect(brushStrokeMetadata({...shaped,bbEnabled:true,tsEnabled:true}).brushBlendVersion).toBe(10);
   const p=newProject();
   activeLayer(p).operations=ids.slice(0,4).map(id=>stroke(id,{},5));
   expect(()=>validateProject(JSON.parse(JSON.stringify(p)))).not.toThrow();

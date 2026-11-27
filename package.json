@@ -1,7 +1,7 @@
 {
   "name": "solo-anime-studio",
   "private": true,
-  "version": "0.5.259",
+  "version": "0.5.260",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -56,4 +56,3 @@
   "description": "Solo Anime Studio - 2D anime drawing and animation studio",
   "author": "Nicholas"
 }
-

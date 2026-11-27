@@ -169,7 +169,7 @@ test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay respon
   const {stockPresets}=await load('/src/core/brushes.ts');
   const frame=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
   const results=[];
-  for(const size of [130,300,500])for(const id of ids){
+  for(const size of [130,150,300,500])for(const id of ids){
    const project=newProject('Blend character performance',1920,1080);
    const paint=(x:number,color:string)=>({id:color,kind:'stroke',tool:'brush',size:550,pressure:false,response:1,opacity:1,color,
     points:[{x,y:160,p:1},{x,y:920,p:1}]});
@@ -232,7 +232,7 @@ test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay respon
  for(const r of rows){
   const label=r.id+' '+r.size;
   console.log('BLEND_V255_TIMING '+JSON.stringify(r));
-  expect.soft(r.version,label).toBe(9);
+  expect.soft(r.version,label).toBe(10);
   expect.soft(r.frames,label).toBeGreaterThanOrEqual(15);
   expect.soft(r.previews,label).toBeGreaterThan(0);
   expect.soft(r.firstPixel,label+' first input to composited preview').toBeLessThanOrEqual(1000/60);
