@@ -1,3 +1,4 @@
+import {blendPressureFactor,effectiveBlendStyle} from '../core/brushBlend';
 import type {Point,Stroke} from '../core/model';
 
 /** The pickup image follows the nib. All four channels are linear and premultiplied. */
@@ -33,7 +34,8 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
  const loaded=[linear[rgb>>16&255],linear[rgb>>8&255],linear[rgb&255]];
  const carrySide=carry?Math.round(Math.sqrt(carry.length/4)):0;
  const capacity=s.bbCapacity??.45,drag=s.bbStretch??.5,flow=s.bbFlow??.6;
- const wet=s.bbWetness??.5,mix=s.bbMix??.5;
+ const style=effectiveBlendStyle(s.bbStyle??'soft',s.bbRenderStyle);
+ const wet=clamp((s.bbWetness??.5)*(style==='dry'||s.bbMode==='dry'?.7:style==='water'?1.08:1)),mix=s.bbMix??.5;
  const spacing=Math.max(.5,s.size*Math.max(.025,Math.min(.15,s.tipSpacing??.08)));
  let total=0;for(let i=1;i<points.length;i++)total+=Math.hypot(points[i].x-points[i-1].x,points[i].y-points[i-1].y);
  // Two passes keep memory independent of stroke length. First assign each
@@ -52,7 +54,8 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
   const dx=length?(b.x-a.x)/length:1,dy=length?(b.y-a.y)/length:0;
   const r=Math.max(1,extent/pitch),moisture=wet*(s.pressure&&s.bbPressureWet?p:1);
   const localMix=mix*(s.pressure&&s.bbPressureMix?p:1);
-  const refill=1-Math.exp(-spacing*(s.bbPickup??.5)*moisture/Math.max(1,s.size*(.18+drag)));
+  const strength=s.pressure&&s.bbPressure?blendPressureFactor(p/.4,s.bbMinPressure??.7,s.bbPressureCurve??'linear'):1;
+  const refill=1-Math.exp(-spacing*(s.bbPickup??.5)*moisture/Math.max(1,s.size*(.18+drag+.35*(s.bbColorCarry??.6))));
   if(pass===1)previousPickup.set(pickup);
   if(pass===1)for(let v=0;v<side;v++)for(let u=0;u<side;u++){
    const k=(v*side+u)*4;
@@ -92,7 +95,8 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
     const offset=Math.min(distance/pitch,r*drag*.65);
     sampleLinear(src,w,h,x-dx*offset,y-dy*offset,sample);
     const dry=1-moisture*(1-capacity)*(1-Math.exp(-distance/fadeLength));
-    const dragged=clamp(localMix*moisture),paint=charge*(1-localMix);
+    const rim=clamp(nx*nx+ny*ny)*(s.bbEdgeDarkness??0);
+    const dragged=clamp(localMix*moisture*(.85+.3*(s.bbTextureKeep??.5))*(1-.25*rim)),paint=charge*(1-localMix);
     for(let c=0;c<4;c++){
      const row=v0*side,row1=Math.min(side-1,v0+1)*side,u1=Math.min(side-1,u0+1);
      const top=pickup[(row+u0)*4+c]*(1-fx)+pickup[(row+u1)*4+c]*fx;
@@ -112,7 +116,7 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
     sample[3]=sample[3]*activity+baseAlpha*(1-activity);
     const alpha=sample[3];if(alpha<=0)continue;
     for(let c=0;c<3;c++)output[k+c]=encoded[Math.round(4096*clamp(sample[c]/alpha))];
-    output[k+3]=Math.round(255*alpha*flow);
+    output[k+3]=Math.round(255*alpha*flow*strength);
    }
   }
   previousX=cx;previousY=cy;
