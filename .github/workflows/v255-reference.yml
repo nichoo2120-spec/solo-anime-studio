@@ -1,0 +1,19 @@
+name: v255 browser reference
+on: [push]
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright test --shard=${{ matrix.shard }}/4
