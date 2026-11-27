@@ -195,10 +195,6 @@ export function brushBlendMetadata(s:BrushBlendSettings&Shape):BrushBlendControl
  * Shaped stamps keep their authored pressure envelope and secondary tip. */
 export function prepareBlendMaskPressure(stroke:Stroke){
  if(stroke.brushBlendVersion===9&&stroke.bbWetness!==0){
-  if(stroke.watercolorBlendVersion===1){
-   // Size retains pen dynamics. Apply mixing pressure once in the reservoir.
-   stroke.pressureOpacity=false;stroke.pressureFlow=false;
-  }
   const taper=stroke.bbTaper??.12;
   stroke.taperStart=Math.max(stroke.taperStart??0,taper*.12);
   stroke.taperEnd=Math.max(stroke.taperEnd??0,taper*.18);
