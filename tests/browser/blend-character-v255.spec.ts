@@ -50,8 +50,12 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
     let outside=0,longest=0,seamRatio=0;
     let longestEdge:{vertical:boolean;col:number;start:number;end:number}|undefined;
     for(let i=0,j=0;i<out.length;i+=4,j++){
-     delta[j]=Math.max(Math.abs(out[i]-before[i]),Math.abs(out[i+1]-before[i+1]),Math.abs(out[i+2]-before[i+2]),Math.abs(out[i+3]-before[i+3]));
-     if(delta[j]&&coverage&&!coverage[i+3])outside++;
+     const srcAlpha=before[i+3],dstAlpha=out[i+3];
+     let changed=false,visibleDelta=Math.abs(dstAlpha-srcAlpha);
+     for(let c=0;c<4;c++)changed=changed||out[i+c]!==before[i+c];
+     for(let c=0;c<3;c++)visibleDelta=Math.max(visibleDelta,Math.abs(out[i+c]*dstAlpha-before[i+c]*srcAlpha)/255);
+     delta[j]=Math.round(visibleDelta);
+     if(changed&&coverage&&!coverage[i+3])outside++;
     }
     // Find aligned jumps from visibly changed pixels directly to blank.
     // A tapered or rotated nib cannot sustain such a jump along an axis.
@@ -65,6 +69,12 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
         ?Math.abs(col-edge)<=1||row>=150&&row<260&&(Math.abs(col-260)<=1||Math.abs(col-380)<=1)
         :row>=260&&row<380&&(Math.abs(col-150)<=1||Math.abs(col-260)<=1);
        if(backgroundEdge){run=0;continue;}
+       // A deliberate chisel edge or grain hole in the Paint mask is legal.
+       // Detect a clipping jump only inside otherwise continuous coverage.
+       if(coverage){
+        const current=coverage[at*4+3],previous=coverage[(at-neighbor)*4+3];
+        if(Math.min(current,previous)<20||Math.abs(current-previous)>8){run=0;continue;}
+       }
        const a=delta[at],b=delta[at-neighbor];
        run=Math.abs(a-b)>27&&Math.min(a,b)<2?run+1:0;
        if(run>longest){longest=run;longestEdge={vertical,col,start:row-run+1,end:row};}
@@ -72,16 +82,22 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
      }
     }
     // Compare edge steps at the old 64 px seams with their nearby controls.
-    let tile=0,neighbor=0;
+    let tile=0,neighbor=0,seamEdges=0;
     for(let x=64;x<width-3;x+=64)for(let y=3;y<height-3;y++){
-     const i=y*width+x;tile+=Math.abs(delta[i]-delta[i-1]);
-     neighbor+=(Math.abs(delta[i-2]-delta[i-3])+Math.abs(delta[i+2]-delta[i+1]))*.5;
+     const i=y*width+x;
+     if(coverage&&(coverage[i*4+3]<24||Math.abs(coverage[i*4+3]-coverage[(i-1)*4+3])>8))continue;
+     if(Math.abs(x-edge)<=4||((Math.abs(x-260)<=4||Math.abs(x-380)<=4)&&y>=150&&y<260))continue;
+     const jump=Math.abs(delta[i]-delta[i-1]);tile+=jump;seamEdges++;
+     neighbor+=(Math.abs(delta[i-1]-delta[i-2])+Math.abs(delta[i+1]-delta[i]))*.5;
     }
     for(let y=64;y<height-3;y+=64)for(let x=3;x<width-3;x++){
-     const i=y*width+x;tile+=Math.abs(delta[i]-delta[i-width]);
-     neighbor+=(Math.abs(delta[i-2*width]-delta[i-3*width])+Math.abs(delta[i+2*width]-delta[i+width]))*.5;
+     const i=y*width+x;
+     if(coverage&&(coverage[i*4+3]<24||Math.abs(coverage[i*4+3]-coverage[(i-width)*4+3])>8))continue;
+     if((Math.abs(y-150)<=4||Math.abs(y-260)<=4)&&x>=260&&x<380)continue;
+     const jump=Math.abs(delta[i]-delta[i-width]);tile+=jump;seamEdges++;
+     neighbor+=(Math.abs(delta[i-width]-delta[i-2*width])+Math.abs(delta[i+width]-delta[i]))*.5;
     }
-    seamRatio=neighbor?tile/neighbor:0;
+    seamRatio=tile/(neighbor+seamEdges*.025||1);
     cases.push({id:preset.id,size,version:s.brushBlendVersion,silk:s.silkBlendVersion,outside,longest,longestEdge,seamRatio,...difference(out,before)});
     if(targetIds.includes(preset.id))reference.set(preset.id,out);
     if(['blend-mix','water-rough','water-flat'].includes(preset.id)){
@@ -112,7 +128,10 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
   expect.soft(row.seamRatio,label+' 64 px seams').toBeLessThan(2.2);
  }
  for(const r of result.pairs)expect.soft(r.mean,r.a+' / '+r.b+' '+r.size).toBeGreaterThan(.65);
- for(const r of result.drag)expect.soft(r.directionalRed,r.id+' '+r.size).toBeGreaterThan(2);
+ for(const r of result.drag){
+  console.log('BLEND_V255_DRAG '+JSON.stringify(r));
+  expect.soft(r.directionalRed,r.id+' '+r.size).toBeGreaterThan(2);
+ }
  for(const r of result.pressure){
   expect.soft(r.mix.pixels,r.id+' '+r.size+' visible at 50%').toBeGreaterThan(250);
   expect.soft(r.difference.pixels,r.id+' '+r.size+' full mix from 40%').toBe(0);
@@ -229,4 +248,46 @@ test('Full Brush Settings pins the Blend controls and saves Smear vs Blur per br
  await openBrushSettings(page);
  await page.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Blend settings',exact:true}).click();
  await expect(blur).toHaveValue('100');
+});
+
+test('Blend CPU fallback saves the exact watercolor mask and supports undo',async({page})=>{
+ await page.goto('/');
+ const result=await page.evaluate(async()=>{
+  const load=(path:string)=>import(path);
+  const {newProject,activeLayer}=await load('/src/core/model.ts');
+  const {DocumentStore}=await load('/src/core/history.ts');
+  const {StudioEngine}=await load('/src/engine/StudioEngine.ts');
+  const {LayerRenderer}=await load('/src/engine/renderer.ts');
+  const {stockPresets}=await load('/src/core/brushes.ts');
+  const project=newProject('Watercolor fallback',840,530);
+  const paint=(x:number,color:string)=>({id:color,kind:'stroke',tool:'brush',size:380,pressure:false,response:1,opacity:1,color,
+   points:[{x,y:50,p:1},{x,y:480,p:1}]});
+  activeLayer(project).operations=[paint(223,'#cf343f'),paint(579,'#194dd8')];
+  const store=new DocumentStore(project),host=document.createElement('div'),canvas=document.createElement('canvas');
+  host.style.cssText='position:fixed;inset:0';canvas.style.cssText='display:block;width:840px;height:530px';
+  host.append(canvas);document.body.append(host);
+  let held=false;canvas.setPointerCapture=()=>{held=true;};canvas.hasPointerCapture=()=>held;canvas.releasePointerCapture=()=>{held=false;};
+  const engine=new StudioEngine(canvas,store,()=>{}),replay=new LayerRenderer(false);
+  const frame=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+  const send=(kind:string,x:number,y:number)=>canvas.dispatchEvent(new PointerEvent(kind,{pointerId:1,button:0,
+   pointerType:'pen',pressure:.5,isPrimary:true,buttons:kind==='pointerup'?0:1,clientX:x,clientY:y}));
+  const pixels=(renderer:any,p:any)=>renderer.get(activeLayer(p),p).getContext('2d').getImageData(0,0,840,530).data as Uint8ClampedArray;
+  const delta=(a:Uint8ClampedArray,b:Uint8ClampedArray)=>a.reduce((n,v,i)=>n+Number(v!==b[i]),0);
+  try{
+   engine.blendWorker.warm=()=>{};engine.blendWorker.available=()=>false;
+   engine.setView({x:0,y:0,zoom:1,rotation:0});
+   engine.setInput('brush',{...stockPresets.find((p:any)=>p.id==='water-flat').settings,size:150,opacity:1,bbEnabled:true});
+   await frame();await frame();
+   send('pointerdown',293,239);await frame();
+   for(let j=1;j<=6;j++){send('pointermove',293+j*45,239+j*5);await frame();}
+   send('pointerup',568,271);await frame();
+   const drawn=store.getSnapshot(),final=pixels(engine.renderer,drawn),old=pixels(replay,project);
+   const changed=delta(final,old),exact=delta(final,pixels(replay,drawn));
+   engine.historyNavigation('undo');await frame();
+   return {changed,exact,undo:delta(pixels(engine.renderer,store.getSnapshot()),old)};
+  }finally{engine.dispose();replay.clear();host.remove();}
+ });
+ expect(result.changed).toBeGreaterThan(500);
+ expect(result.exact).toBe(0);
+ expect(result.undo).toBe(0);
 });

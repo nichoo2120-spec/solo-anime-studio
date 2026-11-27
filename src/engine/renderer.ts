@@ -1,5 +1,3 @@
-import {paintSamples} from './paintPass';
-import {drawCharacterTip,usesCharacterTip} from './characterBlend';
 import {isBrushBlendVersion} from '../core/brushBlend';
 import {drawStampStroke} from './stampBrush';
 import {decodeBlendSample,hasBlendSample} from './brushBlend';
@@ -48,7 +46,6 @@ export function drawStroke(ctx:CanvasRenderingContext2D,s:Stroke,phase:'live'|'f
  if(s.stampVersion===1){drawStampStroke(ctx,s,geometry??finalGeometry(s));return;
  }
  if(s.transform){ctx.save();ctx.transform(...s.transform);drawStroke(ctx,{...s,transform:undefined},phase,geometry);ctx.restore();return;}
- if(usesCharacterTip(s)){drawCharacterTip(ctx,s,paintSamples(geometry??finalGeometry(s),.4).points);return;}
  if((s.dryBristleVersion===1||s.dryBristleVersion===2||s.dryBristleVersion===3)){drawModernStroke(ctx,s,phase,geometry);return;}
  if(s.engineVersion===2||s.engineVersion===3||s.engineVersion===4||s.engineVersion===5||s.engineVersion===6||s.engineVersion===7||s.engineVersion===8||s.engineVersion===9||s.engineVersion===10){drawModernStroke(ctx,s,phase,geometry);return;}
  ctx.save();ctx.fillStyle=s.color;ctx.strokeStyle=s.color;ctx.lineCap='round';ctx.lineJoin='round';

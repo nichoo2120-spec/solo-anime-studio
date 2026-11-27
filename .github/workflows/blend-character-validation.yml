@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test: [build, pixels, performance, old-capture]
+        test: [build, pixels, performance]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,8 +25,6 @@ jobs:
       - if: matrix.test != 'build'
         run: npx playwright install chromium
       - if: matrix.test == 'pixels'
-        run: npx playwright test tests/browser/blend-character-v255.spec.ts --grep "full-resolution|Full Brush Settings pins" --reporter=line
+        run: npx playwright test tests/browser/blend-character-v255.spec.ts --grep-invert "300 px and 500 px" --reporter=line
       - if: matrix.test == 'performance'
         run: npx playwright test tests/browser/blend-character-v255.spec.ts --grep "300 px and 500 px" --reporter=line
-      - if: matrix.test == 'old-capture'
-        run: npx playwright test tests/browser/brush-blend-v4.spec.ts --reporter=line

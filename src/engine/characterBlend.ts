@@ -150,12 +150,10 @@ function restoreRegion(ctx:Ctx,read:Ctx|undefined,box:RasterRegion|undefined){
  const {x,y,width,height}=box;
  ctx.clearRect(x,y,width,height);ctx.drawImage(read.canvas,x,y,width,height,x,y,width,height);
 }
-export function renderCharacterBlend(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Point[],
- maskX:number,maskY:number,read:Ctx=ctx,previous?:RasterRegion,sample?:BlendSnapshot,carry?:Float32Array,transformScale=1):RasterRegion|undefined{
+function blendFootprint(s:Stroke,transformScale:number){
  const style=effectiveBlendStyle(s.bbStyle??'soft',s.bbRenderStyle);
- const water=style==='water',gradient=s.brushTip==='water-gradient',rough=s.brushTip==='water-rough';
- const flat=s.brushTip==='water-flat',mode=s.bbMode??'soft',wet=clamp((s.bbWetness??.4)*(mode==='dry'?.48:mode==='wet'?1.12:1));
- const blur=s.bbRenderStyle==='blur'?1:clamp(s.bbBlur??0),softness=s.bbSoftness??.5,radius=s.size*(s.stampVersion===1?Math.max(.65,stampExtent(s)):.65)*transformScale;
+ const mode=s.bbMode??'soft',wet=clamp((s.bbWetness??.4)*(mode==='dry'?.48:mode==='wet'?1.12:1));
+ const blur=s.bbRenderStyle==='blur'?1:clamp(s.bbBlur??0),radius=s.size*(s.stampVersion===1?Math.max(.65,stampExtent(s)):.65)*transformScale;
  const filteredBlur=blur*ease((blur-.2)/.35);
  const gaussian=filteredBlur>.001,localBlur=blur-filteredBlur;
  const kernel=gaussian?radius*(.14+.34*wet):0;
@@ -163,6 +161,20 @@ export function renderCharacterBlend(ctx:Ctx,mask:CanvasSource,s:Stroke,points:r
  // The contact atlas is at most 1.5 radii wide, including feather. Its
  // destination can be smaller than the read halo, particularly for wet dabs.
  const pad=Math.ceil((usesCharacterTip(s)&&!s.perspective?Math.min(reach,s.size*.76*transformScale):reach)+2);
+ return {style,mode,wet,blur,radius,filteredBlur,gaussian,localBlur,kernel,reach,pad};
+}
+
+/** A saved all-layers sample must retain the same source halo as the worker. */
+export function characterBlendReadReach(s:Stroke,transformScale:number){
+ const {pad,kernel}=blendFootprint(s,transformScale);
+ return pad+Math.ceil(kernel*3)+8;
+}
+
+export function renderCharacterBlend(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Point[],
+ maskX:number,maskY:number,read:Ctx=ctx,previous?:RasterRegion,sample?:BlendSnapshot,carry?:Float32Array,transformScale=1):RasterRegion|undefined{
+ const {style,mode,wet,blur,radius,filteredBlur,gaussian,localBlur,kernel,reach,pad}=blendFootprint(s,transformScale);
+ const softness=s.bbSoftness??.5,water=style==='water',gradient=s.brushTip==='water-gradient';
+ const rough=s.brushTip==='water-rough',flat=s.brushTip==='water-flat';
  let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
  for(const p of points){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);}
  const x=Math.max(0,Math.floor(left-pad)),y=Math.max(0,Math.floor(top-pad));
