@@ -6,6 +6,7 @@ test('New Blend strokes keep the real custom brush mask and match worker final p
  const result=await page.evaluate(async()=>{
   const {stockPresets}=await import('/src/core/brushes.ts');
   const {brushStrokeMetadata}=await import('/src/core/paintTips.ts');
+  const {brushBlendSettingsFor}=await import('/src/core/brushBlend.ts');
   const {drawStroke}=await import('/src/engine/renderer.ts');
   const {compositePaintStroke}=await import('/src/engine/paintCompositing.ts');
   const {LiveBlendWorker}=await import('/src/engine/LiveBlendWorker.ts');
@@ -25,7 +26,7 @@ test('New Blend strokes keep the real custom brush mask and match worker final p
   };
   const points=Array.from({length:53},(_,i)=>({x:44+i*4,y:90+Math.sin(i/9)*5,p:.2+.8*i/52}));
   const stroke={
-   ...settings,...brushStrokeMetadata(settings),id:'dual-blend-v4',kind:'stroke' as const,tool:'brush' as const,
+   ...settings,...brushStrokeMetadata(settings),...brushBlendSettingsFor(settings,6),brushBlendVersion:6,bbBlur:undefined,id:'dual-blend-v4',kind:'stroke' as const,tool:'brush' as const,
    points,size:42,pressure:true,opacity:1,response:1,color:'#00ff00',
   };
   function replay(s:typeof stroke){
@@ -82,6 +83,7 @@ test('watercolor presets keep distinct feel with their real masks and worker rep
  const result=await page.evaluate(async()=>{
   const {stockPresets}=await import('/src/core/brushes.ts');
   const {brushStrokeMetadata}=await import('/src/core/paintTips.ts');
+  const {brushBlendSettingsFor}=await import('/src/core/brushBlend.ts');
   const {drawStroke}=await import('/src/engine/renderer.ts');
   const {compositePaintStroke}=await import('/src/engine/paintCompositing.ts');
   const {LiveBlendWorker}=await import('/src/engine/LiveBlendWorker.ts');
@@ -94,7 +96,7 @@ test('watercolor presets keep distinct feel with their real masks and worker rep
   const before=pixels(source),points=Array.from({length:56},(_,i)=>({x:44+i*4,y:90,p:1,v:.65}));
   const stroke=(id:string,tipAngle=0)=>{
    const settings={...stockPresets.find(p=>p.id===id)!.settings,tipAngle,size:82,bbEnabled:true};
-   return {...settings,...brushStrokeMetadata(settings),id:'watercolor-feel',kind:'stroke' as const,tool:'brush' as const,
+   return {...settings,...brushStrokeMetadata(settings),...brushBlendSettingsFor(settings,6),brushBlendVersion:6,bbBlur:undefined,id:'watercolor-feel',kind:'stroke' as const,tool:'brush' as const,
     points,pressure:false,color:'#00ff00'};
   };
   const render=(s:ReturnType<typeof stroke>)=>{
@@ -227,8 +229,8 @@ test('pen-down captures Blend settings independently of ordinary Paint pressure'
   ]);
  });
  expect(result).toEqual([
-  [6,1,false,'linear',false,false,true,expect.closeTo(.865,5)],
-  [6,1.6,true,'firm',false,false,true,expect.closeTo(.865,5)],
+  [7,1,false,'linear',false,false,true,.1],
+  [7,1.6,true,'firm',false,false,true,.1],
   [null,null,null,null,true,true,true,.1],
  ]);
 });

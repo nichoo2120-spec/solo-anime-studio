@@ -57,7 +57,7 @@ it('stores a custom brush and captures the original seeded tip for Blend',()=>{
  const selected=activePreset(restoreBrushLibrary(JSON.parse(JSON.stringify(library))));
  expect(selected).toMatchObject({name:'Tuft',category:natureCategory,settings:{nature:settings.nature}});
  const blend=brushStrokeMetadata({...selected.settings,bbEnabled:true});
- expect(blend).toMatchObject({natureVersion:1,brushBlendVersion:6,nature:settings.nature});
+ expect(blend).toMatchObject({natureVersion:1,brushBlendVersion:7,nature:settings.nature});
  const project=newProject();project.customBrushes=[selected];
  expect(()=>validateProject(JSON.parse(JSON.stringify(project)))).not.toThrow();
  activeLayer(project).operations.push({...stroke(preset),nature:{...settings.nature,seed:-1}});

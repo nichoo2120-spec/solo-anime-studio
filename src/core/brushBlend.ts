@@ -15,7 +15,7 @@ export const isBlendMode=(v:unknown):v is BlendMode=>typeof v==='string'&&(blend
 export const blendStyles:readonly BlendStyle[]=['water','dry','pencil','ink','air','oil','marker','texture','soft'];
 export const blendStyleNames:Record<BlendStyle,string>={water:'Watercolor',dry:'Dry brush',pencil:'Pencil',ink:'Ink',air:'Airbrush',oil:'Oil paint',marker:'Marker',texture:'Textured',soft:'Soft paint'};
 export const isBlendStyle=(v:unknown):v is BlendStyle=>typeof v==='string'&&(blendStyles as readonly string[]).includes(v);
-export type BrushBlendVersion=1|2|3|4|5|6;
+export type BrushBlendVersion=1|2|3|4|5|6|7;
 export const blendPressureCurves=['soft','linear','firm'] as const;
 export type BlendPressureCurve=(typeof blendPressureCurves)[number];
 export const blendRenderStyles={auto:'Auto (brush family)',silk:'Silk',blur:'Soft blur',wet:'Wet',smudge:'Smudge',dry:'Dry'} as const;
@@ -39,14 +39,14 @@ export function effectiveBlendStyle(family:BlendStyle,style:BlendRenderStyle='au
   default:return family;
  }
 }
-export const isMaterialBrushBlendVersion=(v:unknown):v is 4|5|6=>v===4||v===5||v===6;
+export const isMaterialBrushBlendVersion=(v:unknown):v is 4|5|6|7=>v===4||v===5||v===6||v===7;
 export const isBrushBlendVersion=(v:unknown):v is BrushBlendVersion=>v===1||v===2||v===3||isMaterialBrushBlendVersion(v);
 export function watercolorBlendTip(tip:unknown){
  return tip==='water-smooth'||tip==='water-wet'||tip==='water-rough'||tip==='water-flat'?tip:undefined;
 }
 export const canBlurBlendStyle=(style:BlendStyle)=>style==='air'||style==='soft';
 
-type BlendTip={brushKind?:string;brushTip?:string;textureStrength?:number;tsEnabled?:boolean;dbEnabled?:boolean;dbTip?:string;mixTipA?:string;mixTipB?:string;mixBlend?:number};
+type BlendTip={nativeMixEnabled?:boolean;brushKind?:string;brushTip?:string;textureStrength?:number;tsEnabled?:boolean;dbEnabled?:boolean;dbTip?:string;mixTipA?:string;mixTipB?:string;mixBlend?:number};
 const INKS=['g-pen','mapping','technical','brush-pen','studio-ink','contour-flow'];
 /** Which family a brush blends like (from its kind and tip; custom brushes keep their source's). */
 export function blendStyleFor(s:BlendTip):BlendStyle{
@@ -57,6 +57,7 @@ export function blendStyleFor(s:BlendTip):BlendStyle{
   tip=s.mixBlend>=.99?s.mixTipB:s.mixTipA;
  }
  if(tip.startsWith('water-')||tip==='wash'||tip.startsWith('wash-')||kind.startsWith('watercolor'))return 'water';
+ if(tip==='color-blender')return 'oil';
  if(kind.startsWith('nature-water-'))return 'water';
  if(kind.startsWith('nature-'))return 'texture';
  if(kind.startsWith('graphite-')||/(pencil|crayon|charcoal)/i.test(kind))return 'pencil';
@@ -105,6 +106,8 @@ export type BrushBlendControls={
  bbMinPressure?:number;
  bbPressureCurve?:BlendPressureCurve;
  bbRenderStyle?:BlendRenderStyle;
+ /** 0 carries pigment along the stroke; 1 blends only by soft blur. */
+ bbBlur?:number;
  /** Keep transparent pixels transparent (protect alpha). */
  bbProtectAlpha?:boolean;
  /** v3: controls how long picked-up pigment remains on the nib. */
@@ -123,14 +126,30 @@ export type BrushBlendControls={
  bbSamplePng?:string;bbSampleRect?:{x:number;y:number;width:number;height:number};
 };
 export type BrushBlendSettings=Omit<BrushBlendControls,'brushBlendVersion'|'bbStyle'|'bbCarry'|'bbSamplePng'|'bbSampleRect'>&{bbEnabled?:boolean};
-export const blendDefaults:Required<Omit<BrushBlendSettings,'bbEnabled'>>={bbMode:'soft',bbAmount:.85,bbPickup:.5,bbWetness:.4,bbMix:.6,bbFlow:.6,bbStretch:.45,bbSample:'layer',bbClean:true,bbPaintLoad:0,bbPressure:false,bbStrength:1,bbMinPressure:.7,bbPressureCurve:'linear',bbRenderStyle:'auto',bbProtectAlpha:false,bbColorCarry:.65,bbSoftness:.5,bbTextureKeep:0,bbSmoothing:0,bbEdgeDarkness:0};
+export const blendDefaults:Required<Omit<BrushBlendSettings,'bbEnabled'>>={bbMode:'soft',bbAmount:.85,bbPickup:.5,bbWetness:.4,bbMix:.6,bbFlow:.6,bbStretch:.45,bbSample:'layer',bbClean:true,bbPaintLoad:0,bbPressure:false,bbStrength:1,bbMinPressure:.7,bbPressureCurve:'linear',bbRenderStyle:'auto',bbBlur:0,bbProtectAlpha:false,bbColorCarry:.65,bbSoftness:.5,bbTextureKeep:0,bbSmoothing:0,bbEdgeDarkness:0};
 /** The values exposed for a family become its defaults only when a brush has no custom value saved. */
-export function blendDefaultsFor(s:BlendTip&{stabilization?:number;edgeDarkness?:number}):typeof blendDefaults{
+export function blendDefaultsFor(s:BlendTip&{stabilization?:number;edgeDarkness?:number},version:BrushBlendVersion=7):typeof blendDefaults{
  const style=blendStyleFor(s),mode=defaultBlendMode(style);
- return {...blendDefaults,bbMode:mode,bbColorCarry:style==='pencil'?.35:mode==='smudge'?.78:mode==='wet'?.58:.48,bbSoftness:mode==='soft'?.78:mode==='wet'?.68:mode==='dry'?.18:.38,bbTextureKeep:style==='dry'?.85:style==='water'?.62:style==='pencil'?.8:style==='texture'?.62:style==='oil'?.72:.08,bbSmoothing:Math.max(0,Math.min(1,s.stabilization??0)),bbEdgeDarkness:style==='water'&&s.edgeDarkness===1?1:0};
+ const family={...blendDefaults,bbMode:mode,bbColorCarry:style==='pencil'?.35:mode==='smudge'?.78:mode==='wet'?.58:.48,
+  bbSoftness:mode==='soft'?.78:mode==='wet'?.68:mode==='dry'?.18:.38,
+  bbTextureKeep:style==='dry'?.85:style==='water'?.62:style==='pencil'?.8:style==='texture'?.62:style==='oil'?.72:.08,
+  bbSmoothing:Math.max(0,Math.min(1,s.stabilization??0)),bbEdgeDarkness:style==='water'&&s.edgeDarkness===1?1:0};
+ if(version<7)return family;
+ const tips:Record<string,Partial<BrushBlendSettings>>={
+  'water-smooth':{bbMix:.42,bbStretch:.47,bbWetness:.5,bbTextureKeep:.18,bbBlur:.16,bbEdgeDarkness:.14},
+  'water-rough':{bbMix:.16,bbStretch:.8,bbWetness:.23,bbTextureKeep:.84,bbBlur:.03},
+  'water-wet':{bbMix:.34,bbStretch:.61,bbWetness:.91,bbTextureKeep:.24,bbBlur:.39},
+  'water-flat':{bbMix:.23,bbStretch:.73,bbWetness:.32,bbTextureKeep:.48,bbBlur:.04},
+  'water-gradient':{bbMix:.29,bbStretch:.64,bbWetness:.51,bbTextureKeep:.36,bbBlur:.12},
+  'color-blender':{bbMode:'smudge',bbMix:.15,bbStretch:.88,bbWetness:.23,bbTextureKeep:.32,bbBlur:.03},
+ };
+ if(s.brushTip==='water-wet'&&s.edgeDarkness===1)return {...family,bbMix:.53,bbStretch:.41,bbWetness:.78,bbTextureKeep:.34,bbBlur:.21};
+ if(style==='air')return {...family,bbBlur:1,bbWetness:.58};
+ if(s.nativeMixEnabled)return {...family,...tips['color-blender']};
+ return {...family,...(tips[s.brushTip??'']??(style==='soft'?{bbMix:.46,bbBlur:.15}:{}))};
 }
-export function brushBlendSettingsFor(s:Partial<BrushBlendSettings>&BlendTip&{stabilization?:number;edgeDarkness?:number}):typeof blendDefaults{
- const base=blendDefaultsFor(s),out={...base};
+export function brushBlendSettingsFor(s:Partial<BrushBlendSettings>&BlendTip&{stabilization?:number;edgeDarkness?:number},version:BrushBlendVersion=7):typeof blendDefaults{
+ const base=blendDefaultsFor(s,version),out={...base};
  if(isSilkBrush(s))out.bbRenderStyle='silk';
  for(const [key,min,max] of blendLimits)out[key]=bounded(s[key],base[key],min,max);
  if(isBlendMode(s.bbMode))out.bbMode=s.bbMode;
@@ -140,7 +159,7 @@ export function brushBlendSettingsFor(s:Partial<BrushBlendSettings>&BlendTip&{st
  for(const key of blendFlags)if(typeof s[key]==='boolean')out[key]=s[key] as never;
  return out;
 }
-export const blendLimits=[['bbAmount',0,1],['bbPickup',0,1],['bbWetness',0,1],['bbMix',0,1],['bbFlow',0,1],['bbStretch',0,1],['bbPaintLoad',0,1],['bbColorCarry',0,1],['bbSoftness',0,1],['bbTextureKeep',0,1],['bbSmoothing',0,1],['bbEdgeDarkness',0,1],['bbStrength',0,2],['bbMinPressure',0,1]] as const;
+export const blendLimits=[['bbAmount',0,1],['bbPickup',0,1],['bbWetness',0,1],['bbMix',0,1],['bbBlur',0,1],['bbFlow',0,1],['bbStretch',0,1],['bbPaintLoad',0,1],['bbColorCarry',0,1],['bbSoftness',0,1],['bbTextureKeep',0,1],['bbSmoothing',0,1],['bbEdgeDarkness',0,1],['bbStrength',0,2],['bbMinPressure',0,1]] as const;
 export const blendFlags=['bbClean','bbPressure','bbProtectAlpha'] as const;
 export type BlendPresetId='blend-soft'|'blend-smudge'|'blend-wet'|'blend-dry';
 export const blendPresets:{id:BlendPresetId;name:string;values:Partial<BrushBlendSettings>}[]=[
@@ -159,16 +178,16 @@ const bounded=(v:unknown,fallback:number,min:number,max:number)=>typeof v==='num
 export function brushBlendMetadata(s:BrushBlendSettings&Shape):BrushBlendControls{
  if(!s.bbEnabled||!canBrushBlend(s)||isSilkBlendActive(s))return {};
  const settings=brushBlendSettingsFor(s);
- return {...settings,brushBlendVersion:6,bbStyle:blendStyleFor(s)};
+ return {...settings,brushBlendVersion:7,bbStyle:blendStyleFor(s)};
 }
 /** Freeze the pressure channels used by the paint-shaped mask at pen-down.
  * An unshaped Blend nib stays close to its selected size at light pressure.
  * Shaped stamps keep their authored pressure envelope and secondary tip. */
 export function prepareBlendMaskPressure(stroke:Stroke){
- if(stroke.brushBlendVersion!==6)return;
+ if(stroke.brushBlendVersion!==6&&stroke.brushBlendVersion!==7)return;
  stroke.pressureOpacity=false;
  stroke.pressureFlow=false;
- if(stroke.stampVersion!==1&&stroke.pressure&&stroke.pressureWidth!==false){
+ if(stroke.brushBlendVersion===6&&stroke.stampVersion!==1&&stroke.pressure&&stroke.pressureWidth!==false){
   const min=stroke.minSize??.06,max=Math.max(min,stroke.maxSize??1);
   stroke.minSize=max-(max-min)*.15;
  }
@@ -194,7 +213,8 @@ export function validBrushBlendStroke(o:Record<string,unknown>){
  if(o.brushBlendVersion===1?o.bbStyle!==undefined:!isBlendStyle(o.bbStyle))return false;
  if(o.brushBlendVersion===5&&(o.bbStyle!=='water'||!watercolorBlendTip(o.brushTip)||o.stampVersion===1))return false;
  for(const [key,min,max] of blendLimits){const v=o[key];if(v!==undefined&&(typeof v!=='number'||!Number.isFinite(v)||v<min||v>max))return false;}
- if(o.brushBlendVersion===6){
+ if(o.brushBlendVersion!==7&&o.bbBlur!==undefined)return false;
+ if(o.brushBlendVersion>=6){
   if(!isBlendPressureCurve(o.bbPressureCurve)||!isBlendRenderStyle(o.bbRenderStyle)||o.bbRenderStyle==='silk'||typeof o.bbStrength!=='number'||typeof o.bbMinPressure!=='number')return false;
  }else if(o.bbPressureCurve!==undefined||o.bbRenderStyle!==undefined||o.bbStrength!==undefined||o.bbMinPressure!==undefined)return false;
  const hasDynamics=o.brushBlendVersion>=3;
@@ -209,6 +229,6 @@ export function validBrushBlendStroke(o:Record<string,unknown>){
   for(const k of ['x','y','width','height'])if(!Number.isInteger(r[k]))return false;
   if((r.width as number)<1||(r.height as number)<1||(r.width as number)*(r.height as number)>16777216)return false;
  }
- for(const k of Object.keys(o))if(k.startsWith('bb')&&!['bbAmount','bbPickup','bbWetness','bbMix','bbFlow','bbStretch','bbSample','bbClean','bbPaintLoad','bbPressure','bbProtectAlpha','bbCarry','bbSamplePng','bbSampleRect','bbStyle','bbMode','bbColorCarry','bbSoftness','bbTextureKeep','bbSmoothing','bbEdgeDarkness','bbStrength','bbMinPressure','bbPressureCurve','bbRenderStyle'].includes(k))return false;
+ for(const k of Object.keys(o))if(k.startsWith('bb')&&!['bbAmount','bbPickup','bbWetness','bbMix','bbFlow','bbStretch','bbSample','bbClean','bbPaintLoad','bbPressure','bbProtectAlpha','bbCarry','bbSamplePng','bbSampleRect','bbStyle','bbMode','bbColorCarry','bbSoftness','bbTextureKeep','bbSmoothing','bbEdgeDarkness','bbStrength','bbMinPressure','bbPressureCurve','bbRenderStyle','bbBlur'].includes(k))return false;
  return true;
 }

@@ -25,6 +25,7 @@ let pigmentPoints=0;
 let compactReplies=false,lastPixels:Uint8ClampedArray|undefined;
 let nativeMask:OffscreenCanvas|undefined;let nativeStrokeRaster:LiveStrokeRaster|undefined;
 let activeStroke:Stroke|undefined,activeStrokeToken=0;
+let characterPreviewKey:string|undefined,characterMaskBounds:RasterRegion|undefined;
 const union=(a:RasterRegion|undefined,b:RasterRegion)=>{if(!a)return b;const x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);return{x,y,width:Math.max(a.x+a.width,b.x+b.width)-x,height:Math.max(a.y+a.height,b.y+b.height)-y};};
 // An unchanged native mask can report Infinity/-Infinity extrema. Never let
 // those poison the accumulated region or become a zero-width bitmap crop.
@@ -57,7 +58,7 @@ worker.onmessage=async({data:j})=>{
  let pendingBitmaps:ImageBitmap[]=[];
  try{
   if(j.kind!=='update'){
-   activeStroke=undefined;activeStrokeToken=0;
+   activeStroke=undefined;activeStrokeToken=0;characterPreviewKey=undefined;characterMaskBounds=undefined;
    compactReplies=!!j.compactReplies;pigmentPoints=0;
    if(j.basePixels){if(lastPixels?.length===j.basePixels.length)lastPixels.set(j.basePixels);else lastPixels=j.basePixels.slice();}else if(j.kind!=='cancel'||!j.reuseSurfaces)lastPixels=undefined;
    deltaSupport=j.seeded?j.deltaRegion:undefined;deltaRegion=j.deltaRegion;deltaBase=undefined;
@@ -109,7 +110,15 @@ worker.onmessage=async({data:j})=>{
    // v0.5.238 Silk Blend: incremental; only tiles touched by new dabs come back.
    r=applySilkBlend(tc,bc,s,0,0,undefined,bc)??{x:0,y:0,width:1,height:1};
   }else if(isBrushBlendVersion(s.brushBlendVersion)&&s.tool==='brush'){
-   if(s.blendRasterVersion===2&&!j.final&&!j.resetPoints&&!brushBlendNeedsDab(tc,s)){
+   // Version 7 previews use the canonical curve and compositing. If release
+   // contains no new samples, the displayed bitmap is already the saved result.
+   const character=s.brushBlendVersion===7;
+   const previewKey=character&&!deltaBase&&!s.nature?.bitmap&&!s.dbBitmap&&s.bbSample!=='all'?JSON.stringify({...s,worldStroke:undefined}):undefined;
+   if(j.final&&previewKey&&previewKey===characterPreviewKey){
+    worker.postMessage({token:j.token,serial:j.serial,unchanged:true,final:true});
+    return;
+   }
+   if(s.brushBlendVersion!==7&&s.blendRasterVersion===2&&!j.final&&!j.resetPoints&&!brushBlendNeedsDab(tc,s)){
     worker.postMessage({token:j.token,serial:j.serial,unchanged:true});
     return;
    }
@@ -119,7 +128,14 @@ worker.onmessage=async({data:j})=>{
    if(!nativeMask||nativeMask.width!==target.width||nativeMask.height!==target.height){nativeMask=new OffscreenCanvas(target.width,target.height);nativeStrokeRaster??=new LiveStrokeRaster();}
    nativeStrokeRaster??=new LiveStrokeRaster();
    const maskContext=nativeMask.getContext('2d')! as unknown as CanvasRenderingContext2D;
-   if(j.final&&s.natureVersion!==1){nativeStrokeRaster.reset();maskContext.reset();drawStroke(maskContext,s,'final',currentGeometry());}
+   if(character){
+    const geometry=finalGeometry(s),footprint=strokeRasterBounds(s,target.width,target.height,geometry);
+    const area=union(characterMaskBounds,footprint);
+    maskContext.clearRect(area.x,area.y,area.width,area.height);
+    drawStroke(maskContext,s,'final',geometry);
+    characterMaskBounds=footprint;
+    characterPreviewKey=previewKey;
+   }else if(j.final&&s.natureVersion!==1){nativeStrokeRaster.reset();maskContext.reset();drawStroke(maskContext,s,'final',currentGeometry());}
    else nativeStrokeRaster.paint(maskContext,s,currentGeometry());
    const changed=applyBrushBlendLive(tc,nativeMask as unknown as HTMLCanvasElement,s,bc,!!j.final,s.points,nativeStrokeRaster.lastRegion);
    const updated=finiteRegion(changed??{x:0,y:0,width:1,height:1},target.width,target.height,()=>({x:0,y:0,width:1,height:1}));

@@ -3,7 +3,7 @@ import {stockPresets,newBrushLibrary,restoreBrushLibrary,updatePreset,activePres
 import {brushStrokeMetadata} from '../src/core/paintTips';
 import {newProject,activeLayer,validateProject,appendOperation,type Stroke,type Point} from '../src/core/model';
 import {DocumentStore} from '../src/core/history';
-import {blendDefaultsFor,blendPresets,brushBlendMetadata,canBrushBlend} from '../src/core/brushBlend';
+import {brushBlendSettingsFor,blendDefaultsFor,blendPresets,brushBlendMetadata,canBrushBlend} from '../src/core/brushBlend';
 import {renderBrushBlend,applyBrushBlendLive,resetBrushBlend,decodeCarry} from '../src/engine/brushBlend';
 import {initialShortcuts,normalizeShortcuts,commandLabels} from '../src/core/shortcuts';
 
@@ -27,7 +27,7 @@ function stroke(points:Point[],blend:Record<string,unknown>={},patch:Partial<Str
  const settings={...paint.settings,bbEnabled:true,bbPressure:true,...blend};
  const {bbEnabled:_e,...plain}=settings;
  // v0.5.240 strokes (brushBlendVersion 1): the frozen v1 recipe is tested here; v2 lives in brush-blend-v242.test.ts.
- const {bbStyle:_st,...meta}=brushStrokeMetadata(settings) as Record<string,unknown>;for(const key of ['bbMode','bbColorCarry','bbSoftness','bbTextureKeep','bbSmoothing','bbEdgeDarkness','bbStrength','bbMinPressure','bbPressureCurve','bbRenderStyle'])delete meta[key];
+ const {bbStyle:_st,...meta}={...brushStrokeMetadata(settings),...brushBlendSettingsFor(settings,6)} as Record<string,unknown>;for(const key of ['bbMode','bbColorCarry','bbSoftness','bbTextureKeep','bbSmoothing','bbEdgeDarkness','bbStrength','bbMinPressure','bbPressureCurve','bbRenderStyle','bbBlur'])delete meta[key];
  return {...plain,...meta,brushBlendVersion:1,id:'bb',kind:'stroke',tool:'brush',color:'#00ff00',size:40,opacity:1,pressure:true,response:1,points,...patch} as Stroke;
 }
 const line=(x0:number,x1:number,y:number,n=60)=>Array.from({length:n},(_,i)=>{const t=i/(n-1);return {x:x0+(x1-x0)*t,y,p:.4+.6*Math.sin(t*Math.PI)};});
@@ -42,10 +42,10 @@ describe('Paint / Blend switch v0.5.240',()=>{
   expect(canBrushBlend(stockPresets.find(p=>p.id==='eraser-hard')!.settings)).toBe(false);expect(can).toContain('wet-mix');
  });
  it('Paint mode strokes carry no new fields, so old and Paint drawings stay byte-identical',()=>{
-  for(const p of stockPresets){const m=brushStrokeMetadata(p.settings) as Record<string,unknown>;expect(Object.keys(m).filter(k=>k.startsWith('bb')||k==='brushBlendVersion'),p.id).toEqual([]);
+  for(const p of stockPresets){const m=brushStrokeMetadata({...p.settings,bbEnabled:false}) as Record<string,unknown>;expect(Object.keys(m).filter(k=>k.startsWith('bb')||k==='brushBlendVersion'),p.id).toEqual([]);
    const off=brushStrokeMetadata({...p.settings,bbEnabled:false,bbAmount:.2,bbSample:'all'});if(p.id==='silk-blend')expect(off.silkBlendVersion).toBeUndefined();else expect(JSON.stringify(off),p.id).toBe(JSON.stringify(m));}
   expect(brushBlendMetadata({brushKind:'paint'})).toEqual({});
-  expect(brushStrokeMetadata({...paint.settings,bbEnabled:true})).toMatchObject({brushBlendVersion:6,bbStyle:'soft',...blendDefaultsFor(paint.settings)});
+  expect(brushStrokeMetadata({...paint.settings,bbEnabled:true})).toMatchObject({brushBlendVersion:7,bbStyle:'soft',...blendDefaultsFor(paint.settings)});
  });
  it('Blend mode adds no brush colour and blends the colours already there',()=>{
   const s=stroke(line(120,320,100)),c=run(s),before=scene().data;let changed=0,green=0;

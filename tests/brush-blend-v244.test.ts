@@ -1,7 +1,7 @@
 import {describe,it,expect,vi} from 'vitest';
 import {newBrushLibrary,restoreBrushLibrary,stockPresets,updatePreset,activePreset} from '../src/core/brushes';
 import {brushStrokeMetadata} from '../src/core/paintTips';
-import {blendPressureFactor,blendStrengthPresets,blendPresets,blendDefaultsFor,defaultBlendModeFor,blendStyleFor} from '../src/core/brushBlend';
+import {brushBlendSettingsFor,blendPressureFactor,blendStrengthPresets,blendPresets,blendDefaultsFor,defaultBlendModeFor,blendStyleFor} from '../src/core/brushBlend';
 import {newProject,activeLayer,validateProject,type Point,type Stroke} from '../src/core/model';
 import {applyBrushBlendLive,renderBrushBlend,resetBrushBlend} from '../src/engine/brushBlend';
 import {BrushBlendGestureV2} from '../src/engine/brushBlendStyles';
@@ -21,7 +21,8 @@ function scene(){const c=surface(W,H);for(let y=22;y<106;y++)for(let x=0;x<W;x++
 function mask(){const c=surface(W,H);for(let y=0;y<H;y++)for(let x=0;x<W;x++){for(const p of points)if(Math.hypot(x-p.x,y-p.y)<19){c.data[(y*W+x)*4+3]=255;break;}}return c;}
 const hash=(d:Uint8ClampedArray)=>{let h=2166136261;for(let i=0;i<d.length;i++){h^=d[i];h=Math.imul(h,16777619);}return h>>>0;};
 function stroke(id='soft-paint',settings:Record<string,unknown>={},version:1|2|3|4|5|6=3):Stroke{
- const preset=stockPresets.find(p=>p.id===id)!;const controls={...preset.settings,bbEnabled:true,...(version<6?{bbPressure:true}:{}),...settings},metadata={...brushStrokeMetadata(controls)} as Record<string,unknown>;
+ const preset=stockPresets.find(p=>p.id===id)!;const controls={...preset.settings,bbEnabled:true,...(version<6?{bbPressure:true}:{}),...settings},metadata={...brushStrokeMetadata(controls),...brushBlendSettingsFor(controls,6)} as Record<string,unknown>;
+ delete metadata.bbBlur;
  metadata.brushBlendVersion=version;
  if(version<6)for(const key of ['bbStrength','bbMinPressure','bbPressureCurve','bbRenderStyle'])delete metadata[key];
  if(version<3){for(const key of ['bbMode','bbColorCarry','bbSoftness','bbTextureKeep','bbSmoothing','bbEdgeDarkness'])delete metadata[key];if(version===1)delete metadata.bbStyle;metadata.brushBlendVersion=version;}
@@ -60,7 +61,7 @@ describe('Blend settings v0.5.244',()=>{
   const outputs=ids.map(id=>render(stroke(id,{bbMode:'smudge',bbAmount:1,bbPickup:.8,bbWetness:.8,bbMix:.55,bbFlow:.9,bbStretch:.75,bbColorCarry:.7,bbSoftness:.45,bbTextureKeep:.9})));
   expect(new Set(outputs.map(hash)).size).toBe(ids.length);
   expect(edgeRoughness(outputs[0])).toBeLessThan(edgeRoughness(outputs[2])*.5);
-  expect(blendDefaultsFor(stockPresets.find(p=>p.id==='water-smooth')!.settings).bbEdgeDarkness).toBe(0);
+  expect(blendDefaultsFor(stockPresets.find(p=>p.id==='water-smooth')!.settings,6).bbEdgeDarkness).toBe(0);
   expect(stroke('water-smooth').bbEdgeDarkness).toBe(0);
   expect(stroke('water-edge').bbEdgeDarkness).toBe(1);
  });
@@ -206,10 +207,10 @@ describe('Watercolor Blend v5',()=>{
  it('versions newly created Blend strokes and keeps saved v4 pixels identical',()=>{
   const ids=['water-smooth','water-wet','water-rough','water-flat','water-edge'];
   const metadata=ids.map(id=>brushStrokeMetadata({...stockPresets.find(p=>p.id===id)!.settings,bbEnabled:true}));
-  expect(metadata.map(s=>s.brushBlendVersion)).toEqual([6,6,6,6,6]);
+  expect(metadata.map(s=>s.brushBlendVersion)).toEqual([7,7,7,7,7]);
   expect(ids.map(id=>hash(render(stroke(id,{},4))))).toEqual([2316611864,1919703141,3050506906,3210628171,2682126738]);
   const shaped=stockPresets.find(p=>p.id==='water-flat')!.settings;
-  expect(brushStrokeMetadata({...shaped,bbEnabled:true,tsEnabled:true}).brushBlendVersion).toBe(6);
+  expect(brushStrokeMetadata({...shaped,bbEnabled:true,tsEnabled:true}).brushBlendVersion).toBe(7);
   const p=newProject();
   activeLayer(p).operations=ids.slice(0,4).map(id=>stroke(id,{},5));
   expect(()=>validateProject(JSON.parse(JSON.stringify(p)))).not.toThrow();

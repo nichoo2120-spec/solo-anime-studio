@@ -1,3 +1,5 @@
+import {drawCharacterTip,usesCharacterTip} from './characterBlend';
+import {paintSamples} from './paintPass';
 import {drawNatureStroke} from './natureRaster';
 import {widthPointFactor} from '../core/widthPoints';
 import {importedGrainSampler} from '../core/importedGrain';
@@ -34,6 +36,7 @@ export function drawModernStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phas
 function drawBaseStroke(ctx:CanvasRenderingContext2D,stroke:Stroke,phase:'live'|'final'='final',geometry?:ReturnType<typeof strokeGeometry>,region?:RasterRegion,pass?:PaintPass,origin?:{x:number;y:number}){
  const roundInk=stroke.brushKind==='studio-ink'||stroke.brushKind==='contour-flow'||stroke.inkProfileVersion===1;
  const resolved=geometry??(phase==='final'?finalGeometry(stroke):strokeGeometry(stroke,phase));
+ if(usesCharacterTip(stroke)){drawCharacterTip(ctx,stroke,paintSamples(resolved,.4).points);return;}
  if(stroke.natureVersion===1){drawNatureStroke(ctx,stroke,resolved,region);return;}
  if(stroke.inkEdgeVersion===1&&drawInkWithEdges(ctx,stroke,resolved,region))return;
  if(stroke.dryBristleVersion===3){drawDryBristleV3(ctx,stroke,resolved,region,pass);return;}

@@ -1,7 +1,7 @@
 import {BrushSettingInput,BrushSettingSelect} from './BrushQuickSettings';
 import {memo,useEffect,useRef} from 'react';
 import {ExactRange} from './ExactRange';
-import {blendDefaultsFor,blendModes,blendPresets,brushBlendSettingsFor,blendPressureCurves,blendRenderStyles,blendStrengthPresets,canBrushBlend,isBlendMode,isBlendSample,blendStyleFor,blendStyleNames,type BlendPressureCurve,type BlendRenderStyle,type BlendMode,type BlendStyle} from '../core/brushBlend';
+import {blendDefaultsFor,blendModes,blendPresets,brushBlendSettingsFor,blendPressureCurves,prepareBlendMaskPressure,blendRenderStyles,blendStrengthPresets,canBrushBlend,isBlendMode,isBlendSample,blendStyleFor,blendStyleNames,type BlendPressureCurve,type BlendRenderStyle,type BlendMode,type BlendStyle} from '../core/brushBlend';
 import {brushStrokeMetadata} from '../core/paintTips';
 import type {Stroke} from '../core/model';
 import {drawStroke} from '../engine/renderer';
@@ -44,11 +44,12 @@ function BlendPreview({settings:s}:{settings:BrushSettings}){
    ctx.fillStyle='#e2647c';ctx.fillRect(w/2,6,w/2-12,h-12);
    const stroke:Stroke={
     ...brushStrokeMetadata(settings),id:'blend-preview',kind:'stroke',tool:'brush',
-    points:[{x:119,y:25,p:.1},{x:161,y:18,p:.1},{x:180,y:25,p:.1},{x:203,y:19,p:.1},{x:241,y:24,p:.1}],
+    points:[{x:119,y:25,p:.5},{x:161,y:18,p:.5},{x:180,y:25,p:.5},{x:203,y:19,p:.5},{x:241,y:24,p:.5}],
     size:33,color:settings.color,opacity:settings.opacity,pressure:true,pressureWidth:false,
     pressureFlow:false,pressureOpacity:false,response:settings.response,brushKind:settings.brushKind,
     textureStrength:settings.textureStrength,stabilization:Math.max(settings.stabilization,settings.bbSmoothing??0),
    };
+   prepareBlendMaskPressure(stroke);
    if(stroke.silkBlendVersion)renderSilkStroke(ctx,stroke);
    else{drawStroke(mc,stroke);renderBrushBlend(ctx,swatch,stroke);}
   });
@@ -91,18 +92,19 @@ export const BrushBlendSettingsPanel=memo(function BrushBlendSettingsPanel({sett
     <label className="studio-select">Pressure curve<BrushSettingSelect aria-label="Blend pressure curve" value={values.bbPressureCurve} onChange={e=>patch({bbPressureCurve:e.target.value as BlendPressureCurve})}>{blendPressureCurves.map(curve=><option key={curve} value={curve}>{curve[0].toUpperCase()+curve.slice(1)}</option>)}</BrushSettingSelect></label>
     <ExactRange live name="Minimum blend at light pressure" value={pct(values.bbMinPressure,.7)} unit="%" set={v=>patch({bbMinPressure:v/100})}/>
     <ExactRange live name="Blend amount" value={pct(s.bbAmount,defaults.bbAmount)} unit="%" set={v=>patch({bbAmount:v/100})}/>
+    <ExactRange live name="Mix amount" settingId="Mix" value={pct(values.bbMix,defaults.bbMix)} unit="%" set={v=>patch({bbMix:v/100})}/>
+    <ExactRange live name="Smear vs Blur" value={pct(values.bbBlur,defaults.bbBlur)} unit="%" set={v=>patch({bbBlur:v/100})}/>
     <ExactRange live name="Pickup" value={pct(s.bbPickup,defaults.bbPickup)} unit="%" set={v=>patch({bbPickup:v/100})}/>
-    <ExactRange live name="Drag / pull length" value={pct(s.bbStretch,defaults.bbStretch)} unit="%" set={v=>patch({bbStretch:v/100})}/>
+    <ExactRange live name="Drag length" settingId="Drag / pull length" value={pct(s.bbStretch,defaults.bbStretch)} unit="%" set={v=>patch({bbStretch:v/100})}/>
     <ExactRange live name="Wetness" value={pct(s.bbWetness,defaults.bbWetness)} unit="%" set={v=>patch({bbWetness:v/100})}/>
     <ExactRange live name="Color carry" value={pct(s.bbColorCarry,defaults.bbColorCarry)} unit="%" set={v=>patch({bbColorCarry:v/100})}/>
     <ExactRange live name="Softness" value={pct(s.bbSoftness,defaults.bbSoftness)} unit="%" set={v=>patch({bbSoftness:v/100})}/>
-    <ExactRange live name="Texture keep" value={pct(s.bbTextureKeep,defaults.bbTextureKeep)} unit="%" set={v=>patch({bbTextureKeep:v/100})}/>
+    <ExactRange live name="Texture in blend" settingId="Texture keep" value={pct(s.bbTextureKeep,defaults.bbTextureKeep)} unit="%" set={v=>patch({bbTextureKeep:v/100})}/>
     <ExactRange live name="Smoothing" value={pct(s.bbSmoothing,defaults.bbSmoothing)} unit="%" set={v=>patch({bbSmoothing:v/100})}/>
     <ExactRange live name="Edge darkness" value={pct(s.bbEdgeDarkness,defaults.bbEdgeDarkness)} unit="%" set={v=>patch({bbEdgeDarkness:v/100})}/>
    </fieldset>
    <details className="brush-blend-extras"><summary>More blend controls</summary>
     <fieldset className="brush-blend-controls">
-     <ExactRange live name="Mix" value={pct(s.bbMix,defaults.bbMix)} unit="%" set={v=>patch({bbMix:v/100})}/>
      <ExactRange live name="Blend Flow" value={pct(s.bbFlow,defaults.bbFlow)} unit="%" set={v=>patch({bbFlow:v/100})}/>
      <ExactRange live name="Paint Load" value={pct(s.bbPaintLoad,defaults.bbPaintLoad)} unit="%" set={v=>patch({bbPaintLoad:v/100})}/>
      <label className="studio-select">Sample<BrushSettingSelect aria-label="Blend sample" value={isBlendSample(s.bbSample)?s.bbSample:'layer'} onChange={e=>patch({bbSample:e.target.value as 'layer'|'all'})}><option value="layer">Current layer</option><option value="all">All layers</option></BrushSettingSelect></label>

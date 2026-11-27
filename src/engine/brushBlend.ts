@@ -1,3 +1,4 @@
+import {renderCharacterBlend} from './characterBlend';
 import type {DabBounds} from './blendDabBatch';
 /** v0.5.240 Blend mode for every paint brush.
  *
@@ -281,6 +282,7 @@ const union=(a:RasterRegion|undefined,b:RasterRegion|undefined)=>{if(!a)return b
  * holds the brush's own final stroke raster at (maskX, maskY). */
 export function renderBrushBlend(ctx:Ctx,mask:Readable,s:Stroke,maskX=0,maskY=0,read?:Ctx,previous?:RasterRegion):RasterRegion|undefined{
  if(s.opacity<=0||!s.points.length)return undefined;
+ if(s.brushBlendVersion===7)return renderCharacterBlend(ctx,mask as HTMLCanvasElement,s,blendPath(s),maskX,maskY,read,previous,blendSampleFor(s),decodeCarry(s.bbCarry),blendTransformScale(s));
  const W=ctx.canvas.width,H=ctx.canvas.height,reader=new MaskReader(mask.getContext('2d') as Ctx,maskX,maskY,W,H,s.blendRasterVersion===2);
  const g=gestureFor(s,W,H,read??ctx,reader);g.advance(blendPath(s));return g.flush(ctx,true,previous);
 }
@@ -294,7 +296,8 @@ function gestureFor(s:Stroke,W:number,H:number,read:Ctx,reader:MaskReader):AnyGe
  return s.brushBlendVersion===2?new BrushBlendGestureV2(s,W,H,read,reader,blendSampleFor(s),decodeCarry(s.bbCarry),sampleSnapshot):new BrushBlendGesture(s,W,H,read,reader,blendSampleFor(s));
 }
 let live:{id:string;target:unknown;gesture:AnyGesture;mask?:MaskReader;source?:Readable}|undefined;
-export function resetBrushBlend(){live=undefined;}
+let characterLive:{id:string;target:unknown;region?:RasterRegion}|undefined;
+export function resetBrushBlend(){live=undefined;characterLive=undefined;}
 export function brushBlendNeedsDab(ctx:Ctx,s:Stroke){
  const current=live;
  return !current||current.id!==s.id||current.target!==ctx.canvas||
@@ -303,6 +306,12 @@ export function brushBlendNeedsDab(ctx:Ctx,s:Stroke){
 export function applyBrushBlendLive(ctx:Ctx,mask:Readable,s:Stroke,base:Readable,final:boolean,livePath:Point[],maskDirty?:RasterRegion):RasterRegion|undefined{
  if(s.opacity<=0||!s.points.length)return undefined;
  const read=base.getContext('2d') as Ctx,W=ctx.canvas.width,H=ctx.canvas.height;
+ if(s.brushBlendVersion===7){
+  const previous=characterLive?.id===s.id&&characterLive.target===ctx.canvas?characterLive.region:undefined;
+  const changed=renderBrushBlend(ctx,mask,s,0,0,read,previous);
+  characterLive=final?undefined:{id:s.id,target:ctx.canvas,region:changed};
+  return changed;
+ }
  if(final){
   if(s.blendRasterVersion!==undefined){
    const previous=live&&live.id===s.id&&live.target===ctx.canvas?live.gesture.surface.batchBounds(true):undefined;

@@ -1,3 +1,4 @@
+import {drawCharacterTip,usesCharacterTip} from './characterBlend';
 import {LiveNatureRaster} from './natureRaster';
 import {drawStampStroke,stampBounds,stampPlan,stampChange,type StampPlan} from './stampBrush';
 const clipRegion=(r:RasterRegion,w:number,h:number):RasterRegion=>{const x=Math.max(0,r.x),y=Math.max(0,r.y);return {x,y,width:Math.max(0,Math.min(w,r.x+r.width)-x),height:Math.max(0,Math.min(h,r.y+r.height)-y)};};
@@ -39,6 +40,7 @@ export class LiveStrokeRaster{
   // and new footprints can change the already-composited layer preview.
   const local=!stroke.transform&&!stroke.perspective&&!stroke.nativeMixVersion&&!stroke.mixStops?.length&&
    (stroke.engineVersion===9&&stroke.brushKind?.startsWith('graphite-')||stroke.coloringEngine===1&&stroke.brushTip==='color-soft');
+  if(usesCharacterTip(stroke))return pixels;
   if(local){
    const region=strokeRasterBounds(stroke,ctx.canvas.width,ctx.canvas.height,geometry),previous=this.footprint;
    if(!this.lastRegion&&previous?.id===stroke.id)this.lastRegion=union(previous.region,region);
@@ -52,6 +54,16 @@ export class LiveStrokeRaster{
  private stampPlan?:StampPlan;
  private stampCanvas?:HTMLCanvasElement|OffscreenCanvas;
  private rasterize(ctx:CanvasRenderingContext2D,stroke:Stroke,geometry:ReturnType<typeof strokeGeometry>){
+  if(usesCharacterTip(stroke)){
+   const region=strokeRasterBounds(stroke,ctx.canvas.width,ctx.canvas.height,geometry);
+   this.lastRegion=this.id===stroke.id&&this.footprint?union(this.footprint.region,region):region;
+   const {x,y,width,height}=this.lastRegion;
+   ctx.clearRect(x,y,width,height);
+   drawCharacterTip(ctx,stroke,paintSamples(geometry,.4).points);
+   this.id=stroke.id;this.previous=geometry;
+   this.footprint={id:stroke.id,region};
+   return width*height;
+  }
   if(stroke.natureVersion===1){
    if(!this.natureActive){ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);this.natureActive=true;}
    this.lastRegion=(this.nature??=new LiveNatureRaster()).paint(ctx,stroke,geometry);

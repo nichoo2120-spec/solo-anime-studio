@@ -1,6 +1,7 @@
 // v0.5.243 (owner pt88u): no dark wet edge on new watercolor / Silk Wet / Blend
 // strokes; only the stock "Watercolor Edge" brush keeps it (Edge darkness).
 import {describe,it,expect} from 'vitest';
+import {brushBlendSettingsFor} from '../src/core/brushBlend';
 import {stockPresets,newBrushLibrary,restoreBrushLibrary} from '../src/core/brushes';
 import {brushStrokeMetadata,isNewWatercolorTip} from '../src/core/paintTips';
 import {newProject,activeLayer,validateProject,type Stroke,type Point} from '../src/core/model';
@@ -36,11 +37,16 @@ function rim(before:Uint8ClampedArray,after:Uint8ClampedArray){const P:number[]=
  let edge=0,centre=0,n=0,light=-1e9;for(let y=55;y<146;y++){const d=Math.abs(y-100);if(d<6){centre+=P[y];n++;}else if(d>=8&&d<=42)edge=Math.min(edge,P[y]);if(d>=24&&d<=48)light=Math.max(light,P[y]);}
  centre/=n;return {edge:edge-Math.min(0,centre),centre,light};}
 const silkWet={silkMode:'wet',silkStrength:.8,silkWetness:.8};
+function historicalWaterBlend(s:Stroke):Stroke{
+ const {bbBlur:_blur,...saved}=s;
+ const preset=stockPresets.find(p=>p.settings.brushTip===s.brushTip&&(p.settings.edgeDarkness??0)===(s.edgeDarkness??0))!;
+ return {...saved,...brushBlendSettingsFor(preset.settings,6),brushBlendVersion:6,bbBlur:undefined};
+}
 describe('water edge v0.5.243',()=>{
  it('new strokes of every normal watercolor brush, Silk Wet and Blend watercolor save Edge darkness 0; only Watercolor Edge keeps it',()=>{
   const water=stockPresets.filter(p=>isNewWatercolorTip(p.settings.brushTip));
   expect(water.map(p=>p.id)).toEqual(['water-smooth','water-rough','water-wet','water-flat','water-gradient','water-edge']);
-  for(const p of water){const s=make(p.id),b=make(p.id,{bbEnabled:true});const want=p.id==='water-edge'?1:0;expect(s.edgeDarkness,p.id).toBe(want);expect(b.edgeDarkness,p.id+' blend').toBe(want);expect(b.brushBlendVersion).toBe(6);expect(b.bbEdgeDarkness).toBe(want);}
+  for(const p of water){const s=make(p.id),b=make(p.id,{bbEnabled:true});const want=p.id==='water-edge'?1:0;expect(s.edgeDarkness,p.id).toBe(want);expect(b.edgeDarkness,p.id+' blend').toBe(want);expect(b.brushBlendVersion).toBe(7);expect(b.bbEdgeDarkness).toBe(p.id==='water-smooth'?.14:want);}
   expect(stockPresets.find(p=>p.id==='water-edge')!.name).toBe('Watercolor Edge');
   expect(make('silk-blend',silkWet).edgeDarkness).toBe(0);
   expect(make('silk-blend',{silkMode:'soft'}).edgeDarkness).toBeUndefined();
@@ -60,14 +66,14 @@ describe('water edge v0.5.243',()=>{
   const one=flat();renderSilkStroke(one.ctx,{...legacy,edgeDarkness:1});expect(hash(one.data)).toBe(hash(old.data));
  });
  for(const id of ['water-wet','water-rough','water-flat'])it(id+' in Blend mode: no dark border and no lighter rim; v0.5.242 strokes unchanged',()=>{
-  const s=make(id,{bbEnabled:true}),m=mask(s.points);
+  const s=historicalWaterBlend(make(id,{bbEnabled:true})),m=mask(s.points);
   const c=flat(),before=c.data.slice();renderBrushBlend(c.ctx,m.canvas,s);const r=rim(before,c.data);expect(r.edge).toBeGreaterThan(-1.5);expect(r.light).toBeLessThan(1.5);
   const {bbMode:_mode,bbColorCarry:_carry,bbSoftness:_softness,bbTextureKeep:_texture,bbSmoothing:_smoothing,bbEdgeDarkness:_edge,bbStrength:_strength,bbMinPressure:_min,bbPressureCurve:_curve,bbRenderStyle:_style,...rest}=s;
   const legacy:Stroke={...rest,brushBlendVersion:2,bbPressure:true,edgeDarkness:undefined},o=flat(),ob=o.data.slice();renderBrushBlend(o.ctx,m.canvas,legacy);expect(rim(ob,o.data).edge).toBeLessThan(-3);
   const one=flat();renderBrushBlend(one.ctx,m.canvas,{...legacy,edgeDarkness:1});expect(hash(one.data)).toBe(hash(o.data));
  });
  it('Watercolor Edge in Blend mode keeps the darker wet edge, and Edge darkness 0 removes it',()=>{
-  const s=make('water-edge',{bbEnabled:true}),m=mask(s.points);
+  const s=historicalWaterBlend(make('water-edge',{bbEnabled:true})),m=mask(s.points);
   const c=flat(),b=c.data.slice();renderBrushBlend(c.ctx,m.canvas,s);const strong=rim(b,c.data).edge;
   const z=flat(),zb=z.data.slice();renderBrushBlend(z.ctx,m.canvas,{...s,bbEdgeDarkness:0});const none=rim(zb,z.data).edge;
   expect(strong).toBeLessThan(-3);expect(none).toBeGreaterThan(-1.5);
