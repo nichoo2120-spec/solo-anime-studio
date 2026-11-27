@@ -29,6 +29,7 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
  coverage.fill(-1,0,w*h);field.data.fill(0);pickup.fill(0);
  const output=field.data,rgb=parseInt(s.color.slice(1),16);
  const loaded=[linear[rgb>>16&255],linear[rgb>>8&255],linear[rgb&255]];
+ const carrySide=carry?Math.round(Math.sqrt(carry.length/4)):0;
  const capacity=s.bbCapacity??.45,drag=s.bbStretch??.5,flow=s.bbFlow??.6;
  const wet=s.bbWetness??.5,mix=s.bbMix??.5;
  const spacing=Math.max(.5,s.size*Math.max(.025,Math.min(.15,s.tipSpacing??.08)));
@@ -53,8 +54,8 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
     for(let c=0;c<4;c++)loadedImage[k+c]=s.bbSolidLoad||!sample[3]?(c===3?1:loaded[c]):sample[c];
    }
    if(!distance&&carry){
-    const n=Math.round(v*7/(side-1))*8+Math.round(u*7/(side-1)),alpha=carry[n*4+3]/255;
-    for(let c=0;c<3;c++)pickup[k+c]=linear[Math.round(carry[n*4+c])]*alpha;
+    const n=Math.round(v*(carrySide-1)/(side-1))*carrySide+Math.round(u*(carrySide-1)/(side-1)),alpha=carry[n*4+3]/255;
+    for(let c=0;c<3;c++)pickup[k+c]=linear[Math.min(255,Math.round(carry[n*4+c]/(alpha||1)))]*alpha;
     pickup[k+3]=alpha;
    }
    const charge=distance||carry?refill:1;
@@ -64,7 +65,7 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
   const charge=(s.bbPaintLoad??0)*Math.exp(-distance/fadeLength);
   const entry=total&&tail?Math.min(1,(distance+s.size*.15)/(s.size*(.15+tail))):1;
   const exit=total&&tail?Math.min(1,(total-distance+s.size*.15)/(s.size*(.15+tail))):1;
-  const width=entry*exit,reach=r*width;
+  const width=entry*exit,reach=r*1.45+2;
   for(let y=Math.max(0,Math.floor(cy-reach));y<=Math.min(h-1,Math.ceil(cy+reach));y++){
    for(let x=Math.max(0,Math.floor(cx-reach));x<=Math.min(w-1,Math.ceil(cx+reach));x++){
     const nx=(x-cx)/reach,ny=(y-cy)/reach,d=nx*nx+ny*ny;
@@ -76,6 +77,7 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
     const u0=Math.floor(u),v0=Math.floor(v),fx=u-u0,fy=v-v0;
     const offset=Math.min(distance/pitch,r*drag*.65);
     sampleLinear(src,w,h,x-dx*offset,y-dy*offset,sample);
+    const dry=1-moisture*(1-capacity)*(1-Math.exp(-distance/fadeLength));
     const dragged=clamp(localMix*moisture),paint=charge*(1-localMix);
     for(let c=0;c<4;c++){
      const row=v0*side,row1=Math.min(side-1,v0+1)*side,u1=Math.min(side-1,u0+1);
@@ -86,10 +88,14 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
      const loadBottom=loadedImage[(row1+u0)*4+c]*(1-fx)+loadedImage[(row1+u1)*4+c]*fx;
      sample[c]=sample[c]*(1-paint)+(loadTop*(1-fy)+loadBottom*fy)*paint;
     }
+    // Exhaustion returns to local canvas pigment, which preserves authored
+    // grain contrast on an even wash while dragged stripes gradually weaken.
+    const baseAlpha=src[k+3]/255,activity=dry*width;
+    for(let c=0;c<3;c++)sample[c]=sample[c]*activity+baseAlpha*linear[src[k+c]]*(1-activity);
+    sample[3]=sample[3]*activity+baseAlpha*(1-activity);
     const alpha=sample[3];if(alpha<=0)continue;
     for(let c=0;c<3;c++)output[k+c]=encoded[Math.round(4096*clamp(sample[c]/alpha))];
-    const dry=1-moisture*.6*(1-capacity)*(1-Math.exp(-distance/fadeLength));
-    output[k+3]=Math.round(255*alpha*flow*width*dry*Math.min(1,score*8));
+    output[k+3]=Math.round(255*alpha*flow);
    }
   }
   if(distance>=total)break;

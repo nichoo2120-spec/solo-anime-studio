@@ -1,3 +1,4 @@
+import {mixerRecipe} from './mixerBrush';
 import type {Stroke} from './model';
 import {isSilkBrush} from './silkBlend';
 
@@ -127,9 +128,9 @@ export type BrushBlendControls={
  bbSamplePng?:string;bbSampleRect?:{x:number;y:number;width:number;height:number};
 };
 export type BrushBlendSettings=Omit<BrushBlendControls,'brushBlendVersion'|'bbStyle'|'bbCarry'|'bbSamplePng'|'bbSampleRect'>&{bbEnabled?:boolean};
-export const blendDefaults:Required<Omit<BrushBlendSettings,'bbEnabled'>>={bbLoadToken:0,bbCapacity:.45,bbTaper:.12,bbReload:false,bbSolidLoad:false,bbPressureWet:false,bbPressureMix:false,bbMode:'soft',bbAmount:.85,bbPickup:.5,bbWetness:.4,bbMix:.6,bbFlow:.6,bbStretch:.45,bbSample:'layer',bbClean:true,bbPaintLoad:0,bbPressure:false,bbStrength:1,bbMinPressure:.7,bbPressureCurve:'linear',bbRenderStyle:'auto',bbBlur:0,bbProtectAlpha:false,bbColorCarry:.65,bbSoftness:.5,bbTextureKeep:0,bbSmoothing:0,bbEdgeDarkness:0};
+export const blendDefaults:Required<Omit<BrushBlendSettings,'bbEnabled'>>={bbLoadToken:0,bbCapacity:.45,bbTaper:.12,bbReload:false,bbSolidLoad:true,bbPressureWet:false,bbPressureMix:false,bbMode:'soft',bbAmount:.85,bbPickup:.5,bbWetness:.4,bbMix:.6,bbFlow:.6,bbStretch:.45,bbSample:'layer',bbClean:true,bbPaintLoad:0,bbPressure:false,bbStrength:1,bbMinPressure:.7,bbPressureCurve:'linear',bbRenderStyle:'auto',bbBlur:0,bbProtectAlpha:false,bbColorCarry:.65,bbSoftness:.5,bbTextureKeep:0,bbSmoothing:0,bbEdgeDarkness:0};
 /** The values exposed for a family become its defaults only when a brush has no custom value saved. */
-export function blendDefaultsFor(s:BlendTip&{stabilization?:number;edgeDarkness?:number},version:BrushBlendVersion=7):typeof blendDefaults{
+export function blendDefaultsFor(s:BlendTip&{stabilization?:number;edgeDarkness?:number},version:BrushBlendVersion=9):typeof blendDefaults{
  const style=blendStyleFor(s),mode=defaultBlendMode(style);
  const family={...blendDefaults,bbMode:mode,bbColorCarry:style==='pencil'?.35:mode==='smudge'?.78:mode==='wet'?.58:.48,
   bbSoftness:mode==='soft'?.78:mode==='wet'?.68:mode==='dry'?.18:.38,
@@ -144,12 +145,18 @@ export function blendDefaultsFor(s:BlendTip&{stabilization?:number;edgeDarkness?
   'water-gradient':{bbMix:.29,bbStretch:.64,bbWetness:.51,bbTextureKeep:.36,bbBlur:.12},
   'color-blender':{bbMode:'smudge',bbMix:.15,bbStretch:.88,bbWetness:.23,bbTextureKeep:.32,bbBlur:.03},
  };
+ if(version>=9){
+  const recipes:Record<string,string>={'water-smooth':'Wet','water-rough':'Moist','water-wet':'Very Wet','water-flat':'Moist Light Mix','water-gradient':'Wet Heavy Mix','color-blender':'Wet Light Mix'};
+  const recipe=s.edgeDarkness===1?'Very Wet Heavy Mix':recipes[s.brushTip??'']??(style==='air'?'Very Wet':style==='oil'?'Wet Heavy Mix':'Moist');
+  return {...family,...tips[s.brushTip??''],...mixerRecipe(recipe),...(style==='air'?{bbBlur:1}:{}),
+   ...(s.edgeDarkness===1?{bbEdgeDarkness:1}:{})};
+ }
  if(s.brushTip==='water-wet'&&s.edgeDarkness===1)return {...family,bbMix:.53,bbStretch:.41,bbWetness:.78,bbTextureKeep:.34,bbBlur:.21};
  if(style==='air')return {...family,bbBlur:1,bbWetness:.58};
  if(s.nativeMixEnabled)return {...family,...tips['color-blender']};
  return {...family,...(tips[s.brushTip??'']??(style==='soft'?{bbMix:.46,bbBlur:.15}:{}))};
 }
-export function brushBlendSettingsFor(s:Partial<BrushBlendSettings>&BlendTip&{stabilization?:number;edgeDarkness?:number},version:BrushBlendVersion=7):typeof blendDefaults{
+export function brushBlendSettingsFor(s:Partial<BrushBlendSettings>&BlendTip&{stabilization?:number;edgeDarkness?:number},version:BrushBlendVersion=9):typeof blendDefaults{
  const base=blendDefaultsFor(s,version),out={...base};
  if(isSilkBrush(s))out.bbRenderStyle='silk';
  for(const [key,min,max] of blendLimits)out[key]=bounded(s[key],base[key],min,max);
@@ -185,6 +192,12 @@ export function brushBlendMetadata(s:BrushBlendSettings&Shape):BrushBlendControl
  * An unshaped Blend nib stays close to its selected size at light pressure.
  * Shaped stamps keep their authored pressure envelope and secondary tip. */
 export function prepareBlendMaskPressure(stroke:Stroke){
+ if(stroke.brushBlendVersion===9&&stroke.bbWetness!==0){
+  const taper=stroke.bbTaper??.12;
+  stroke.taperStart=Math.max(stroke.taperStart??0,taper*.12);
+  stroke.taperEnd=Math.max(stroke.taperEnd??0,taper*.18);
+  return;
+ }
  if(stroke.brushBlendVersion!==6&&stroke.brushBlendVersion!==7)return;
  stroke.pressureOpacity=false;
  stroke.pressureFlow=false;

@@ -201,7 +201,7 @@ export class StudioEngine {
  }
  /** v0.5.240 Blend mode: brush strokes only; pen-down snapshot for "All layers"
   * and the carried colour when "Clean brush after each stroke" is off. */
- private blendPageSample?:BlendSampleSource;private lastBlendEnd?:{layer:string;x:number;y:number;r:number};
+ private blendPageSample?:BlendSampleSource;private lastBlendEnd?:{project:string;preset:string;layer:string;x:number;y:number;r:number};
  private consumedLoad=new Map<string,number>();
  private prepareBrushBlend(s:Stroke,layer:Layer,doc:Project){
   this.blendPageSample=undefined;this.blendWorker.blendSample=undefined;setLiveBlendSample(undefined);
@@ -209,7 +209,7 @@ export class StudioEngine {
   if(s.tool!=='brush'){for(const k of Object.keys(s))if(k==='brushBlendVersion'||k.startsWith('bb'))delete (s as Record<string,unknown>)[k];return;}
   s.nativeMixVersion=undefined;s.nativeMixPickupVersion=undefined;s.nativeMixAmount=undefined;s.nativeMixPaintLoad=undefined;s.nativeMixRadius=undefined;
   if(s.brushBlendVersion===9){
-   const key=this.brush.brushKind+'|'+this.brush.brushTip+'|'+this.brush.watercolorShape+'|'+this.brush.edgeDarkness;
+   const key=this.preset.id;
    if(s.bbReload)s.bbPaintLoad=1;
    else if(s.bbLoadToken){
     if(this.consumedLoad.get(key)===s.bbLoadToken)s.bbPaintLoad=0;
@@ -218,13 +218,13 @@ export class StudioEngine {
   }
   prepareBlendMaskPressure(s);
   if(s.brushBlendVersion>=3)s.stabilization=Math.max(s.stabilization??0,s.bbSmoothing??0);
-  if(s.bbClean===false&&this.lastBlendEnd&&this.lastBlendEnd.layer===layer.id&&layer.operations.length){const e=this.lastBlendEnd;try{s.bbCarry=encodeCarry(this.renderer.get(layer,doc),e.x,e.y,e.r);}catch{/* no carry */}}
+  if(s.bbClean===false&&this.lastBlendEnd&&this.lastBlendEnd.project===doc.id&&this.lastBlendEnd.preset===this.preset.id&&this.lastBlendEnd.layer===layer.id&&layer.operations.length){const e=this.lastBlendEnd;try{s.bbCarry=encodeCarry(this.renderer.get(layer,doc),e.x,e.y,e.r);}catch{/* no carry */}}
   if(s.bbSample==='all'){const page=this.renderer.composite(doc,{includeReferences:false});const sample=sampleFromCanvas(page,{x:0,y:0,width:page.width,height:page.height});this.blendPageSample=sample;this.blendWorker.blendSample=sample;setLiveBlendSample(sample);}
  }
  private finishBrushBlend(stroke:Stroke):Stroke{
   const page=this.blendPageSample;this.blendPageSample=undefined;
   const last=stroke.points[stroke.points.length-1],target=this.strokeTarget;
-  if(last&&target)this.lastBlendEnd={layer:target.layer,x:last.x,y:last.y,r:Math.max(1,stroke.size*.5)};
+  if(last&&target)this.lastBlendEnd={project:target.project,preset:this.preset.id,layer:target.layer,x:last.x,y:last.y,r:Math.max(1,stroke.size*.5)};
   if(stroke.bbSample!=='all'||!page||!stroke.points.length)return stroke;
   const path=blendPath(stroke),scale=blendTransformScale(stroke);
   const pad=(stroke.brushBlendVersion===7||(stroke.brushBlendVersion===8||stroke.brushBlendVersion===9))?characterBlendReadReach(stroke,scale):
