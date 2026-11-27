@@ -46,8 +46,10 @@ export class MixerPreview{
   if(this.count===s.points.length)return this.surface;
   const ctx=this.surface.getContext('2d')!,patch=this.patch.getContext('2d')!,side=this.patch.width;
   const step=Math.max(1,s.size*.12);
+  let a=s.points[Math.max(0,this.count-1)];
   for(let i=this.count;i<s.points.length;i++){
-   const p=s.points[i],a=s.points[Math.max(0,i-1)],dx=p.x-a.x,dy=p.y-a.y,d=Math.hypot(dx,dy);
+   const p=s.points[i],dx=p.x-a.x,dy=p.y-a.y,d=Math.hypot(dx,dy);
+   if(i>0&&i<s.points.length-1&&d<step)continue;
    const pieces=Math.max(1,Math.ceil(d/step));
    for(let n=1;n<=pieces;n++){
     const t=n/pieces,x=a.x+dx*t,y=a.y+dy*t,pressure=a.p+(p.p-a.p)*t;
@@ -64,6 +66,7 @@ export class MixerPreview{
     ctx.globalAlpha=s.opacity*(s.bbFlow??.6)*(s.bbAmount??1);
     ctx.drawImage(this.patch,x-width/2,y-width/2,width,width);
    }
+   a=p;
   }
   ctx.globalAlpha=1;this.count=this.presentedSamples=s.points.length;
   return this.surface;

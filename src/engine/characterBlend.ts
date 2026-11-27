@@ -348,7 +348,7 @@ export function renderCharacterBlend(ctx:Ctx,mask:CanvasSource,s:Stroke,points:r
  if(s.brushBlendVersion===9&&s.bbWetness===0){
   const box=strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height);
   restoreRegion(ctx,read,previous);restoreRegion(ctx,read,box);
-  compositePaintStroke(ctx,mask as HTMLCanvasElement,{...s,brushBlendVersion:undefined},maskX,maskY,box);
+  compositePaintStroke(ctx,mask as HTMLCanvasElement,{...s,brushBlendVersion:undefined},maskX,maskY);
   return box;
  }
  if((s.brushBlendVersion===8||s.brushBlendVersion===9))return renderPaintMasked(ctx,mask,s,points,maskX,maskY,read,previous,sample,carry,transformScale);

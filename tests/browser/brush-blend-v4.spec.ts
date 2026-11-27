@@ -368,10 +368,10 @@ test('Silk fallback previews update and its watercolor strokes undo and redo byt
   engine.historyNavigation('redo');
   const redone=capture();
   engine.dispose();canvas.remove();
-  return {version:operation.silkBlendVersion,style:operation.silkMode,otherVersion:operation.brushBlendVersion??null,mix:operation.nativeMixVersion??null,
+  return {version:operation.brushBlendVersion,style:operation.bbMode,otherVersion:operation.silkBlendVersion??null,mix:operation.nativeMixVersion??null,
    liveChanged,changed:diff(before,after),undo:diff(before,undone),redo:diff(after,redone)};
  });
- expect(result).toMatchObject({version:2,style:'smudge',otherVersion:null,mix:null,undo:0,redo:0});
+ expect(result).toMatchObject({version:9,style:'smudge',otherVersion:null,mix:null,undo:0,redo:0});
  expect(result.changed).toBeGreaterThan(100);
  expect(result.liveChanged).toBeGreaterThan(100);
 });
