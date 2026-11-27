@@ -84,10 +84,12 @@ export const BrushStudio=memo(function BrushStudio({library,eraser,onChange,noti
   dry?['texture/Paper grain strength','texture/Scatter']:
   s.brushTip==='chalk'?['texture/Texture strength','tip/Tip spacing']:
   inkTip?['smoothing/Stabilization','taper/Beginning taper']:['smoothing/Stabilization','smoothing/Smoothness'];
- const pins=Array.isArray(publishedPins[preset.id])?publishedPins[preset.id]:defaults;
+ const pinKey=s.bbEnabled?preset.id+'/mixer':preset.id;
+ const savedPins=publishedPins[pinKey],priorPins=publishedPins[preset.id];
+ const pins=Array.isArray(savedPins)?savedPins:s.bbEnabled&&Array.isArray(priorPins)?[...new Set([...priorPins,...defaults])]:defaults;
  const visible=menu==='quick'||settingsOpen;
  const toggle=(id:string)=>{
-  const next={...publishedPins,[preset.id]:pins.includes(id)?pins.filter(key=>key!==id):[...pins,id]};
+  const next={...publishedPins,[pinKey]:pins.includes(id)?pins.filter(key=>key!==id):[...pins,id]};
   setPublishedPins(next);writePreference('brush-quick-pins',next);
  };
  const quickLabels:Record<string,string>={'paint/Water amount':'Wetness','paint/Edge bleeding':'Bleed','paint/Edge softness':'Edge softness','texture/Paper grain strength':'Grain','texture/Texture strength':'Grain','nature/Scatter amount':'Scatter','taper/Beginning taper':'Beginning taper'};

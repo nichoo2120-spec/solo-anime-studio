@@ -6,7 +6,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [build, before, after, pixels, latency, browser1, browser2, browser3, browser4]
+        suite: [replay, build, before, after, pixels, latency, browser1, browser2, browser3, browser4]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -16,6 +16,18 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - if: matrix.suite == 'replay'
+        uses: actions/checkout@v4
+        with:
+          ref: f2328198a875748e73721bc178ca63d0c9ddb926
+          path: old
+      - if: matrix.suite == 'replay'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Junction -Path old/node_modules -Target "$PWD/node_modules"
+          Start-Process node -ArgumentList "$PWD/node_modules/vite/bin/vite.js","--host","127.0.0.1","--port","5175" -WorkingDirectory "$PWD/old"
+          $env:BLEND_BASELINE_URL="http://127.0.0.1:5175"
+          npx playwright test tests/browser/large-blend-v254.spec.ts --grep "historical blend"
       - if: matrix.suite == 'before'
         run: git checkout f2328198a875748e73721bc178ca63d0c9ddb926 -- src
       - if: matrix.suite == 'build'
@@ -25,7 +37,9 @@ jobs:
           npm test -- --maxWorkers=2
           if ($LASTEXITCODE) {exit $LASTEXITCODE}
           npm run build
-      - if: matrix.suite == 'before' || matrix.suite == 'after'
+      - if: matrix.suite == 'before'
+        run: npx playwright test tests/browser/mixer-profile-v257.spec.ts --grep "profile two"
+      - if: matrix.suite == 'after'
         run: npx playwright test tests/browser/mixer-profile-v257.spec.ts
       - if: matrix.suite == 'pixels'
         run: npx playwright test tests/browser/shared-blend-v256.spec.ts tests/browser/blend-character-v255.spec.ts --grep-invert "300 px"

@@ -6,6 +6,7 @@ export type QuickControl=
  | {kind:'number';props:ExactRangeProps}
  | {kind:'choice';name:string;value:string;options:{value:string;label:string;disabled?:boolean}[];set:(s:string)=>void;disabled?:boolean}
  | {kind:'toggle';name:string;value:boolean;set:(s:boolean)=>void;disabled?:boolean}
+ | {kind:'action';name:string;run:()=>void}
  | {kind:'color';name:string;value:string;set:(s:string)=>void;disabled?:boolean};
 export type QuickRegistry=Map<string,()=>QuickControl>;
 export const BrushPins=createContext<{register:(key:string,read:()=>QuickControl)=>()=>void;has:(key:string)=>boolean;toggle:(key:string)=>void;preview:boolean}|null>(null);
@@ -59,4 +60,9 @@ export function BrushSettingInput(props:ComponentProps<'input'>){
   kind:'number',props:{name,value:Number(props.value),min:Number(props.min??0),max:Number(props.max??100),step:Number(props.step??1),set:v=>change(String(v))}
  }:null);
  return <><input {...props} ref={ref}/>{pin}</>;
+}
+
+export function BrushSettingAction({name,run}:{name:string;run:()=>void}){
+ const pin=useBrushSettingPin(name,{kind:'action',name,run});
+ return <><button type="button" onClick={run}>{name}</button>{pin}</>;
 }

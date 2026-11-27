@@ -1,5 +1,5 @@
 import {mixerPresets,mixerRecipe} from '../core/mixerBrush';
-import {BrushSettingInput,BrushSettingSelect} from './BrushQuickSettings';
+import {BrushSettingAction,BrushSettingInput,BrushSettingSelect} from './BrushQuickSettings';
 import {memo,useEffect,useRef} from 'react';
 import {ExactRange} from './ExactRange';
 import {blendDefaultsFor,blendModes,blendPresets,brushBlendSettingsFor,blendPressureCurves,prepareBlendMaskPressure,blendRenderStyles,blendStrengthPresets,canBrushBlend,isBlendMode,isBlendSample,blendStyleFor,blendStyleNames,type BlendPressureCurve,type BlendRenderStyle,type BlendMode,type BlendStyle} from '../core/brushBlend';
@@ -88,7 +88,7 @@ export const BrushBlendSettingsPanel=memo(function BrushBlendSettingsPanel({sett
    <ExactRange live name="Mixer taper" value={pct(values.bbTaper,.12)} unit="%" set={v=>patch({bbTaper:v/100})}/>
    {([['bbReload','Load brush after each stroke'],['bbPressureWet','Pressure controls Wet'],['bbPressureMix','Pressure controls Mix'],['bbSolidLoad','Load solid colours only']] as const).map(([key,name])=><label className="check-row" key={key}><span>{name}</span><BrushSettingInput type="checkbox" aria-label={name} checked={values[key]} onChange={e=>patch({[key]:e.target.checked})}/></label>)}
    <label className="check-row"><span>Sample All Layers</span><BrushSettingInput type="checkbox" aria-label="Sample All Layers" checked={values.bbSample==='all'} onChange={e=>patch({bbSample:e.target.checked?'all':'layer'})}/></label>
-   <div className="silk-presets"><button type="button" onClick={()=>patch({bbPaintLoad:1,bbLoadToken:Date.now()})}>Load brush</button><button type="button" onClick={()=>patch({bbPaintLoad:0,bbLoadToken:Date.now(),bbClean:true})}>Clean brush</button></div>
+   <div className="silk-presets"><BrushSettingAction name="Load brush" run={()=>patch({bbPaintLoad:1,bbLoadToken:Date.now()})}/><BrushSettingAction name="Clean brush" run={()=>patch({bbPaintLoad:0,bbLoadToken:Date.now(),bbClean:true,bbReload:false})}/></div>
    <label className="studio-select">Blend style<BrushSettingSelect aria-label="Blend style" value={values.bbRenderStyle} onChange={e=>patch({bbRenderStyle:e.target.value as BlendRenderStyle})}>{Object.entries(blendRenderStyles).map(([key,name])=><option key={key} value={key}>{name}</option>)}</BrushSettingSelect></label>
    {values.bbRenderStyle==='silk'?<SilkBlendPanel settings={s} patch={patch} reset={resetSilk}/>:<>
    <label className="studio-select">Blend mode<BrushSettingSelect aria-label="Blend mode" value={mode} onChange={e=>patch({bbMode:e.target.value as BlendMode})}>{blendModes.map(m=><option key={m} value={m}>{m[0].toUpperCase()+m.slice(1)}</option>)}</BrushSettingSelect></label>

@@ -2,6 +2,7 @@ import type {Stroke} from '../core/model';
 import {drawStroke} from './renderer';
 import type {RasterRegion} from './liveRaster';
 const canvas=()=>document.createElement('canvas');
+const nibCache=new Map<string,HTMLCanvasElement>();
 
 /** A provisional colour transfer at the pen, replaced by worker pixels. It
  * never owns a layer, goes into history, or supplies saved-stroke pixels. */
@@ -10,18 +11,23 @@ export class MixerPreview{
  private nib=canvas();
  private patch=canvas();
  private count=0;
- private key='';
  presentedSamples=0;
  begin(source:HTMLCanvasElement,s:Stroke,signature:string){
   this.count=this.presentedSamples=0;
-  this.surface.width=source.width;this.surface.height=source.height;
-  this.surface.getContext('2d')!.drawImage(source,0,0);
-  if(this.key===signature)return;
-  this.key=signature;
-  const side=96;this.nib.width=this.nib.height=this.patch.width=this.patch.height=side;
+  if(this.surface.width!==source.width)this.surface.width=source.width;
+  if(this.surface.height!==source.height)this.surface.height=source.height;
+  const ctx=this.surface.getContext('2d')!;ctx.globalCompositeOperation='copy';ctx.drawImage(source,0,0);ctx.globalCompositeOperation='source-over';
+  const properties=JSON.parse(signature);
+  for(const key of ['id','rasterSourceId','watercolorSeed','colorSeed','dryBristleSeed','color','bbCarry'])delete properties[key];
+  properties.size=Math.round(s.size/8);properties.tipAngle=Math.round((s.tipAngle??0)/5);
+  const key=JSON.stringify(properties),side=64,existing=nibCache.get(key);
+  if(this.patch.width!==side)this.patch.width=this.patch.height=side;
+  if(existing){this.nib=existing;return;}
+  this.nib=canvas();this.nib.width=this.nib.height=side;
   const nib={...s,size:side*.65,id:s.rasterSourceId??s.id,color:'#ffffff',pressure:false,
    points:[{x:side/2,y:side/2,p:1}],taperStart:0,taperEnd:0};
-  drawStroke(this.nib.getContext('2d')!,nib);
+  drawStroke(this.nib.getContext('2d')!,nib);nibCache.set(key,this.nib);
+  if(nibCache.size>48)nibCache.delete(nibCache.keys().next().value!);
  }
  replace(source:HTMLCanvasElement,r:RasterRegion){
   const ctx=this.surface.getContext('2d')!;ctx.clearRect(r.x,r.y,r.width,r.height);

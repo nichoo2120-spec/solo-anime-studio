@@ -18,7 +18,7 @@ type Job={token:number;id:string;ownershipBase?:BlendBaseline;source:HTMLCanvasE
 export class LiveBlendWorker{
  private worker?:Worker;private job?:Job;private token=0;private serial=0;private failed=false;private failures=0;
  private surface=canvas(1,1);private surfaceReadback=false;
- private mixerPreview?:MixerPreview;
+ private mixerPreview?:MixerPreview;private retainedMixer?:MixerPreview;
  get presentedMixerSamples(){return this.mixerPreview?.presentedSamples??0;}
  private dirty?:RasterRegion;private delta?:BlendDelta;
  /** v0.5.240 Blend mode "All layers": page snapshot taken at pen-down. */
@@ -53,7 +53,7 @@ export class LiveBlendWorker{
    this.cancel(true);const token=++this.token,j:Job={token,id:s.id,ownershipBase,source,signature,ready:false,inFlight:false,pointCount:0};this.job=j;
    if(this.surfaceReadback!==nativeDelta){this.surface=canvas(1,1);this.surfaceReadback=nativeDelta;}
    if(s.brushBlendVersion===9&&!nativeDelta&&s.bbSample!=='all'&&!s.transform&&!s.perspective){
-    this.mixerPreview=new MixerPreview();this.mixerPreview.begin(source,s,signature);
+    this.mixerPreview=this.retainedMixer??=new MixerPreview();this.mixerPreview.begin(source,s,signature);
    }
    const deltaPixels=ownershipBase?.pixels.slice();
    if(nativeDelta){const seed=ownershipBase?.seed;this.delta={mask:canvas(source.width,source.height),patch:canvas(source.width,source.height),tiles:new Map(seed?.tiles),revision:0,group:ownershipBase,box:seed?.box};if(seed){this.delta.mask.getContext('2d')!.drawImage(seed.mask,seed.box.x,seed.box.y);this.delta.patch.getContext('2d')!.drawImage(seed.paint,seed.box.x,seed.box.y);}}
