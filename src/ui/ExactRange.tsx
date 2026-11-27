@@ -21,7 +21,7 @@ export type ExactRangeProps={
  */
 export function ExactRange({live=false,name,settingId,value,min=0,max=100,step=1,unit='',set}:ExactRangeProps){
   const id=useId();
-  const pin=useBrushSettingPin(settingId??name,{kind:'number',props:{name,value,min,max,step,unit,set}});
+  const pin=useBrushSettingPin(name,{kind:'number',props:{name,value,min,max,step,unit,set}},settingId);
   const [editing,setEditing]=useState(false);
   const [draft,setDraft]=useState('');
   const [sliding,setSliding]=useState<number|null>(null);

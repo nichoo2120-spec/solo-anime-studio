@@ -48,6 +48,7 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
     const {s,out,coverage}=render(preset,size);
     const delta=new Uint8Array(width*height);
     let outside=0,longest=0,seamRatio=0;
+    let longestEdge:{vertical:boolean;col:number;start:number;end:number}|undefined;
     for(let i=0,j=0;i<out.length;i+=4,j++){
      delta[j]=Math.max(Math.abs(out[i]-before[i]),Math.abs(out[i+1]-before[i+1]),Math.abs(out[i+2]-before[i+2]),Math.abs(out[i+3]-before[i+3]));
      if(delta[j]&&coverage&&!coverage[i+3])outside++;
@@ -66,7 +67,7 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
        if(backgroundEdge){run=0;continue;}
        const a=delta[at],b=delta[at-neighbor];
        run=Math.abs(a-b)>27&&Math.min(a,b)<2?run+1:0;
-       longest=Math.max(longest,run);
+       if(run>longest){longest=run;longestEdge={vertical,col,start:row-run+1,end:row};}
       }
      }
     }
@@ -81,7 +82,7 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
      neighbor+=(Math.abs(delta[i-2*width]-delta[i-3*width])+Math.abs(delta[i+2*width]-delta[i+width]))*.5;
     }
     seamRatio=neighbor?tile/neighbor:0;
-    cases.push({id:preset.id,size,version:s.brushBlendVersion,silk:s.silkBlendVersion,outside,longest,seamRatio,...difference(out,before)});
+    cases.push({id:preset.id,size,version:s.brushBlendVersion,silk:s.silkBlendVersion,outside,longest,longestEdge,seamRatio,...difference(out,before)});
     if(targetIds.includes(preset.id))reference.set(preset.id,out);
     if(['blend-mix','water-rough','water-flat'].includes(preset.id)){
      const reverse=render(preset,size,[...points].reverse()).out;
@@ -159,10 +160,11 @@ test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay respon
     await engine.renderer.whenSettled();
     engine.historyNavigation('undo');await frame();await frame();
     const timings:number[]=[],render=engine.render.bind(engine);
-    let undo=0,undoStart=0,previews=0;
+    let undo=0,undoStart=0,previews=0,reusedFinal=false;
     const receive=engine.blendWorker.receive.bind(engine.blendWorker);
-    engine.blendWorker.receive=(reply:{bitmap?:ImageBitmap;final?:boolean})=>{
+    engine.blendWorker.receive=(reply:{bitmap?:ImageBitmap;final?:boolean;unchanged?:boolean})=>{
      if(reply.bitmap&&!reply.final&&engine.drawing)previews++;
+     if(reply.final)reusedFinal=!!reply.unchanged;
      receive(reply);
     };
     engine.render=()=>{
@@ -183,7 +185,7 @@ test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay respon
     const restored=pixels(engine.renderer,store.getSnapshot()),original=pixels(recorder,project);
     const undoParity=restored.reduce((n,v,i)=>n+Number(v!==original[i]),0);
     timings.sort((a,b)=>a-b);
-    results.push({id,size,version:op.brushBlendVersion,previews,frames:timings.length,
+    results.push({id,size,version:op.brushBlendVersion,previews,reusedFinal,frames:timings.length,
      p95:timings[Math.ceil(timings.length*.95)-1],dispatch,exact,undo,parity,undoParity});
    }finally{engine.dispose();recorder.clear();host.remove();}
   }

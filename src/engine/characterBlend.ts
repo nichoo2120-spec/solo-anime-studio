@@ -156,8 +156,13 @@ export function renderCharacterBlend(ctx:Ctx,mask:CanvasSource,s:Stroke,points:r
  const water=style==='water',gradient=s.brushTip==='water-gradient',rough=s.brushTip==='water-rough';
  const flat=s.brushTip==='water-flat',mode=s.bbMode??'soft',wet=clamp((s.bbWetness??.4)*(mode==='dry'?.48:mode==='wet'?1.12:1));
  const blur=s.bbRenderStyle==='blur'?1:clamp(s.bbBlur??0),softness=s.bbSoftness??.5,radius=s.size*(s.stampVersion===1?Math.max(.65,stampExtent(s)):.65)*transformScale;
- const kernel=blur>0?radius*(.14+.34*wet):0;
- const reach=radius*(1.18+wet*.37),pad=Math.ceil(reach+2);
+ const filteredBlur=blur*ease((blur-.2)/.35);
+ const gaussian=filteredBlur>.001,localBlur=blur-filteredBlur;
+ const kernel=gaussian?radius*(.14+.34*wet):0;
+ const reach=radius*(1.18+wet*.37);
+ // The contact atlas is at most 1.5 radii wide, including feather. Its
+ // destination can be smaller than the read halo, particularly for wet dabs.
+ const pad=Math.ceil((usesCharacterTip(s)&&!s.perspective?Math.min(reach,s.size*.76*transformScale):reach)+2);
  let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
  for(const p of points){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);}
  const x=Math.max(0,Math.floor(left-pad)),y=Math.max(0,Math.floor(top-pad));
@@ -172,7 +177,7 @@ export function renderCharacterBlend(ctx:Ctx,mask:CanvasSource,s:Stroke,points:r
  const inCtx=buffer(pickup??=make(),cw,ch,true),out=buffer(field??=make(),cw,ch);
  const source=sample?sampleCanvas(sample):read.canvas;
  inCtx.drawImage(source,((sample?.x??0)-gx)/scale,((sample?.y??0)-gy)/scale,source.width/scale,source.height/scale);
- const image=inCtx.getImageData(0,0,cw,ch),picked=new Float64Array(4),reservoir=new Float64Array(4);
+ const image=inCtx.getImageData(0,0,cw,ch),picked=new Float64Array(4),reservoir=new Float64Array(4),blurSample=new Float64Array(4);
  const mix=s.bbMix??.55,drag=s.bbStretch??.45,load=s.bbPaintLoad??0,flow=s.bbFlow??.6;
  const hold=s.size*(.12+drag*1.5+(s.bbColorCarry??.6)*.45)/Math.max(.01,s.bbPickup??.5);
  const seed=seedFor(s.rasterSourceId??s.id),texture=s.bbTextureKeep??0,rim=s.bbEdgeDarkness??0;
@@ -183,6 +188,15 @@ export function renderCharacterBlend(ctx:Ctx,mask:CanvasSource,s:Stroke,points:r
   const cx=(p.x-gx)/scale,cy=(p.y-gy)/scale,r=reach/scale;
   const trailing=radius*(.15+drag*.42)*(1-blur)/scale;
   sampleGrid(image,cx-p.dx*trailing,cy-p.dy*trailing,picked);
+  if(localBlur>0){
+   // A light blend of diffusion uses symmetric samples from the same
+   // premultiplied grid. Larger blur settings use the spatial filter.
+   const spread=r*.33;
+   for(const [x,y] of [[cx-spread,cy],[cx+spread,cy],[cx,cy-spread],[cx,cy+spread]]){
+    sampleGrid(image,x,y,blurSample);
+    for(let c=0;c<4;c++)picked[c]=lerp(picked[c],blurSample[c],localBlur*.25);
+   }
+  }
   if(!p.distance&&!carry)reservoir.set(picked);
   else{
    const charge=(1-Math.exp(-p.step/Math.max(1,hold)))*picked[3];
@@ -215,12 +229,18 @@ export function renderCharacterBlend(ctx:Ctx,mask:CanvasSource,s:Stroke,points:r
   }
   out.restore();
  });
- if(blur>0){
-  const bc=buffer(blurLayer??=make(),cw,ch);
-  bc.save();bc.filter=`blur(${kernel/scale}px)`;bc.drawImage(pickup,0,0,cw,ch,0,0,cw,ch);bc.restore();
-  bc.globalCompositeOperation='destination-in';bc.drawImage(field,0,0,cw,ch,0,0,cw,ch);bc.globalCompositeOperation='source-over';
+ if(gaussian){
+  const factor=scale>1?2:1,w=Math.ceil(cw/factor),h=Math.ceil(ch/factor);
+  const bc=buffer(blurLayer??=make(),w,h);
+  bc.save();
+  bc.filter='blur('+(kernel/(scale*factor))+'px)';
+  bc.drawImage(pickup,0,0,cw,ch,0,0,w,h);
+  bc.restore();
+  bc.globalCompositeOperation='destination-in';
+  bc.drawImage(field,0,0,cw,ch,0,0,w,h);
+  bc.globalCompositeOperation='source-over';
   if(blur===1)out.clearRect(0,0,cw,ch);
-  out.globalAlpha=blur;out.drawImage(blurLayer,0,0,cw,ch,0,0,cw,ch);out.globalAlpha=1;
+  out.globalAlpha=filteredBlur;out.drawImage(blurLayer,0,0,w,h,0,0,cw,ch);out.globalAlpha=1;
  }
  const target=buffer(patch??=make(),w,h);
  target.drawImage(field,0,0,cw,ch,gx-x,gy-y,cw*scale,ch*scale);

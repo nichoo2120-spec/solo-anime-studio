@@ -11,9 +11,9 @@ export type QuickRegistry=Map<string,()=>QuickControl>;
 export const BrushPins=createContext<{register:(key:string,read:()=>QuickControl)=>()=>void;has:(key:string)=>boolean;toggle:(key:string)=>void;preview:boolean}|null>(null);
 const Section=createContext('');
 export function BrushSettingGroup({id,children}:{id:string;children:ReactNode}){return <Section.Provider value={id}>{children}</Section.Provider>;}
-export function useBrushSettingPin(name:string,control:QuickControl|null){
+export function useBrushSettingPin(name:string,control:QuickControl|null,settingId=name){
  const section=useContext(Section),pins=useContext(BrushPins),latest=useRef(control);latest.current=control;
- const key=section&&name?section+'/'+name:'';
+ const key=section&&settingId?section+'/'+settingId:'';
  const register=pins?.register,enabled=!!control;
  useLayoutEffect(()=>{if(key&&register&&enabled)return register(key,()=>latest.current!);},[key,register,enabled]);
  if(!key||!pins||!control)return null;
