@@ -33,6 +33,7 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
  const output=field.data,rgb=parseInt(s.color.slice(1),16);
  const loaded=[linear[rgb>>16&255],linear[rgb>>8&255],linear[rgb&255]];
  const carrySide=carry?Math.round(Math.sqrt(carry.length/4)):0;
+ const wash=s.watercolorBlendVersion===1;
  const capacity=s.bbCapacity??.45,drag=s.bbStretch??.5,flow=s.bbFlow??.6;
  const style=effectiveBlendStyle(s.bbStyle??'soft',s.bbRenderStyle);
  const wet=clamp((s.bbWetness??.5)*(style==='dry'||s.bbMode==='dry'?.7:style==='water'?1.08:1)),mix=s.bbMix??.5;
@@ -52,8 +53,9 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
   const t=length?clamp((distance-start)/length):0,p=a.p+(b.p-a.p)*t;
   const cx=(a.x+(b.x-a.x)*t-originX)/pitch-.5,cy=(a.y+(b.y-a.y)*t-originY)/pitch-.5;
   const dx=length?(b.x-a.x)/length:1,dy=length?(b.y-a.y)/length:0;
-  const r=Math.max(1,extent/pitch),moisture=wet*(s.pressure&&s.bbPressureWet?p:1);
-  const localMix=mix*(s.pressure&&s.bbPressureMix?p:1);
+  const contact=wash?Math.sqrt(clamp(p/.4)):p;
+  const r=Math.max(1,extent/pitch),moisture=wet*(s.pressure&&s.bbPressureWet?contact:1);
+  const localMix=mix*(s.pressure&&s.bbPressureMix?contact:1);
   const strength=s.pressure&&s.bbPressure?blendPressureFactor(p/.4,s.bbMinPressure??.7,s.bbPressureCurve??'linear'):1;
   const refill=1-Math.exp(-spacing*(s.bbPickup??.5)*moisture/Math.max(1,s.size*(.18+drag+.35*(s.bbColorCarry??.6))));
   if(pass===1)previousPickup.set(pickup);
@@ -69,7 +71,17 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
     pickup[k+3]=alpha;
    }
    const charge=distance||carry?refill:1;
-   for(let c=0;c<4;c++)pickup[k+c]+=(sample[c]-pickup[k+c])*charge;
+   for(let c=0;c<4;c++){
+    let pigment=pickup[k+c];
+    if(wash&&distance){
+     // Let adjacent bristles exchange a little wet pigment on each contact.
+     const left=k-(u?4:0),right=k+(u<side-1?4:0);
+     const up=k-(v?side*4:0),down=k+(v<side-1?side*4:0);
+     const adjacent=(previousPickup[left+c]+previousPickup[right+c]+previousPickup[up+c]+previousPickup[down+c])*.25;
+     pigment+=(adjacent-pigment)*moisture*.5;
+    }
+    pickup[k+c]=pigment+(sample[c]-pigment)*charge;
+   }
   }
   const tail=s.bbTaper??.12,fadeLength=Math.max(1,s.size*(.3+capacity*5));
   const charge=(s.bbPaintLoad??0)*Math.exp(-distance/fadeLength);
@@ -104,7 +116,8 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
      const oldTop=previousPickup[(row+u0)*4+c]*(1-fx)+previousPickup[(row+u1)*4+c]*fx;
      const oldBottom=previousPickup[(row1+u0)*4+c]*(1-fx)+previousPickup[(row1+u1)*4+c]*fx;
      const carried=(top*(1-fy)+bottom*fy)*f+(oldTop*(1-fy)+oldBottom*fy)*(1-f);
-     sample[c]=carried*(1-dragged)+sample[c]*dragged;
+     const direct=wash?dragged*(1-.8*moisture):dragged;
+     sample[c]=carried*(1-direct)+sample[c]*direct;
      const loadTop=loadedImage[(row+u0)*4+c]*(1-fx)+loadedImage[(row+u1)*4+c]*fx;
      const loadBottom=loadedImage[(row1+u0)*4+c]*(1-fx)+loadedImage[(row1+u1)*4+c]*fx;
      sample[c]=sample[c]*(1-paint)+(loadTop*(1-fy)+loadBottom*fy)*paint;
@@ -116,7 +129,9 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
     sample[3]=sample[3]*activity+baseAlpha*(1-activity);
     const alpha=sample[3];if(alpha<=0)continue;
     for(let c=0;c<3;c++)output[k+c]=encoded[Math.round(4096*clamp(sample[c]/alpha))];
-    output[k+3]=Math.round(255*alpha*flow*strength);
+    const edge=wash?clamp(1-(nx*nx+ny*ny)):1;
+    const feather=edge*edge*(3-2*edge);
+    output[k+3]=Math.round(255*alpha*flow*strength*feather);
    }
   }
   previousX=cx;previousY=cy;

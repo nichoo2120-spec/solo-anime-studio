@@ -77,6 +77,7 @@ function defaultBlendMode(style:BlendStyle):BlendMode{
 }
 export const defaultBlendModeFor=(s:BlendTip)=>defaultBlendMode(blendStyleFor(s));
 export type BrushBlendControls={
+ watercolorBlendVersion?:1;
  brushBlendVersion?:BrushBlendVersion;
  /** v2 (v0.5.242): the brush family's blend character (watercolor, dry, pencil, ink, ...). */
  bbStyle?:BlendStyle;
@@ -127,7 +128,7 @@ export type BrushBlendControls={
  /** Stroke-only: all-layers sample snapshot (opaque PNG) and its document rectangle. */
  bbSamplePng?:string;bbSampleRect?:{x:number;y:number;width:number;height:number};
 };
-export type BrushBlendSettings=Omit<BrushBlendControls,'brushBlendVersion'|'bbStyle'|'bbCarry'|'bbSamplePng'|'bbSampleRect'>&{bbEnabled?:boolean};
+export type BrushBlendSettings=Omit<BrushBlendControls,'watercolorBlendVersion'|'brushBlendVersion'|'bbStyle'|'bbCarry'|'bbSamplePng'|'bbSampleRect'>&{bbEnabled?:boolean};
 export const blendDefaults:Required<Omit<BrushBlendSettings,'bbEnabled'>>={bbLoadToken:0,bbCapacity:.45,bbTaper:.12,bbReload:false,bbSolidLoad:true,bbPressureWet:false,bbPressureMix:false,bbMode:'soft',bbAmount:.85,bbPickup:.5,bbWetness:.4,bbMix:.6,bbFlow:.6,bbStretch:.45,bbSample:'layer',bbClean:true,bbPaintLoad:0,bbPressure:false,bbStrength:1,bbMinPressure:.7,bbPressureCurve:'linear',bbRenderStyle:'auto',bbBlur:0,bbProtectAlpha:false,bbColorCarry:.65,bbSoftness:.5,bbTextureKeep:0,bbSmoothing:0,bbEdgeDarkness:0};
 /** The values exposed for a family become its defaults only when a brush has no custom value saved. */
 export function blendDefaultsFor(s:BlendTip&{stabilization?:number;edgeDarkness?:number},version:BrushBlendVersion=9):typeof blendDefaults{
@@ -186,13 +187,18 @@ const bounded=(v:unknown,fallback:number,min:number,max:number)=>typeof v==='num
 export function brushBlendMetadata(s:BrushBlendSettings&Shape):BrushBlendControls{
  if(!s.bbEnabled||!canBrushBlend(s))return {};
  const settings=brushBlendSettingsFor(s);
- return {...settings,brushBlendVersion:9,bbStyle:blendStyleFor(s)};
+ const watercolor=s.brushKind?.startsWith('watercolor')||s.brushTip?.startsWith('wash');
+ return {...settings,...(watercolor?{watercolorBlendVersion:1 as const}:{}),brushBlendVersion:9,bbStyle:blendStyleFor(s)};
 }
 /** Freeze the pressure channels used by the paint-shaped mask at pen-down.
  * An unshaped Blend nib stays close to its selected size at light pressure.
  * Shaped stamps keep their authored pressure envelope and secondary tip. */
 export function prepareBlendMaskPressure(stroke:Stroke){
  if(stroke.brushBlendVersion===9&&stroke.bbWetness!==0){
+  if(stroke.watercolorBlendVersion===1){
+   // Size retains pen dynamics. Apply mixing pressure once in the reservoir.
+   stroke.pressureOpacity=false;stroke.pressureFlow=false;
+  }
   const taper=stroke.bbTaper??.12;
   stroke.taperStart=Math.max(stroke.taperStart??0,taper*.12);
   stroke.taperEnd=Math.max(stroke.taperEnd??0,taper*.18);

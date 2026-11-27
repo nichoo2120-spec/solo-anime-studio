@@ -330,6 +330,7 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
   color.globalAlpha=blur;color.drawImage(sharedBlur,0,0,cw,ch,0,0,cw,ch);color.globalAlpha=1;
  }
  const target=buffer(patch??=make(),w,h);
+ if(s.watercolorBlendVersion===1)target.imageSmoothingQuality='high';
  target.drawImage(sharedColor,0,0,cw,ch,gx-x,gy-y,cw*pitch,ch*pitch);
  target.globalCompositeOperation='destination-in';
  if(!drawCrop(target,mask,maskX,maskY,x,y,w,h))target.clearRect(0,0,w,h);
