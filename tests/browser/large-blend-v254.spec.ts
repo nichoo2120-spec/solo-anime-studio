@@ -272,7 +272,7 @@ test('replays historical blend strokes byte for byte against the previous releas
   const load=(path:string)=>import(path);
   const {stockPresets}=await load('/src/core/brushes.ts');
   const {brushStrokeMetadata}=await load('/src/core/paintTips.ts');
-  const {brushBlendSettingsFor}=await load('/src/core/brushBlend.ts');
+  const {brushBlendSettingsFor,watercolorBlendTip}=await load('/src/core/brushBlend.ts');
   const {drawStroke}=await load('/src/engine/renderer.ts');
   const {renderBrushBlend}=await load('/src/engine/brushBlend.ts');
   const surface=()=>Object.assign(document.createElement('canvas'),{width:1050,height:590}).getContext('2d',{willReadFrequently:true})!;
@@ -285,7 +285,8 @@ test('replays historical blend strokes byte for byte against the previous releas
    const settings={...stockPresets.find((p:{id:string})=>p.id===id).settings,bbEnabled:true,bbRenderStyle:style,pressureWidth:false};
    const base={...settings,...brushStrokeMetadata(settings),...brushBlendSettingsFor(settings,6),brushBlendVersion:6,bbBlur:undefined,id:'historical-blend-'+id,kind:'stroke',tool:'brush',size:300,points,pressure:false};
    mask.clearRect(0,0,1050,590);drawStroke(mask,base);
-   for(const version of [3,4,6]){
+   for(const version of [1,2,3,4,5,6]){
+    if(version===5&&!watercolorBlendTip(base.brushTip))continue;
     ctx.clearRect(0,0,1050,590);
     const palette=ctx.createLinearGradient(95,130,918,466);
     palette.addColorStop(0,'#a02bc4');palette.addColorStop(.38,'#dea158');palette.addColorStop(1,'#258baf');

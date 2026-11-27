@@ -79,10 +79,18 @@ export class LiveBlendWorker{
   j.pointsRef=points;j.pointCount=points.length;j.lastPoint=points.length?{...points[points.length-1]}:undefined;
   j.timer=setTimeout(()=>this.fail(),5000);
 }
+ private resolveFinal(j:Job){
+  const result=this.surface;
+  this.surface=canvas(1,1);this.job=undefined;j.resolve?.(result);
+ }
  private receive(reply:Reply){
   const j=this.job;if(!j||reply.token!==j.token){reply.bitmap?.close();reply.deltaMask?.close();reply.deltaPaint?.close();return;}
   if(j.timer)clearTimeout(j.timer);j.timer=undefined;j.inFlight=false;
-  if(reply.unchanged){this.flush(j);return;}
+  if(reply.unchanged){
+   if(reply.final)this.resolveFinal(j);
+   else this.flush(j);
+   return;
+  }
   if(reply.error||!reply.bitmap||!reply.region){reply.bitmap?.close();reply.deltaMask?.close();reply.deltaPaint?.close();this.fail();return;}
   const r=reply.region;let displayRegion=r;
   if(this.delta){const oldBox=this.delta.box;if((!reply.deltaMask||!reply.deltaPaint)&&(!reply.maskData||!reply.paintData)||!reply.tiles){reply.bitmap?.close();reply.deltaMask?.close();reply.deltaPaint?.close();this.fail();return;}
@@ -95,7 +103,7 @@ export class LiveBlendWorker{
   }else{reply.deltaMask?.close();reply.deltaPaint?.close();}
   const c=this.surface.getContext('2d')!;c.clearRect(r.x,r.y,r.width,r.height);c.drawImage(reply.bitmap,r.x,r.y);reply.bitmap.close();
   const old=this.dirty;if(old){const x=Math.min(old.x,displayRegion.x),y=Math.min(old.y,displayRegion.y);this.dirty={x,y,width:Math.max(old.x+old.width,displayRegion.x+displayRegion.width)-x,height:Math.max(old.y+old.height,displayRegion.y+displayRegion.height)-y};}else this.dirty=displayRegion;
-  if(reply.final){const result=this.surface;this.surface=canvas(1,1);this.job=undefined;j.resolve?.(result);}else this.flush(j);
+  if(reply.final)this.resolveFinal(j);else this.flush(j);
   this.request();
  }
 }

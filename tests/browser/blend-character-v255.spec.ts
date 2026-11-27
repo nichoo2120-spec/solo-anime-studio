@@ -1,4 +1,5 @@
 import {expect,test} from '@playwright/test';
+import {selectBrushOption,openBrushSettings} from '../brush-workspace.mjs';
 
 const targetIds=['blend-mix','water-smooth','water-rough','water-wet','water-flat','water-gradient','water-edge','color-air'];
 
@@ -9,6 +10,7 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
   const load=(path:string)=>import(path);
   const {stockPresets}=await load('/src/core/brushes.ts');
   const {brushStrokeMetadata}=await load('/src/core/paintTips.ts');
+  const {prepareBlendMaskPressure}=await load('/src/core/brushBlend.ts');
   const {drawStroke}=await load('/src/engine/renderer.ts');
   const {renderBrushBlend}=await load('/src/engine/brushBlend.ts');
   const {renderSilkStroke}=await load('/src/engine/silkBlend.ts');
@@ -34,6 +36,7 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
    const settings={...preset.settings,size,bbEnabled:true,bbPressure:true,pressureWidth:false,opacity:1,...options};
    const s={...settings,...brushStrokeMetadata(settings),id:'blend-character-'+preset.id,kind:'stroke',tool:'brush',points:path};
    mask.clearRect(0,0,width,height);paint.clearRect(0,0,width,height);paint.drawImage(base.canvas,0,0);
+   prepareBlendMaskPressure(s);
    if(s.silkBlendVersion)renderSilkStroke(paint,s);
    else{drawStroke(mask,s);renderBrushBlend(paint,mask.canvas,s);}
    return {s,out:bytes(paint),coverage:s.silkBlendVersion?undefined:bytes(mask)};
@@ -57,7 +60,10 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
       let run=0;
       for(let row=1;row<rows-1;row++){
        const at=vertical?row*width+col:col*width+row,neighbor=vertical?1:width;
-       if((vertical&&Math.abs(col-edge)<=1)||(!vertical&&[149,150,259,260].includes(col))){run=0;continue;}
+       const backgroundEdge=vertical
+        ?Math.abs(col-edge)<=1||row>=150&&row<260&&(Math.abs(col-260)<=1||Math.abs(col-380)<=1)
+        :row>=260&&row<380&&(Math.abs(col-150)<=1||Math.abs(col-260)<=1);
+       if(backgroundEdge){run=0;continue;}
        const a=delta[at],b=delta[at-neighbor];
        run=Math.abs(a-b)>27&&Math.min(a,b)<2?run+1:0;
        longest=Math.max(longest,run);
@@ -147,6 +153,11 @@ test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay respon
      if(coalesced)Object.defineProperty(latest,'getCoalescedEvents',{value:()=>coalesced.map(event)});
      canvas.dispatchEvent(latest);
     };
+    // The worker is kept alive between gestures in the installed application.
+    // Warm its module and mask caches before timing the next visible stroke.
+    send('pointerdown',506);await frame();send('pointermove',566);await frame();send('pointerup',566);
+    await engine.renderer.whenSettled();
+    engine.historyNavigation('undo');await frame();await frame();
     const timings:number[]=[],render=engine.render.bind(engine);
     let undo=0,undoStart=0,previews=0;
     const receive=engine.blendWorker.receive.bind(engine.blendWorker);
@@ -191,4 +202,29 @@ test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay respon
   expect.soft(r.exact,label+' exact pen-up result').toBeLessThanOrEqual(50);
   expect.soft(r.undo,label+' undo').toBeLessThanOrEqual(50);
  }
+});
+
+
+test('Full Brush Settings pins the Blend controls and saves Smear vs Blur per brush',async({page})=>{
+ await page.goto('/');
+ await selectBrushOption(page,'Brush category','Paint');
+ await selectBrushOption(page,'Brush family','all');
+ await selectBrushOption(page,'Brush preset','water-flat');
+ await page.getByRole('group',{name:'Paint or Blend'}).first().getByRole('button',{name:'Blend',exact:true}).click();
+ await openBrushSettings(page);
+ await page.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Blend settings',exact:true}).click();
+ const panel=page.getByRole('region',{name:'Brush Settings'});
+ for(const name of ['Mix amount','Drag length','Wetness','Texture in blend','Smear vs Blur']){
+  await expect(panel.getByRole('slider',{name,exact:true})).toBeVisible();
+ }
+ const blur=panel.getByRole('spinbutton',{name:'Smear vs Blur exact value'});
+ await expect(blur).toHaveValue('4');
+ await blur.fill('100');await blur.press('Enter');
+ await expect(blur).toHaveValue('100');
+ await panel.getByRole('button',{name:/show Smear vs Blur/i}).click();
+ await expect(panel.getByRole('button',{name:/hide Smear vs Blur/i})).toBeVisible();
+ await page.reload();
+ await openBrushSettings(page);
+ await page.getByRole('navigation',{name:'Brush settings sections'}).getByRole('button',{name:'Blend settings',exact:true}).click();
+ await expect(blur).toHaveValue('100');
 });

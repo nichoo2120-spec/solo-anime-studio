@@ -184,11 +184,10 @@ export function brushBlendMetadata(s:BrushBlendSettings&Shape):BrushBlendControl
  * An unshaped Blend nib stays close to its selected size at light pressure.
  * Shaped stamps keep their authored pressure envelope and secondary tip. */
 export function prepareBlendMaskPressure(stroke:Stroke){
- if(stroke.brushBlendVersion===7)return;
- if(stroke.brushBlendVersion!==6)return;
+ if(stroke.brushBlendVersion!==6&&stroke.brushBlendVersion!==7)return;
  stroke.pressureOpacity=false;
  stroke.pressureFlow=false;
- if(stroke.stampVersion!==1&&stroke.pressure&&stroke.pressureWidth!==false){
+ if(stroke.brushBlendVersion===6&&stroke.stampVersion!==1&&stroke.pressure&&stroke.pressureWidth!==false){
   const min=stroke.minSize??.06,max=Math.max(min,stroke.maxSize??1);
   stroke.minSize=max-(max-min)*.15;
  }

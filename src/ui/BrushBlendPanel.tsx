@@ -1,7 +1,7 @@
 import {BrushSettingInput,BrushSettingSelect} from './BrushQuickSettings';
 import {memo,useEffect,useRef} from 'react';
 import {ExactRange} from './ExactRange';
-import {blendDefaultsFor,blendModes,blendPresets,brushBlendSettingsFor,blendPressureCurves,blendRenderStyles,blendStrengthPresets,canBrushBlend,isBlendMode,isBlendSample,blendStyleFor,blendStyleNames,type BlendPressureCurve,type BlendRenderStyle,type BlendMode,type BlendStyle} from '../core/brushBlend';
+import {blendDefaultsFor,blendModes,blendPresets,brushBlendSettingsFor,blendPressureCurves,prepareBlendMaskPressure,blendRenderStyles,blendStrengthPresets,canBrushBlend,isBlendMode,isBlendSample,blendStyleFor,blendStyleNames,type BlendPressureCurve,type BlendRenderStyle,type BlendMode,type BlendStyle} from '../core/brushBlend';
 import {brushStrokeMetadata} from '../core/paintTips';
 import type {Stroke} from '../core/model';
 import {drawStroke} from '../engine/renderer';
@@ -49,6 +49,7 @@ function BlendPreview({settings:s}:{settings:BrushSettings}){
     pressureFlow:false,pressureOpacity:false,response:settings.response,brushKind:settings.brushKind,
     textureStrength:settings.textureStrength,stabilization:Math.max(settings.stabilization,settings.bbSmoothing??0),
    };
+   prepareBlendMaskPressure(stroke);
    if(stroke.silkBlendVersion)renderSilkStroke(ctx,stroke);
    else{drawStroke(mc,stroke);renderBrushBlend(ctx,swatch,stroke);}
   });

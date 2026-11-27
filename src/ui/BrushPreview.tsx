@@ -3,6 +3,8 @@ import type {BrushSettings} from '../engine/StudioEngine';
 import type {Stroke} from '../core/model';
 import {brushStrokeMetadata} from '../core/paintTips';
 import {drawModernStroke} from '../engine/brushRaster';
+import {drawStroke} from '../engine/renderer';
+import {prepareBlendMaskPressure} from '../core/brushBlend';
 import {compositePaintStroke} from '../engine/paintCompositing';
 import {Pickup} from '../engine/mixing';
 import {isSilkBlendActive} from '../core/silkBlend';
@@ -20,14 +22,16 @@ export function renderBrushPreview(c:HTMLCanvasElement,mask:HTMLCanvasElement,{s
  const points=Array.from({length:180},(_,i)=>{const t=i/179;return {x:(12+t*(width-24))*scale,y:(height*.5-Math.sin(t*Math.PI*2)*height*.15)*scale,p:.06+Math.sin(t*Math.PI)*.94,v:.2+.8*Math.sin(t*Math.PI*2)**2};});
  const metadata=brushStrokeMetadata(settings,!eraser);
  const silk=!eraser&&isSilkBlendActive(settings);
- const mix=!eraser&&!silk&&!settings.nature&&!!settings.nativeMixEnabled,pickup=!eraser&&!silk&&!mix&&!metadata.inkEdgeVersion&&!!(settings.mixColors||settings.watercolorMode==='wet'),blender=!metadata.inkEdgeVersion&&(settings.brushTip==='color-blender'||silk);
+ const blend=!!metadata.brushBlendVersion&&!eraser;
+ const mix=!blend&&!eraser&&!silk&&!settings.nature&&!!settings.nativeMixEnabled,pickup=!blend&&!eraser&&!silk&&!mix&&!metadata.inkEdgeVersion&&!!(settings.mixColors||settings.watercolorMode==='wet'),blender=!metadata.inkEdgeVersion&&(settings.brushTip==='color-blender'||silk);
  const s:Stroke={...settings,...metadata,size,captureZoom:1/scale,inkProfileLength:settings.inkProfileLength===undefined?undefined:settings.inkProfileLength*scale,inkFlowLength:settings.inkFlowLength===undefined?undefined:settings.inkFlowLength*scale,inkGrainScale:(settings.inkGrainScale??1)*scale,inkImageScale:(settings.inkImageScale??1)*scale,kind:'stroke',id:'preview',tool:eraser?'eraser':'brush',points,color:mix||settings.nature?settings.color:'#d9e2e5',pressure:settings.pressure,
   nativeMixVersion:mix?3:undefined,nativeMixPickupVersion:mix?3:undefined,nativeMixAmount:mix?settings.mixAmount??.58:undefined,nativeMixRadius:mix?Math.max(.02,Math.min(1,(settings.mixPickupLen??1)/2)):undefined,nativeMixPaintLoad:mix?settings.mixPaintLoad??0:undefined};
  // Mixing and erasing need existing paint to act on; a blank thumbnail hides
  // their controls. Keep this sample local and independent of the artist's scene.
- if(mix||pickup||eraser||blender||metadata.natureVersion&&metadata.brushBlendVersion){const colors=['#53828f','#ba8b74','#7f829f'];for(let i=0;i<3;i++){ctx.fillStyle=colors[i];ctx.fillRect((10+i*(width-20)/3)*scale,6*scale,(width-20)/3*scale,(height-12)*scale);}}
+ if(blend||mix||pickup||eraser||blender){const colors=['#53828f','#ba8b74','#7f829f'];for(let i=0;i<3;i++){ctx.fillStyle=colors[i];ctx.fillRect((10+i*(width-20)/3)*scale,6*scale,(width-20)/3*scale,(height-12)*scale);}}
  if(pickup){s.mixStops=[];s.mixVersion=2;new Pickup(c,settings.mixAmount??.55).update(s);}
- if(!s.silkBlendVersion)drawModernStroke(mc,s);
+ if(blend){prepareBlendMaskPressure(s);drawStroke(mc,s);}
+ else if(!s.silkBlendVersion)drawModernStroke(mc,s);
  if(blender&&!mix&&!eraser){
   // Blender's live compositor retains a gesture for its target surface. Each
   // thumbnail is a fresh gesture over the sample paint, never an append to it.
