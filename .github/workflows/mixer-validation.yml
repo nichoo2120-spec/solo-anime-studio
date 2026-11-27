@@ -19,7 +19,7 @@ jobs:
         run: |
           npx tsc --noEmit
           if ($LASTEXITCODE) {exit $LASTEXITCODE}
-          npm test
+          npx vitest run --maxWorkers=2
           if ($LASTEXITCODE) {exit $LASTEXITCODE}
           npm run build
       - if: matrix.run == 'regression'

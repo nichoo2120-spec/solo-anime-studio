@@ -23,6 +23,7 @@ function sampleLinear(bytes:Uint8ClampedArray,w:number,h:number,x:number,y:numbe
 }
 let coverage=new Float32Array(0),owner=new Int32Array(0),fraction=new Float32Array(0);
 const previousPickup=new Float32Array(side*side*4);
+let rowStart=new Int32Array(0),rowEnd=new Int32Array(0);
 let field:ImageData|undefined;
 export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke,points:readonly Point[],
  originX:number,originY:number,pitch:number,extent:number,carry?:Float32Array){
@@ -41,8 +42,24 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
  let total=0;for(let i=1;i<points.length;i++)total+=Math.hypot(points[i].x-points[i-1].x,points[i].y-points[i-1].y);
  // Two passes keep memory independent of stroke length. First assign each
  // grid cell to its closest swept segment. Then shade that cell exactly once.
+ // Restrict the shading pass to the rows and columns won by this contact.
+ // Bound storage for very long paths; those retain the original scan.
+ const rows=(Math.ceil(total/spacing)+2)*h;
+ const compact=s.brushBlendVersion===10&&rows<=2_000_000;
+ if(compact){
+  if(rowStart.length<rows){rowStart=new Int32Array(rows);rowEnd=new Int32Array(rows);}
+  rowStart.fill(w,0,rows);rowEnd.fill(-1,0,rows);
+ }
  let previousX=0,previousY=0;
  for(let pass=0;pass<2;pass++){
+ if(pass&&compact){
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+   const i=y*w+x;if(coverage[i]<0)continue;
+   const row=owner[i]*h+y;
+   if(x<rowStart[row])rowStart[row]=x;
+   rowEnd[row]=x;
+  }
+ }
  let segment=1,start=0,ordinal=0;
  for(let distance=0;;distance=Math.min(total,distance+spacing),ordinal++){
   let a=points[Math.max(0,segment-1)],b=points[segment]??a;
@@ -93,7 +110,10 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
   if(!ordinal){previousX=cx;previousY=cy;}
   const sx=cx-previousX,sy=cy-previousY,span=sx*sx+sy*sy||1;
   for(let y=Math.max(0,Math.floor(Math.min(cy,previousY)-reach));y<=Math.min(h-1,Math.ceil(Math.max(cy,previousY)+reach));y++){
-   for(let x=Math.max(0,Math.floor(Math.min(cx,previousX)-reach));x<=Math.min(w-1,Math.ceil(Math.max(cx,previousX)+reach));x++){
+   const row=ordinal*h+y;
+   const left=compact&&pass?rowStart[row]:Math.max(0,Math.floor(Math.min(cx,previousX)-reach));
+   const right=compact&&pass?rowEnd[row]:Math.min(w-1,Math.ceil(Math.max(cx,previousX)+reach));
+   for(let x=left;x<=right;x++){
     const index=y*w+x,k=index*4;
     if(!pass){
      const f=clamp(((x-previousX)*sx+(y-previousY)*sy)/span);

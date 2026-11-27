@@ -11,6 +11,7 @@ import {strokeGeometry} from './strokeGeometry';
 import {finalGeometry} from './geometryCache';
 import {applyNativeBrushMix} from './nativeBrushMix';
 import {resetPigmentMix} from './pigmentMix';
+import {drawMixerMask} from './mixerPreview';
 import {drawStroke} from './renderer';
 import {resetDryBristleV3MixModel} from './dryBristleV3';
 import type {RasterRegion} from './liveRaster';
@@ -23,7 +24,6 @@ let deltaSupport:RasterRegion|undefined,deltaRegion:RasterRegion|undefined;
 let deltaBase:Uint8ClampedArray|undefined,deltaRead:OffscreenCanvas|undefined,deltaMask:OffscreenCanvas|undefined,deltaPaint:OffscreenCanvas|undefined;
 let pigmentPoints=0;
 let compactReplies=false,lastPixels:Uint8ClampedArray|undefined;
-let draftTip:OffscreenCanvas|undefined;
 let nativeMask:OffscreenCanvas|undefined;let nativeStrokeRaster:LiveStrokeRaster|undefined;
 let activeStroke:Stroke|undefined,activeStrokeToken=0;
 let characterPreviewKey:string|undefined,characterMaskBounds:RasterRegion|undefined;
@@ -129,25 +129,11 @@ worker.onmessage=async({data:j})=>{
    if(!nativeMask||nativeMask.width!==target.width||nativeMask.height!==target.height){nativeMask=new OffscreenCanvas(target.width,target.height);nativeStrokeRaster??=new LiveStrokeRaster();}
    nativeStrokeRaster??=new LiveStrokeRaster();
    const maskContext=nativeMask.getContext('2d')! as unknown as CanvasRenderingContext2D;
-   const draft=s.brushBlendVersion===9&&!j.final&&s.size>=64&&!s.transform&&!s.perspective;
-   if(draft){
-    // Only the provisional contact surface is reduced. Canvas pigment and
-    // the destination stay in document coordinates, including transparent areas.
-    const factor=s.size>=256?4:2,w=Math.ceil(target.width/factor),h=Math.ceil(target.height/factor);
-    if(!draftTip||draftTip.width!==w||draftTip.height!==h)draftTip=new OffscreenCanvas(w,h);
-    const small={...s,size:s.size/factor,points:s.points.map(p=>({...p,x:p.x/factor,y:p.y/factor}))};
-    const draftContext=draftTip.getContext('2d')! as unknown as CanvasRenderingContext2D;
-    const footprint=strokeRasterBounds(s,target.width,target.height);
-    const area=union(characterMaskBounds,footprint);
-    draftContext.clearRect(0,0,w,h);drawStroke(draftContext,small);
-    maskContext.clearRect(area.x,area.y,area.width,area.height);
-    maskContext.drawImage(draftTip,0,0,w*factor,h*factor);
-    characterMaskBounds=footprint;characterPreviewKey=undefined;
-   }else if(character){
+   if(character){
     const geometry=finalGeometry(s),footprint=strokeRasterBounds(s,target.width,target.height,geometry);
     const area=union(characterMaskBounds,footprint);
     maskContext.clearRect(area.x,area.y,area.width,area.height);
-    drawStroke(maskContext,s,'final',geometry);
+    drawMixerMask(maskContext,s,geometry);
     characterMaskBounds=footprint;
     characterPreviewKey=previewKey;
    }else if(j.final&&s.natureVersion!==1){nativeStrokeRaster.reset();maskContext.reset();drawStroke(maskContext,s,'final',currentGeometry());}

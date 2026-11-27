@@ -140,7 +140,7 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
  for(const row of result.cases){
   const label=row.id+' '+row.size;
   console.log('BLEND_V255_PIXELS '+JSON.stringify(row));
-  expect.soft(row.version??row.silk,label).toBe(row.silk?2:9);
+  expect.soft(row.version??row.silk,label).toBe(row.silk?2:10);
   expect.soft(row.outside,label+' writes outside the brush mask').toBe(0);
   expect.soft(row.longest,label+' uninterrupted hard axis edge').toBeLessThanOrEqual(25);
   expect.soft(row.seamRatio,label+' 64 px seams').toBeLessThan(2.2);
@@ -206,7 +206,7 @@ test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay respon
     };
     engine.render=()=>{
      const start=performance.now();render();
-     if((ready||engine.blendWorker.presentedMixerSamples>0)&&engine.drawing&&firstInput&&!firstPixel)firstPixel=performance.now()-firstInput;
+     if(ready&&engine.drawing&&firstInput&&!firstPixel)firstPixel=performance.now()-firstInput;
      if(engine.drawing)timings.push(performance.now()-start);
      if(undoStart){undo=performance.now()-undoStart;undoStart=0;}
     };

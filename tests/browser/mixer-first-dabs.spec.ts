@@ -7,6 +7,8 @@ test('moving mixer prefixes use the full Paint mask and match independent replay
   const load=(path:string)=>import(path);
   const {drawStroke}=await load('/src/engine/renderer.ts');
   const {renderBrushBlend}=await load('/src/engine/brushBlend.ts');
+  const {drawPigmentBrush}=await load('/src/engine/pigmentBrush.ts');
+  const {finalGeometry}=await load('/src/engine/geometryCache.ts');
   const {stockPresets}=await load('/src/core/brushes.ts');
   const {brushStrokeMetadata}=await load('/src/core/paintTips.ts');
   const {LiveBlendWorker}=await load('/src/engine/LiveBlendWorker.ts');
@@ -26,7 +28,13 @@ test('moving mixer prefixes use the full Paint mask and match independent replay
       const points=Array.from({length:count},(_,i)=>({x:249+i*12,y:200,p:.3,v:.75}));
       const s={...blend,points};
       for(const c of [mask,paint,expected])c.clearRect(0,0,560,400);
-      drawStroke(mask,s);drawStroke(paint,{...normal,points});
+      drawStroke(mask,s);
+      const paintStroke={...normal,points};
+      // Native smudge-only presets sample the destination in Paint mode; their
+      // isolated Paint raster is empty. Compare their physical pigment nib.
+      if(normal.brushTip==='color-blender'&&normal.coloringAppearanceVersion===3)
+       drawPigmentBrush(paint,paintStroke,finalGeometry(paintStroke));
+      else drawStroke(paint,paintStroke);
       expected.drawImage(base.canvas,0,0);renderBrushBlend(expected,mask.canvas,s);
       const ready=new Promise<void>(r=>{resolve=r;});
       const preview=worker.preview(s,base.canvas,count);
