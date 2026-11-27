@@ -41,11 +41,18 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
    else{drawStroke(mask,s);renderBrushBlend(paint,mask.canvas,s);}
    return {s,out:bytes(paint),coverage:s.silkBlendVersion?undefined:bytes(mask)};
   };
-  const cases=[],pairs=[],drag=[],pressure=[];
+  const cases=[],pairs=[],drag=[],pressure=[],signatures=new Map<string,Uint8Array>();
   for(const size of [132,150,400])for(const mode of (size===150?['auto']:['auto','smudge','blur'])){
    const reference=new Map<string,Uint8ClampedArray>();
    for(const preset of presets){
     const {s,out,coverage}=render(preset,size,points,{bbRenderStyle:mode});
+    if(size===132&&mode==='auto'){
+     const signature=[];
+     for(let y=200;y<490;y+=4)for(let x=180;x<850;x+=4){
+      const i=(y*width+x)*4;signature.push(out[i],out[i+1],out[i+2],out[i+3]);
+     }
+     signatures.set(preset.id,new Uint8Array(signature));
+    }
     const delta=new Uint8Array(width*height);
     let outside=0,longest=0,seamRatio=0;
     let longestEdge:{vertical:boolean;col:number;start:number;end:number}|undefined;
@@ -121,8 +128,15 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
   }
   const mix=stockPresets.find((p:any)=>p.id==='blend-mix');
   const smear=render(mix,150,points,{bbBlur:0}).out,blur=render(mix,150,points,{bbBlur:1}).out;
-  return {cases,pairs,drag,pressure,blurDifference:difference(smear,blur)};
+  const nearDuplicates=[];
+  for(const [a,first] of signatures)for(const [b,second] of signatures)if(a<b){
+   let delta=0,n=0;
+   for(let i=0;i<first.length;i++){const d=Math.abs(first[i]-second[i]);delta+=d;if(d)n++;}
+   if(!n||delta/first.length<.01)nearDuplicates.push([a,b]);
+  }
+  return {cases,pairs,drag,pressure,nearDuplicates,blurDifference:difference(smear,blur)};
  },targetIds);
+ expect.soft(result.nearDuplicates,'all preset pairs on the edge fixture').toEqual([]);
  for(const row of result.cases){
   const label=row.id+' '+row.size;
   console.log('BLEND_V255_PIXELS '+JSON.stringify(row));

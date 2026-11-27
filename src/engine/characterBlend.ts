@@ -192,13 +192,16 @@ function blendFootprint(s:Stroke,transformScale:number){
 /** A saved all-layers sample must retain the same source halo as the worker. */
 export function characterBlendReadReach(s:Stroke,transformScale:number){
  const {pad,kernel}=blendFootprint(s,transformScale);
- if(s.brushBlendVersion===8)return Math.ceil(sharedReach(s,transformScale)+3*Math.max(kernel,s.size*transformScale*.12)+2);
+ if(s.brushBlendVersion===8)return Math.ceil(sharedReach(s,transformScale)+4.2*Math.max(kernel,s.size*transformScale*.12)+2);
  return pad+Math.ceil(kernel*3)+8;
 }
 
+function sharedTipRadius(s:Stroke,scale:number){
+ const extent=s.stampVersion===1?stampExtent(s):s.paintTipVersion===2?.76:1.5;
+ return Math.ceil(s.size*scale*extent+8);
+}
 function sharedReach(s:Stroke,scale:number){
- const extent=s.stampVersion===1?stampExtent(s):1.5;
- return Math.ceil(s.size*scale*(Math.max(extent,1.5)+.65)+8);
+ return sharedTipRadius(s,scale)+Math.ceil(s.size*scale*.65)+2;
 }
 
 let sharedMask:HTMLCanvasElement|undefined, sharedSource:HTMLCanvasElement|undefined;
@@ -208,14 +211,14 @@ let sharedColor:HTMLCanvasElement|undefined, sharedBlur:HTMLCanvasElement|undefi
  * pigment in premultiplied form so bilinear filtering preserves transparent edges. */
 function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Point[],
  maskX:number,maskY:number,read:Ctx,previous:RasterRegion|undefined,sample:BlendSnapshot|undefined,carry:Float32Array|undefined,scale:number){
- const {blur,kernel,wet,mode}=blendFootprint(s,scale),size=s.size*scale,pad=sharedReach(s,scale);
+ const {blur,kernel,wet,mode,style}=blendFootprint(s,scale),size=s.size*scale,pad=sharedTipRadius(s,scale);
  let left=Infinity,right=-Infinity,top=Infinity,bottom=-Infinity;
  for(const p of points){left=Math.min(left,p.x);right=Math.max(right,p.x);top=Math.min(top,p.y);bottom=Math.max(bottom,p.y);}
  const x=Math.max(0,Math.floor(left-pad)),y=Math.max(0,Math.floor(top-pad));
  const w=Math.min(ctx.canvas.width,Math.ceil(right+pad))-x,h=Math.min(ctx.canvas.height,Math.ceil(bottom+pad))-y;
  if(w<=0||h<=0){restoreRegion(ctx,read,previous);return previous;}
  const sigma=blur>0?Math.max(.5,(kernel||size*(.035+.08*wet))*(.6+.8*(s.bbSoftness??.5))):0;
- const pitch=size>200?4:size>64?2:1,halo=Math.ceil(3*sigma+2);
+ const pitch=size>200?4:size>64?2:1,halo=Math.ceil(3*sigma+size*.65+2);
  const gx=Math.floor((x-halo)/pitch)*pitch,gy=Math.floor((y-halo)/pitch)*pitch;
  const cw=Math.ceil((x+w+halo-gx)/pitch),ch=Math.ceil((y+h+halo-gy)/pitch);
  const source=sample?sampleCanvas(sample):read.canvas;
@@ -245,7 +248,7 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
   if(carry)for(let i=0;i<carry.length;i++)tank[i%4]+=carry[i]/(carry.length/4)/(i%4===3?255:1);
   const radius=Math.max(1,size*.5/pitch),drag=s.bbStretch??.5;
   const spacing=Math.max(.5,size*Math.max(.025,Math.min(.12,s.tipSpacing??.08)));
-  const transport=clamp((1-(s.bbMix??.5))*(.48+.4*(s.bbTextureKeep??.3))),load=s.bbPaintLoad??0;
+  const transport=clamp((1-(s.bbMix??.5))*(.48+.4*(s.bbTextureKeep??.3))*(style==='oil'?1.1:style==='water'?.93:1)*(mode==='dry'?1.12:mode==='wet'?.85:1)),load=s.bbPaintLoad??0;
   const rgb=parseInt(s.color.slice(1),16),paint=[rgb>>16&255,rgb>>8&255,rgb&255];
   type Contact={x:number;y:number;ox:number;oy:number;tank:Float64Array;strength:number};
   const contacts:Contact[]=[];
@@ -264,12 +267,12 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
    const pickup=!tank[3]?1:1-Math.exp(-p.step*(s.bbPickup??.5)/Math.max(1,size*(.12+drag+(s.bbColorCarry??.5))));
    for(let c=0;c<4;c++)tank[c]=lerp(tank[c],picked[c],pickup);
    const pressure=s.pressure&&s.bbPressure?blendPressureFactor(p.p/.4,s.bbMinPressure??.7,s.bbPressureCurve??'linear'):1;
-   contacts.push({x:cx,y:cy,ox:p.dx*offset,oy:p.dy*offset,tank:tank.slice(),strength:pressure*(mode==='dry'?Math.exp(-p.distance/Math.max(1,size*(1+drag*3))):1)});
+   contacts.push({x:cx,y:cy,ox:p.dx*offset,oy:p.dy*offset,tank:tank.slice(),strength:pressure});
   });
   // Index nearby segments once. Each pixel samples the carried pigment
   // once regardless of the number of overlapping full-sized brush dabs.
   const bin=32,cols=Math.ceil(cw/bin),bins=new Map<number,number[]>();
-  const range=Math.max(radius*1.5,s.stampVersion===1?size*stampExtent(s)/pitch:radius*2)+2;
+  const range=pad/pitch+2;
   for(let i=0;i<contacts.length;i++){
    const a=contacts[Math.max(0,i-1)],b=contacts[i];
    const left=Math.max(0,Math.floor((Math.min(a.x,b.x)-range)/bin));
@@ -299,10 +302,13 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
     }
     const a=contacts[Math.max(0,index-1)],b=contacts[index],k=(v*cw+u)*4;
     sampleGrid(pixels,u+.5-lerp(a.ox,b.ox,t),v+.5-lerp(a.oy,b.oy,t),sampleAt);
-    const alpha=lerp(lerp(a.tank[3],b.tank[3],t),sampleAt[3],transport);
+    // Pool more carried pigment where the painted watercolor begins to thin.
+    const boundary=1-weight[cell]/255;
+    const smearWeight=transport*(1-(s.bbEdgeDarkness??0)*boundary*(1-boundary)*2);
+    const alpha=lerp(lerp(a.tank[3],b.tank[3],t),sampleAt[3],smearWeight);
     if(!alpha&&!load)continue;
     for(let c=0;c<3;c++){
-     const pigment=lerp(lerp(a.tank[c],b.tank[c],t),sampleAt[c],transport)/Math.max(.0001,alpha);
+     const pigment=lerp(lerp(a.tank[c],b.tank[c],t),sampleAt[c],smearWeight)/Math.max(.0001,alpha);
      data[k+c]=lerp(pigment,paint[c],load);
     }
     data[k+3]=255*lerp(alpha,1,load)*lerp(a.strength,b.strength,t);

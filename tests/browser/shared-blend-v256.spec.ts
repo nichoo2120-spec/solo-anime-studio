@@ -44,7 +44,15 @@ test('Paint and Blend share coverage and grain on a uniform contrasting pickup',
        if(a||b)union++;
        if(a&&alpha[i-1]>8){grainPaint+=Math.abs(alpha[i+3]-alpha[i-1]);grainBlend+=Math.abs(out[i]-out[i-4]);}
       }
-      rows.push({id:preset.id,size,style,iou:intersection/Math.max(1,union),grainError:Math.abs(grainPaint-grainBlend)/Math.max(1,union)});
+      // Sparse events leave a long span. Check each interior cross-section
+      // Paint actually touches, preserving intentional holes in a textured nib.
+      let gaps=0;
+      for(let x=230;x<510;x++){
+       let hasPaint=false,hasBlend=false;
+       for(let y=0;y<height;y++){const k=(y*width+x)*4;hasPaint ||= alpha[k+3]>8;hasBlend ||= out[k]>8;}
+       if(hasPaint&&!hasBlend)gaps++;
+      }
+      rows.push({id:preset.id,size,style,gaps,iou:intersection/Math.max(1,union),grainError:Math.abs(grainPaint-grainBlend)/Math.max(1,union)});
      }
     }
    }
@@ -53,6 +61,7 @@ test('Paint and Blend share coverage and grain on a uniform contrasting pickup',
  });
  for(const row of rows){
   const label=row.id+' '+row.style+' '+row.size;
+  expect.soft(row.gaps,label+' sparse input gaps').toBe(0);
   expect.soft(row.iou,label+' coverage').toBeGreaterThanOrEqual(.85);
   expect.soft(row.grainError,label+' mean high-frequency error').toBeLessThan(3);
  }
