@@ -1,0 +1,20 @@
+name: Focused cursor compatibility checks
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/full-playwright-comparison.yml']
+permissions:
+  contents: read
+jobs:
+  cursor:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright test tests/browser/paint-tips-v124.spec.ts tests/browser/pressure-stability.spec.ts --grep 'flat brush hover|eraser cursor and actual' --workers=1
+      - run: npx playwright test tests/browser/brush-tip-cursor-v253.spec.ts --workers=1
