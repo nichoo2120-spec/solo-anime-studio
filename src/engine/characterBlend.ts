@@ -208,13 +208,13 @@ let sharedColor:HTMLCanvasElement|undefined, sharedBlur:HTMLCanvasElement|undefi
  * pigment in premultiplied form so bilinear filtering preserves transparent edges. */
 function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Point[],
  maskX:number,maskY:number,read:Ctx,previous:RasterRegion|undefined,sample:BlendSnapshot|undefined,carry:Float32Array|undefined,scale:number){
- const {blur,kernel,wet}=blendFootprint(s,scale),size=s.size*scale,pad=sharedReach(s,scale);
+ const {blur,kernel,wet,mode}=blendFootprint(s,scale),size=s.size*scale,pad=sharedReach(s,scale);
  let left=Infinity,right=-Infinity,top=Infinity,bottom=-Infinity;
  for(const p of points){left=Math.min(left,p.x);right=Math.max(right,p.x);top=Math.min(top,p.y);bottom=Math.max(bottom,p.y);}
  const x=Math.max(0,Math.floor(left-pad)),y=Math.max(0,Math.floor(top-pad));
  const w=Math.min(ctx.canvas.width,Math.ceil(right+pad))-x,h=Math.min(ctx.canvas.height,Math.ceil(bottom+pad))-y;
  if(w<=0||h<=0){restoreRegion(ctx,read,previous);return previous;}
- const sigma=blur>0?Math.max(.5,kernel||size*(.035+.08*wet)):0;
+ const sigma=blur>0?Math.max(.5,(kernel||size*(.035+.08*wet))*(.6+.8*(s.bbSoftness??.5))):0;
  const pitch=size>200?4:size>64?2:1,halo=Math.ceil(3*sigma+2);
  const gx=Math.floor((x-halo)/pitch)*pitch,gy=Math.floor((y-halo)/pitch)*pitch;
  const cw=Math.ceil((x+w+halo-gx)/pitch),ch=Math.ceil((y+h+halo-gy)/pitch);
@@ -263,8 +263,8 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
    else sampleGrid(pixels,cx,cy,picked);
    const pickup=!tank[3]?1:1-Math.exp(-p.step*(s.bbPickup??.5)/Math.max(1,size*(.12+drag+(s.bbColorCarry??.5))));
    for(let c=0;c<4;c++)tank[c]=lerp(tank[c],picked[c],pickup);
-   const pressure=s.bbPressure?blendPressureFactor(p.p/.4,s.bbMinPressure??.7,s.bbPressureCurve??'linear'):1;
-   contacts.push({x:cx,y:cy,ox:p.dx*offset,oy:p.dy*offset,tank:tank.slice(),strength:pressure});
+   const pressure=s.pressure&&s.bbPressure?blendPressureFactor(p.p/.4,s.bbMinPressure??.7,s.bbPressureCurve??'linear'):1;
+   contacts.push({x:cx,y:cy,ox:p.dx*offset,oy:p.dy*offset,tank:tank.slice(),strength:pressure*(mode==='dry'?Math.exp(-p.distance/Math.max(1,size*(1+drag*3))):1)});
   });
   // Index nearby segments once. Each pixel samples the carried pigment
   // once regardless of the number of overlapping full-sized brush dabs.
@@ -284,6 +284,11 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
   for(const [key,list] of bins){
    const x=key%cols*bin,y=Math.floor(key/cols)*bin;
    for(let v=y;v<Math.min(y+bin,ch);v++)for(let u=x;u<Math.min(x+bin,cw);u++){
+    // Transparent holes may be subpixel in pickup space. Extend the
+    // field one grid cell beyond all positive samples before upsampling.
+    const cell=(v*cw+u)*4+3;
+    if(!weight[cell]&&!weight[cell-4]&&!weight[cell+4]&&!weight[cell-cw*4]&&!weight[cell+cw*4]&&
+       !weight[cell-cw*4-4]&&!weight[cell-cw*4+4]&&!weight[cell+cw*4-4]&&!weight[cell+cw*4+4])continue;
     let best=Infinity,index=0,t=0;
     for(const i of list){
      const a=contacts[Math.max(0,i-1)],b=contacts[i],dx=b.x-a.x,dy=b.y-a.y;
@@ -320,7 +325,7 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
  width:Math.max(x+w,previous.x+previous.width)-Math.min(x,previous.x),
  height:Math.max(y+h,previous.y+previous.height)-Math.min(y,previous.y)}:{x,y,width:w,height:h};
  restoreRegion(ctx,read,dirty);
- ctx.save();ctx.globalAlpha=clamp(s.opacity*(s.bbAmount??1)*(s.bbStrength??1));
+ ctx.save();ctx.globalAlpha=clamp(s.opacity*(s.bbAmount??1)*(s.bbStrength??1)*Math.min(1,(s.bbFlow??.6)/.6));
  ctx.globalCompositeOperation=s.bbProtectAlpha?'source-atop':'source-over';
  ctx.drawImage(patch,0,0,w,h,x,y,w,h);ctx.restore();return dirty;
 }

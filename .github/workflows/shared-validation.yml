@@ -6,7 +6,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [build, shape, pixels, perf, browser1, browser2, browser3, browser4]
+        suite: [replay, build, shape, pixels, perf, browser1, browser2, browser3, browser4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -14,10 +14,24 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - if: matrix.suite == 'build'
+      - if: matrix.suite == 'replay'
+        uses: actions/checkout@v4
+        with:
+          ref: 24470f7b1cf17beef571628aacd98c662b917534
+          path: old
+      - if: matrix.suite == 'replay'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Junction -Path old/node_modules -Target "$PWD/node_modules"
+          Start-Process node -ArgumentList "$PWD/node_modules/vite/bin/vite.js","--host","127.0.0.1","--port","5175" -WorkingDirectory "$PWD/old"
+          $env:BLEND_BASELINE_URL="http://127.0.0.1:5175"
+          npx playwright test tests/browser/large-blend-v254.spec.ts --grep "historical blend"
+      - if: matrix.suite == 'build' 
         run: |
           npx tsc -b
+          if ($LASTEXITCODE) {exit $LASTEXITCODE}
           npm test -- --maxWorkers=2
+          if ($LASTEXITCODE) {exit $LASTEXITCODE}
           npm run build
       - if: matrix.suite == 'shape'
         run: npx playwright test tests/browser/shared-blend-v256.spec.ts

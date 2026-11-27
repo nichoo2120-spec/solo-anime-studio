@@ -42,10 +42,10 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
    return {s,out:bytes(paint),coverage:s.silkBlendVersion?undefined:bytes(mask)};
   };
   const cases=[],pairs=[],drag=[],pressure=[];
-  for(const size of [150,400]){
+  for(const size of [132,150,400])for(const mode of (size===150?['auto']:['auto','smudge','blur'])){
    const reference=new Map<string,Uint8ClampedArray>();
    for(const preset of presets){
-    const {s,out,coverage}=render(preset,size);
+    const {s,out,coverage}=render(preset,size,points,{bbRenderStyle:mode});
     const delta=new Uint8Array(width*height);
     let outside=0,longest=0,seamRatio=0;
     let longestEdge:{vertical:boolean;col:number;start:number;end:number}|undefined;
@@ -98,17 +98,17 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
      neighbor+=(Math.abs(delta[i-width]-delta[i-2*width])+Math.abs(delta[i+width]-delta[i]))*.5;
     }
     seamRatio=tile/(neighbor+seamEdges*.025||1);
-    cases.push({id:preset.id,size,version:s.brushBlendVersion,silk:s.silkBlendVersion,outside,longest,longestEdge,seamRatio,...difference(out,before)});
-    if(targetIds.includes(preset.id))reference.set(preset.id,out);
-    if(['blend-mix','water-rough','water-flat'].includes(preset.id)){
-     const reverse=render(preset,size,[...points].reverse()).out;
+    cases.push({id:preset.id,size,mode,version:s.brushBlendVersion,silk:s.silkBlendVersion,outside,longest,longestEdge,seamRatio,...difference(out,before)});
+    if(mode==='auto'&&targetIds.includes(preset.id))reference.set(preset.id,out);
+    if(mode!=='blur'&&['blend-mix','water-rough','water-flat'].includes(preset.id)){
+     const reverse=render(preset,size,[...points].reverse(),{bbRenderStyle:mode}).out;
      let sum=0,n=0;
      for(let x=edge+12;x<edge+70;x++)for(let y=323;y<378;y++){
       const i=(y*width+x)*4;sum+=out[i]-reverse[i];n++;
      }
-     drag.push({id:preset.id,size,directionalRed:sum/n});
+     drag.push({id:preset.id,size,mode,directionalRed:sum/n});
     }
-    if(targetIds.includes(preset.id)){
+    if(mode==='auto'&&targetIds.includes(preset.id)){
      // Isolate the Blend pressure curve. Paint opacity and flow are
      // intentionally pressure-sensitive in v8, and have independent coverage tests.
      const neutral={pressureOpacity:false,pressureFlow:false,pressure:false};

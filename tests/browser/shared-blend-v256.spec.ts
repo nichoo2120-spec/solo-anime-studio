@@ -30,7 +30,7 @@ test('Paint and Blend share coverage and grain on a uniform contrasting pickup',
      else drawStroke(paint,reference);
      const alpha=paint.getImageData(0,0,width,height).data;
      for(const style of ['smudge','blur','auto']){
-      const settings={...common,bbEnabled:true,bbRenderStyle:style,bbSample:'all',bbAmount:1,bbStrength:1,bbPaintLoad:0};
+      const settings={...common,bbEnabled:true,bbRenderStyle:style,bbSample:'all',bbFlow:1,bbAmount:1,bbStrength:1,bbPaintLoad:0};
       const stroke={...settings,...brushStrokeMetadata(settings,true)};
       if(stroke.silkBlendVersion)continue;
       mask.clearRect(0,0,width,height);drawStroke(mask,stroke);
