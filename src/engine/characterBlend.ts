@@ -1,3 +1,4 @@
+import {dryRasterPadding} from '../core/dryBrush';
 import {blendPressureFactor, effectiveBlendStyle} from '../core/brushBlend';
 import type {Point, Stroke} from '../core/model';
 import type {BlendSnapshot} from './brushBlendStyles';
@@ -197,6 +198,7 @@ export function characterBlendReadReach(s:Stroke,transformScale:number){
 }
 
 function sharedTipRadius(s:Stroke,scale:number){
+ if(s.dryBristleVersion)return Math.ceil(dryRasterPadding(s)*scale+2);
  const extent=s.stampVersion===1?stampExtent(s):s.paintTipVersion===2?.76:1.5;
  return Math.ceil(s.size*scale*extent+8);
 }
@@ -290,7 +292,7 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
     // Transparent holes may be subpixel in pickup space. Extend the
     // field one grid cell beyond all positive samples before upsampling.
     const cell=(v*cw+u)*4+3;
-    if(!weight[cell]&&!weight[cell-4]&&!weight[cell+4]&&!weight[cell-cw*4]&&!weight[cell+cw*4]&&
+    if(s.watercolorEngine===1&&!weight[cell]&&!weight[cell-4]&&!weight[cell+4]&&!weight[cell-cw*4]&&!weight[cell+cw*4]&&
        !weight[cell-cw*4-4]&&!weight[cell-cw*4+4]&&!weight[cell+cw*4-4]&&!weight[cell+cw*4+4])continue;
     let best=Infinity,index=0,t=0;
     for(const i of list){
