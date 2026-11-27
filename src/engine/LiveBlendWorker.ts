@@ -1,3 +1,4 @@
+import {MixerPreview} from './mixerPreview';
 import {isBrushBlendVersion} from '../core/brushBlend';
 import type {BlendSampleSource} from './brushBlend';
 import type {Point,Stroke} from '../core/model';
@@ -17,6 +18,8 @@ type Job={token:number;id:string;ownershipBase?:BlendBaseline;source:HTMLCanvasE
 export class LiveBlendWorker{
  private worker?:Worker;private job?:Job;private token=0;private serial=0;private failed=false;private failures=0;
  private surface=canvas(1,1);private surfaceReadback=false;
+ private mixerPreview?:MixerPreview;
+ get presentedMixerSamples(){return this.mixerPreview?.presentedSamples??0;}
  private dirty?:RasterRegion;private delta?:BlendDelta;
  /** v0.5.240 Blend mode "All layers": page snapshot taken at pen-down. */
  blendSample?:BlendSampleSource;
@@ -32,10 +35,13 @@ export class LiveBlendWorker{
   * repeatedly spawning a broken worker during the same editing session. */
  retryForNewGesture(){if(!this.failed||this.failures>=2)return;this.failed=false;this.warm();}
  deltaFor(s:Stroke){return this.job?.id===s.id?this.delta:undefined;}
- cancel(reuseSurfaces=false){if(this.delta){this.delta.mask.width=this.delta.mask.height=this.delta.patch.width=this.delta.patch.height=0;this.delta=undefined;}const j=this.job;if(j){if(j.timer)clearTimeout(j.timer);j.resolve?.(undefined);}this.job=undefined;this.dirty=undefined;this.token++;this.worker?.postMessage({kind:'cancel',token:this.token,reuseSurfaces});this.surface.width=this.surface.height=0;}
+ cancel(reuseSurfaces=false){if(this.delta){this.delta.mask.width=this.delta.mask.height=this.delta.patch.width=this.delta.patch.height=0;this.delta=undefined;}const j=this.job;if(j){if(j.timer)clearTimeout(j.timer);j.resolve?.(undefined);}this.job=undefined;this.mixerPreview=undefined;this.dirty=undefined;this.token++;this.worker?.postMessage({kind:'cancel',token:this.token,reuseSurfaces});this.surface.width=this.surface.height=0;}
  dispose(){this.cancel();this.worker?.terminate();this.worker=undefined;}
  matches(s:Stroke,source:HTMLCanvasElement){return !!this.job&&this.job.id===s.id&&this.job.source===source&&!this.failed;}
- takeRegion(s:Stroke){if(this.job?.id!==s.id)return undefined;const r=this.dirty??{x:0,y:0,width:0,height:0};this.dirty=undefined;return r;}
+ takeRegion(s:Stroke){if(this.job?.id!==s.id)return undefined;const r=this.dirty??{x:0,y:0,width:0,height:0};this.dirty=undefined;
+  const tip=this.mixerPreview?.bounds(s);if(!tip)return r;if(!r.width)return tip;
+  const x=Math.min(r.x,tip.x),y=Math.min(r.y,tip.y);
+  return {x,y,width:Math.max(r.x+r.width,tip.x+tip.width)-x,height:Math.max(r.y+r.height,tip.y+tip.height)-y};}
  preview(s:Stroke,source:HTMLCanvasElement,geometry:unknown,nativeDelta=false,ownershipBase?:BlendBaseline){
   this.warm();if(!this.worker||this.failed||!workerBlendEligible(s))return undefined;
   const bitmap=s.nature?.bitmap;
@@ -46,6 +52,9 @@ export class LiveBlendWorker{
   if(!this.job||this.job.id!==s.id||this.job.source!==source||this.job.signature!==signature||this.job.ownershipBase!==ownershipBase){
    this.cancel(true);const token=++this.token,j:Job={token,id:s.id,ownershipBase,source,signature,ready:false,inFlight:false,pointCount:0};this.job=j;
    if(this.surfaceReadback!==nativeDelta){this.surface=canvas(1,1);this.surfaceReadback=nativeDelta;}
+   if(s.brushBlendVersion===9&&!nativeDelta&&s.bbSample!=='all'&&!s.transform&&!s.perspective){
+    this.mixerPreview=new MixerPreview();this.mixerPreview.begin(source,s,signature);
+   }
    const deltaPixels=ownershipBase?.pixels.slice();
    if(nativeDelta){const seed=ownershipBase?.seed;this.delta={mask:canvas(source.width,source.height),patch:canvas(source.width,source.height),tiles:new Map(seed?.tiles),revision:0,group:ownershipBase,box:seed?.box};if(seed){this.delta.mask.getContext('2d')!.drawImage(seed.mask,seed.box.x,seed.box.y);this.delta.patch.getContext('2d')!.drawImage(seed.paint,seed.box.x,seed.box.y);}}
    this.surface.width=source.width;this.surface.height=source.height;this.surface.getContext('2d',{willReadFrequently:nativeDelta})!.drawImage(source,0,0);
@@ -53,7 +62,7 @@ export class LiveBlendWorker{
    // blend modes retain their existing bitmap setup and readback behavior.
    const begin=(bitmap?:ImageBitmap)=>{if(this.job!==j){bitmap?.close();return;}this.worker!.postMessage({kind:'begin',token,width:source.width,height:source.height,base:bitmap,readFrequently:!s.nativeMixVersion,nativeDelta,deltaPixels,deltaRegion:ownershipBase?.region,seeded:!!ownershipBase?.seed,compactReplies:nativeDelta,blendSample:isBrushBlendVersion(s.brushBlendVersion)&&s.bbSample==='all'?this.blendSample:undefined},[...(bitmap?[bitmap]:[]),...(deltaPixels?[deltaPixels.buffer as ArrayBuffer]:[])]);j.ready=true;this.flush(j);};createImageBitmap(source).then(begin).catch(()=>this.fail());
   }
-  const j=this.job!;if(j.geometry!==geometry){j.geometry=geometry;j.queued={stroke:s,final:false};this.flush(j);}return this.surface;
+  const j=this.job!;if(j.geometry!==geometry){j.geometry=geometry;j.queued={stroke:s,final:false};this.flush(j);}return this.mixerPreview?.paint(s,source)??this.surface;
  }
  finish(s:Stroke){
   const j=this.job;if(!j||j.id!==s.id||this.failed)return undefined;
@@ -102,6 +111,7 @@ export class LiveBlendWorker{
    if(oldBox?.x!==box?.x||oldBox?.y!==box?.y||oldBox?.w!==box?.w||oldBox?.h!==box?.h){for(const b of [oldBox,box])if(b){const x=Math.min(displayRegion.x,b.x),y=Math.min(displayRegion.y,b.y);displayRegion={x,y,width:Math.max(displayRegion.x+displayRegion.width,b.x+b.w)-x,height:Math.max(displayRegion.y+displayRegion.height,b.y+b.h)-y};}}
   }else{reply.deltaMask?.close();reply.deltaPaint?.close();}
   const c=this.surface.getContext('2d')!;c.clearRect(r.x,r.y,r.width,r.height);c.drawImage(reply.bitmap,r.x,r.y);reply.bitmap.close();
+  this.mixerPreview?.replace(this.surface,r);
   const old=this.dirty;if(old){const x=Math.min(old.x,displayRegion.x),y=Math.min(old.y,displayRegion.y);this.dirty={x,y,width:Math.max(old.x+old.width,displayRegion.x+displayRegion.width)-x,height:Math.max(old.y+old.height,displayRegion.y+displayRegion.height)-y};}else this.dirty=displayRegion;
   if(reply.final)this.resolveFinal(j);else this.flush(j);
   this.request();

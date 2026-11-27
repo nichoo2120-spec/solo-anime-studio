@@ -20,12 +20,14 @@ function sampleLinear(bytes:Uint8ClampedArray,w:number,h:number,x:number,y:numbe
   out[3]+=a;
  }
 }
-let coverage=new Float32Array(0),field:ImageData|undefined;
+let coverage=new Float32Array(0),owner=new Int32Array(0),fraction=new Float32Array(0);
+const previousPickup=new Float32Array(side*side*4);
+let field:ImageData|undefined;
 export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke,points:readonly Point[],
  originX:number,originY:number,pitch:number,extent:number,carry?:Float32Array){
  const {width:w,height:h,data:src}=input;
  if(!field||field.width!==w||field.height!==h)field=ctx.createImageData(w,h);
- if(coverage.length<w*h)coverage=new Float32Array(w*h);
+ if(coverage.length<w*h){coverage=new Float32Array(w*h);owner=new Int32Array(w*h);fraction=new Float32Array(w*h);}
  coverage.fill(-1,0,w*h);field.data.fill(0);pickup.fill(0);
  const output=field.data,rgb=parseInt(s.color.slice(1),16);
  const loaded=[linear[rgb>>16&255],linear[rgb>>8&255],linear[rgb&255]];
@@ -34,8 +36,12 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
  const wet=s.bbWetness??.5,mix=s.bbMix??.5;
  const spacing=Math.max(.5,s.size*Math.max(.025,Math.min(.15,s.tipSpacing??.08)));
  let total=0;for(let i=1;i<points.length;i++)total+=Math.hypot(points[i].x-points[i-1].x,points[i].y-points[i-1].y);
- let segment=1,start=0;
- for(let distance=0;;distance=Math.min(total,distance+spacing)){
+ // Two passes keep memory independent of stroke length. First assign each
+ // grid cell to its closest swept segment. Then shade that cell exactly once.
+ let previousX=0,previousY=0;
+ for(let pass=0;pass<2;pass++){
+ let segment=1,start=0,ordinal=0;
+ for(let distance=0;;distance=Math.min(total,distance+spacing),ordinal++){
   let a=points[Math.max(0,segment-1)],b=points[segment]??a;
   let length=Math.hypot(b.x-a.x,b.y-a.y);
   while(segment<points.length-1&&start+length<distance){
@@ -47,7 +53,8 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
   const r=Math.max(1,extent/pitch),moisture=wet*(s.pressure&&s.bbPressureWet?p:1);
   const localMix=mix*(s.pressure&&s.bbPressureMix?p:1);
   const refill=1-Math.exp(-spacing*(s.bbPickup??.5)*moisture/Math.max(1,s.size*(.18+drag)));
-  for(let v=0;v<side;v++)for(let u=0;u<side;u++){
+  if(pass===1)previousPickup.set(pickup);
+  if(pass===1)for(let v=0;v<side;v++)for(let u=0;u<side;u++){
    const k=(v*side+u)*4;
    sampleLinear(src,w,h,cx+(u/(side-1)-.5)*2*r,cy+(v/(side-1)-.5)*2*r,sample);
    if(!distance){
@@ -66,13 +73,20 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
   const entry=total&&tail?Math.min(1,(distance+s.size*.15)/(s.size*(.15+tail))):1;
   const exit=total&&tail?Math.min(1,(total-distance+s.size*.15)/(s.size*(.15+tail))):1;
   const width=entry*exit,reach=r*1.45+2;
-  for(let y=Math.max(0,Math.floor(cy-reach));y<=Math.min(h-1,Math.ceil(cy+reach));y++){
-   for(let x=Math.max(0,Math.floor(cx-reach));x<=Math.min(w-1,Math.ceil(cx+reach));x++){
-    const nx=(x-cx)/reach,ny=(y-cy)/reach,d=nx*nx+ny*ny;
-    if(d>=1)continue;
-    const index=y*w+x,k=index*4,score=1-d;
-    if(score<=coverage[index])continue;
-    coverage[index]=score;
+  if(!ordinal){previousX=cx;previousY=cy;}
+  const sx=cx-previousX,sy=cy-previousY,span=sx*sx+sy*sy||1;
+  for(let y=Math.max(0,Math.floor(Math.min(cy,previousY)-reach));y<=Math.min(h-1,Math.ceil(Math.max(cy,previousY)+reach));y++){
+   for(let x=Math.max(0,Math.floor(Math.min(cx,previousX)-reach));x<=Math.min(w-1,Math.ceil(Math.max(cx,previousX)+reach));x++){
+    const index=y*w+x,k=index*4;
+    if(!pass){
+     const f=clamp(((x-previousX)*sx+(y-previousY)*sy)/span);
+     const ex=x-previousX-sx*f,ey=y-previousY-sy*f,score=1-(ex*ex+ey*ey)/(reach*reach);
+     if(score>=0&&score>coverage[index]){coverage[index]=score;owner[index]=ordinal;fraction[index]=f;}
+     continue;
+    }
+    if(coverage[index]<0||owner[index]!==ordinal)continue;
+    const f=ordinal?fraction[index]:1;
+    const nx=(x-previousX-sx*f)/r,ny=(y-previousY-sy*f)/r;
     const u=clamp(nx*.5+.5)*(side-1),v=clamp(ny*.5+.5)*(side-1);
     const u0=Math.floor(u),v0=Math.floor(v),fx=u-u0,fy=v-v0;
     const offset=Math.min(distance/pitch,r*drag*.65);
@@ -83,7 +97,10 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
      const row=v0*side,row1=Math.min(side-1,v0+1)*side,u1=Math.min(side-1,u0+1);
      const top=pickup[(row+u0)*4+c]*(1-fx)+pickup[(row+u1)*4+c]*fx;
      const bottom=pickup[(row1+u0)*4+c]*(1-fx)+pickup[(row1+u1)*4+c]*fx;
-     sample[c]=(top*(1-fy)+bottom*fy)*(1-dragged)+sample[c]*dragged;
+     const oldTop=previousPickup[(row+u0)*4+c]*(1-fx)+previousPickup[(row+u1)*4+c]*fx;
+     const oldBottom=previousPickup[(row1+u0)*4+c]*(1-fx)+previousPickup[(row1+u1)*4+c]*fx;
+     const carried=(top*(1-fy)+bottom*fy)*f+(oldTop*(1-fy)+oldBottom*fy)*(1-f);
+     sample[c]=carried*(1-dragged)+sample[c]*dragged;
      const loadTop=loadedImage[(row+u0)*4+c]*(1-fx)+loadedImage[(row+u1)*4+c]*fx;
      const loadBottom=loadedImage[(row1+u0)*4+c]*(1-fx)+loadedImage[(row1+u1)*4+c]*fx;
      sample[c]=sample[c]*(1-paint)+(loadTop*(1-fy)+loadBottom*fy)*paint;
@@ -98,7 +115,9 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
     output[k+3]=Math.round(255*alpha*flow);
    }
   }
+  previousX=cx;previousY=cy;
   if(distance>=total)break;
+ }
  }
  return field;
 }

@@ -206,7 +206,7 @@ test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay respon
     };
     engine.render=()=>{
      const start=performance.now();render();
-     if(ready&&firstInput&&!firstPixel)firstPixel=performance.now()-firstInput;
+     if((ready||engine.blendWorker.presentedMixerSamples>0)&&engine.drawing&&firstInput&&!firstPixel)firstPixel=performance.now()-firstInput;
      if(engine.drawing)timings.push(performance.now()-start);
      if(undoStart){undo=performance.now()-undoStart;undoStart=0;}
     };
