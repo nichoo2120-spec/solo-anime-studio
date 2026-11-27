@@ -64,7 +64,16 @@ export class MixerPreview{
     patch.globalCompositeOperation='destination-in';patch.drawImage(this.nib,0,0);
     patch.globalCompositeOperation='source-over';
     ctx.globalAlpha=s.opacity*(s.bbFlow??.6)*(s.bbAmount??1);
+    // Move translucent pigment by interpolating premultiplied pixels. Plain
+    // source-over adds opacity every time the pen crosses the same wash.
+    const transfer=s.bbWetness!==0&&!s.bbProtectAlpha;
+    if(transfer){
+     ctx.globalCompositeOperation='destination-out';
+     ctx.drawImage(this.nib,x-width/2,y-width/2,width,width);
+     ctx.globalCompositeOperation='lighter';
+    }
     ctx.drawImage(this.patch,x-width/2,y-width/2,width,width);
+    ctx.globalCompositeOperation='source-over';
    }
    a=p;
   }
