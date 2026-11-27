@@ -33,7 +33,7 @@ const silk=stockPresets.find(p=>p.id==='silk-blend')!;
 function stroke(mode:SilkMode,points:Point[],patch:Partial<Stroke>={}):Stroke{
  const {bbEnabled:_enabled,bbRenderStyle:_style,...legacy}=silk.settings;
  const settings={...legacy,silkMode:mode,silkTexture:mode==='dry'?.65:0};
- return {...settings,...brushStrokeMetadata(settings),id:'silk-'+mode,kind:'stroke',tool:'brush',color:'#00ff00',size:60,opacity:1,pressure:true,response:1,points,...patch} as Stroke;
+ return {...settings,...silkStrokeMetadata(settings),id:'silk-'+mode,kind:'stroke',tool:'brush',color:'#00ff00',size:60,opacity:1,pressure:true,response:1,points,...patch} as Stroke;
 }
 const line=(x0:number,x1:number,y:number,n=60,p=(t:number)=>.4+.6*Math.sin(t*Math.PI))=>Array.from({length:n},(_,i)=>{const t=i/(n-1);return {x:x0+(x1-x0)*t,y,p:p(t)};});
 const hash=(d:Uint8ClampedArray)=>{let h=2166136261;for(let i=0;i<d.length;i++){h^=d[i];h=Math.imul(h,16777619);}return h>>>0;};
@@ -47,7 +47,7 @@ describe('Silk Blend v0.5.238',()=>{
  });
  it('adds Silk metadata only to Silk strokes, so every other brush stays byte-identical',()=>{
   for(const p of stockPresets.filter(p=>p.id!=='silk-blend')){const m=brushStrokeMetadata(p.settings) as Record<string,unknown>;for(const k of ['silkBlendVersion','silkMode','silkStrength','silkPickup','silkWetness','silkTexture'])expect(m[k],p.id+' '+k).toBeUndefined();}
-  expect(brushStrokeMetadata(silk.settings)).toMatchObject({silkBlendVersion:2,silkMode:'soft',silkStrength:.55,silkPickup:.7,silkWetness:.35,silkTexture:0});
+  expect(brushStrokeMetadata(silk.settings)).toMatchObject({brushBlendVersion:9,bbRenderStyle:'silk',bbMode:'soft',bbStrength:.55,bbPickup:.7,bbWetness:.35,bbTextureKeep:0});
   expect(silkStrokeMetadata({brushKind:'paint'})).toEqual({});
  });
  it('blends the existing paint in all four modes, differently, without adding the brush colour',()=>{
@@ -149,7 +149,7 @@ it.each(['soft','wet','smudge','dry'] as const)('Silk style uses the same %s pix
  const settings={...silk.settings,brushKind:'g-pen',bbEnabled:true,bbRenderStyle:'silk' as const,tsEnabled:true,
   silkMode:mode,silkTexture:mode==='dry'?.65:0};
  const old=stroke(mode,line(95,320,100));
- const next:Stroke={...old,brushKind:'g-pen',...brushStrokeMetadata(settings)};
+ const next:Stroke={...old,brushKind:'g-pen',...silkStrokeMetadata(settings)};
  expect(next).toMatchObject({silkBlendVersion:2,silkMode:mode});
  expect(next.brushBlendVersion).toBeUndefined();
  expect(next.stampVersion).toBeUndefined();

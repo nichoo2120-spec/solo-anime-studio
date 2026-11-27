@@ -45,6 +45,7 @@ export function BrushContextBar({preset,library,eraser,menu,setMenu,openSettings
     const name=label??(control.kind==='number'?control.props.name:control.name);
     return <div className="brush-quick-row" key={key}><span>{name}</span>
      {control.kind==='number'?<BrushNumber {...control.props} name={name}/>:
+      control.kind==='action'?<button type="button" onClick={control.run}>{name}</button>:
       control.kind==='choice'?<select aria-label={name} value={control.value} disabled={control.disabled} onChange={e=>control.set(e.target.value)}>{control.options.map(o=><option key={o.value} value={o.value} disabled={o.disabled}>{o.label}</option>)}</select>:
       control.kind==='toggle'?<input type="checkbox" aria-label={name} checked={control.value} disabled={control.disabled} onChange={e=>control.set(e.target.checked)}/>:
       <input type="color" aria-label={name} value={control.value} disabled={control.disabled} onChange={e=>control.set(e.target.value)}/>}

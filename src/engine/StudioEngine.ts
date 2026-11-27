@@ -201,24 +201,33 @@ export class StudioEngine {
  }
  /** v0.5.240 Blend mode: brush strokes only; pen-down snapshot for "All layers"
   * and the carried colour when "Clean brush after each stroke" is off. */
- private blendPageSample?:BlendSampleSource;private lastBlendEnd?:{layer:string;x:number;y:number;r:number};
+ private blendPageSample?:BlendSampleSource;private lastBlendEnd?:{project:string;preset:string;layer:string;x:number;y:number;r:number};
+ private consumedLoad=new Map<string,number>();
  private prepareBrushBlend(s:Stroke,layer:Layer,doc:Project){
   this.blendPageSample=undefined;this.blendWorker.blendSample=undefined;setLiveBlendSample(undefined);
   if(!isBrushBlendVersion(s.brushBlendVersion))return;
   if(s.tool!=='brush'){for(const k of Object.keys(s))if(k==='brushBlendVersion'||k.startsWith('bb'))delete (s as Record<string,unknown>)[k];return;}
   s.nativeMixVersion=undefined;s.nativeMixPickupVersion=undefined;s.nativeMixAmount=undefined;s.nativeMixPaintLoad=undefined;s.nativeMixRadius=undefined;
+  if(s.brushBlendVersion===9){
+   const key=this.preset.id;
+   if(s.bbReload)s.bbPaintLoad=1;
+   else if(s.bbLoadToken){
+    if(this.consumedLoad.get(key)===s.bbLoadToken)s.bbPaintLoad=0;
+    else this.consumedLoad.set(key,s.bbLoadToken);
+   }
+  }
   prepareBlendMaskPressure(s);
   if(s.brushBlendVersion>=3)s.stabilization=Math.max(s.stabilization??0,s.bbSmoothing??0);
-  if(s.bbClean===false&&this.lastBlendEnd&&this.lastBlendEnd.layer===layer.id&&layer.operations.length){const e=this.lastBlendEnd;try{s.bbCarry=encodeCarry(this.renderer.get(layer,doc),e.x,e.y,e.r);}catch{/* no carry */}}
+  if(s.bbClean===false&&this.lastBlendEnd&&this.lastBlendEnd.project===doc.id&&this.lastBlendEnd.preset===this.preset.id&&this.lastBlendEnd.layer===layer.id&&layer.operations.length){const e=this.lastBlendEnd;try{s.bbCarry=encodeCarry(this.renderer.get(layer,doc),e.x,e.y,e.r);}catch{/* no carry */}}
   if(s.bbSample==='all'){const page=this.renderer.composite(doc,{includeReferences:false});const sample=sampleFromCanvas(page,{x:0,y:0,width:page.width,height:page.height});this.blendPageSample=sample;this.blendWorker.blendSample=sample;setLiveBlendSample(sample);}
  }
  private finishBrushBlend(stroke:Stroke):Stroke{
   const page=this.blendPageSample;this.blendPageSample=undefined;
   const last=stroke.points[stroke.points.length-1],target=this.strokeTarget;
-  if(last&&target)this.lastBlendEnd={layer:target.layer,x:last.x,y:last.y,r:Math.max(1,stroke.size*.5)};
+  if(last&&target)this.lastBlendEnd={project:target.project,preset:this.preset.id,layer:target.layer,x:last.x,y:last.y,r:Math.max(1,stroke.size*.5)};
   if(stroke.bbSample!=='all'||!page||!stroke.points.length)return stroke;
   const path=blendPath(stroke),scale=blendTransformScale(stroke);
-  const pad=(stroke.brushBlendVersion===7||stroke.brushBlendVersion===8)?characterBlendReadReach(stroke,scale):
+  const pad=(stroke.brushBlendVersion===7||(stroke.brushBlendVersion===8||stroke.brushBlendVersion===9))?characterBlendReadReach(stroke,scale):
    Math.ceil((isMaterialBrushBlendVersion(stroke.brushBlendVersion)?brushBlendV4Reach(stroke)*scale:stroke.size*.75)+8);let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const p of path){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);}
   // Mirrored copies replay elsewhere on the page, so they keep the whole page.
@@ -583,8 +592,8 @@ export class StudioEngine {
   if(this.tool==='fill'){void this.fill(p);return;}
   const metadata=brushStrokeMetadata(this.tool==='eraser'?{...this.brush,bbEnabled:false}:this.brush,this.tool==='brush');
   const silk=metadata.silkBlendVersion!==undefined;
-  const fastBlend=this.brush.size>64&&(silk||(metadata.brushBlendVersion===7||metadata.brushBlendVersion===8));
-  const nativeMix=this.tool==='brush'&&this.brush.nativeMixEnabled&&!silk&&!metadata.natureVersion;
+  const fastBlend=this.brush.size>64&&(silk||(metadata.brushBlendVersion===7||(metadata.brushBlendVersion===8||metadata.brushBlendVersion===9)));
+  const nativeMix=this.tool==='brush'&&this.brush.nativeMixEnabled&&!metadata.brushBlendVersion&&!silk&&!metadata.natureVersion;
   const workspaceStroke=!silk&&doc.version===6&&!this.mirrorDrawing.enabled&&!this.brush.nativeMixEnabled&&!this.brush.mixColors&&
    supportsSparseStroke({...this.brush,...metadata,tool:this.tool==='eraser'?'eraser':'brush'});
   if(beyond&&!workspaceStroke){this.diagnostics.note('Press began outside project boundaries.');if(this.infinite)this.notify('Use Pencil, Solid Paint, Soft Paint or Hard Eraser to draw here.');return;}

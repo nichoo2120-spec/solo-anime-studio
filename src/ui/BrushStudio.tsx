@@ -78,16 +78,18 @@ export const BrushStudio=memo(function BrushStudio({library,eraser,onChange,noti
  const mixPatch=(p:TipMixControls)=>patch({mixTipA:mixA,mixTipB:mixB,mixBlend:s.mixBlend??.5,...p});
  const curve=s.pressureCurve??linearPressure;
  const imported=preset.category===importedCategory;
- const defaults=s.bbEnabled?['blend/Blend strength','blend/Blend Strength','blend/Blend style']:
+ const defaults=s.bbEnabled?['blend/Wet','blend/Load','blend/Mixer mix','blend/Flow','blend/Mixer preset','blend/Blend strength','blend/Blend style']:
   s.nature?['nature/Density','nature/Scatter amount','nature/Seed']:
   watercolor?['paint/Water amount',s.brushTip==='water-wet'?'paint/Edge bleeding':'paint/Edge softness']:
   dry?['texture/Paper grain strength','texture/Scatter']:
   s.brushTip==='chalk'?['texture/Texture strength','tip/Tip spacing']:
   inkTip?['smoothing/Stabilization','taper/Beginning taper']:['smoothing/Stabilization','smoothing/Smoothness'];
- const pins=Array.isArray(publishedPins[preset.id])?publishedPins[preset.id]:defaults;
+ const pinKey=s.bbEnabled?preset.id+'/mixer':preset.id;
+ const savedPins=publishedPins[pinKey],priorPins=publishedPins[preset.id];
+ const pins=Array.isArray(savedPins)?savedPins:s.bbEnabled&&Array.isArray(priorPins)?[...new Set([...priorPins,...defaults])]:defaults;
  const visible=menu==='quick'||settingsOpen;
  const toggle=(id:string)=>{
-  const next={...publishedPins,[preset.id]:pins.includes(id)?pins.filter(key=>key!==id):[...pins,id]};
+  const next={...publishedPins,[pinKey]:pins.includes(id)?pins.filter(key=>key!==id):[...pins,id]};
   setPublishedPins(next);writePreference('brush-quick-pins',next);
  };
  const quickLabels:Record<string,string>={'paint/Water amount':'Wetness','paint/Edge bleeding':'Bleed','paint/Edge softness':'Edge softness','texture/Paper grain strength':'Grain','texture/Texture strength':'Grain','nature/Scatter amount':'Scatter','taper/Beginning taper':'Beginning taper'};

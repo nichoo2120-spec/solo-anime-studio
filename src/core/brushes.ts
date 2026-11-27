@@ -151,7 +151,9 @@ export function brushList(library:BrushLibrary,category:BrushCategory,family?:Br
 }
 export const brushSupportsMix=(preset:BrushPreset)=>preset.category!=='Eraser'&&preset.category!==natureCategory&&preset.category!==importedCategory;
 export function mixifiedBrushSettings(settings:BrushSettings):BrushSettings{
- return {...settings,nativeMixEnabled:true,mixColors:false};
+ return {...settings,nativeMixEnabled:true,mixColors:false,bbEnabled:true,
+  bbMix:settings.bbMix??settings.mixAmount,bbPaintLoad:settings.bbPaintLoad??settings.mixPaintLoad,
+  bbStretch:settings.bbStretch??Math.min(1,(settings.mixPickupLen??1)/2)};
 }
 export function activeInputPreset(library:BrushLibrary,eraser=false){
  const preset=activePreset(library,eraser);
