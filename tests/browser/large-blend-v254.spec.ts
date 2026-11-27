@@ -10,6 +10,7 @@ test('profiles each Blend family and style on a 1920 × 1080 canvas',async({page
   const load=(path:string)=>import(path);
   const {stockPresets}=await load('/src/core/brushes.ts');
   const {brushStrokeMetadata}=await load('/src/core/paintTips.ts');
+  const {brushBlendSettingsFor}=await load('/src/core/brushBlend.ts');
   const {drawStroke}=await load('/src/engine/renderer.ts');
   const {renderBrushBlend,applyBrushBlendLive,resetBrushBlend}=await load('/src/engine/brushBlend.ts');
   const {BrushBlendGestureV3}=await load('/src/engine/brushBlendStyles.ts');
@@ -45,7 +46,9 @@ test('profiles each Blend family and style on a 1920 × 1080 canvas',async({page
   const frame=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
   for(const size of [20,100,300,500])for(const [label,id,style,silkMode] of fixture){
    const settings={...stockPresets.find((p:{id:string})=>p.id===id).settings,bbEnabled:true,bbRenderStyle:style,silkMode,pressureWidth:false};
-   const stroke={...settings,...brushStrokeMetadata(settings),id:'blend-profile-'+id,kind:'stroke',tool:'brush',size,points,pressure:false};
+   const metadata=brushStrokeMetadata(settings);
+   const old=metadata.silkBlendVersion?metadata:{...metadata,...brushBlendSettingsFor(settings,6),brushBlendVersion:6,bbBlur:undefined};
+   const stroke={...settings,...old,id:'blend-profile-'+id,kind:'stroke',tool:'brush',size,points,pressure:false};
    const baseline={...stroke,blendRasterVersion:size>64?1:undefined};
    const candidate={...stroke,blendRasterVersion:size>64?2:undefined};
    mask.clearRect(0,0,width,height);
@@ -118,6 +121,7 @@ test('large Blend preserves responsive input, a canonical worker result and exac
   const {newProject,activeLayer}=await load('/src/core/model.ts');
   const {DocumentStore}=await load('/src/core/history.ts');
   const {StudioEngine}=await load('/src/engine/StudioEngine.ts');
+  const {brushBlendSettingsFor}=await load('/src/core/brushBlend.ts');
   const {LayerRenderer}=await load('/src/engine/renderer.ts');
   const {stockPresets}=await load('/src/core/brushes.ts');
   const width=1920,height=1080;
@@ -171,6 +175,7 @@ test('large Blend preserves responsive input, a canonical worker result and exac
     stamp('pointerdown',424);
     const selectedVersion=engine.stroke.blendRasterVersion;
     engine.stroke.blendRasterVersion=version;
+    if(!engine.stroke.silkBlendVersion)Object.assign(engine.stroke,brushBlendSettingsFor({...pins,bbRenderStyle:renderStyle},6),{brushBlendVersion:6,bbBlur:undefined});
     for(let i=1;i<=18;i++){
      const x=424+i*39;
      stamp('pointermove',x,[x-26,x-13,x]);
@@ -227,8 +232,9 @@ test('large Blend skips worker mask work between brush contacts',async({page})=>
   const {LiveBlendWorker}=await load('/src/engine/LiveBlendWorker.ts');
   const {stockPresets}=await load('/src/core/brushes.ts');
   const {brushStrokeMetadata}=await load('/src/core/paintTips.ts');
+  const {brushBlendSettingsFor}=await load('/src/core/brushBlend.ts');
   const brush={...stockPresets.find((p:{id:string})=>p.id==='soft-paint').settings,bbEnabled:true};
-  const stroke={...brush,...brushStrokeMetadata(brush),id:'sub-dab-preview',kind:'stroke',tool:'brush',
+  const stroke={...brush,...brushStrokeMetadata(brush),...brushBlendSettingsFor(brush,6),brushBlendVersion:6,bbBlur:undefined,id:'sub-dab-preview',kind:'stroke',tool:'brush',
    size:300,pressure:false,blendRasterVersion:2,points:[{x:220,y:185,p:1}]};
   const source=Object.assign(document.createElement('canvas'),{width:720,height:420});
   const ctx=source.getContext('2d')!;
@@ -266,6 +272,7 @@ test('replays historical blend strokes byte for byte against the previous releas
   const load=(path:string)=>import(path);
   const {stockPresets}=await load('/src/core/brushes.ts');
   const {brushStrokeMetadata}=await load('/src/core/paintTips.ts');
+  const {brushBlendSettingsFor}=await load('/src/core/brushBlend.ts');
   const {drawStroke}=await load('/src/engine/renderer.ts');
   const {renderBrushBlend}=await load('/src/engine/brushBlend.ts');
   const surface=()=>Object.assign(document.createElement('canvas'),{width:1050,height:590}).getContext('2d',{willReadFrequently:true})!;
@@ -276,7 +283,7 @@ test('replays historical blend strokes byte for byte against the previous releas
    ['hb','auto'],['g-pen','auto'],['marker','auto'],['color-texture','auto'],['dry','auto'],
    ...['blur','wet','smudge','dry'].map(style=>['soft-paint',style])]){
    const settings={...stockPresets.find((p:{id:string})=>p.id===id).settings,bbEnabled:true,bbRenderStyle:style,pressureWidth:false};
-   const base={...settings,...brushStrokeMetadata(settings),id:'historical-blend-'+id,kind:'stroke',tool:'brush',size:300,points,pressure:false};
+   const base={...settings,...brushStrokeMetadata(settings),...brushBlendSettingsFor(settings,6),brushBlendVersion:6,bbBlur:undefined,id:'historical-blend-'+id,kind:'stroke',tool:'brush',size:300,points,pressure:false};
    mask.clearRect(0,0,1050,590);drawStroke(mask,base);
    for(const version of [3,4,6]){
     ctx.clearRect(0,0,1050,590);

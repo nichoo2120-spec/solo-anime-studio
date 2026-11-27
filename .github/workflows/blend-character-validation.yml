@@ -1,0 +1,35 @@
+name: Blend character validation
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  focused:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        test: [changed, existing]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx playwright install chromium
+      - if: matrix.test == 'changed'
+        run: npx playwright test tests/browser/blend-character-v255.spec.ts --reporter=line
+      - if: matrix.test == 'existing'
+        run: npx playwright test tests/browser/large-blend-v254.spec.ts tests/browser/brush-blend-v4.spec.ts tests/browser/large-blend-performance.spec.ts --reporter=line
+  validate:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx tsc -b
+      - run: npx vitest run --maxWorkers=2
+      - run: npm run build

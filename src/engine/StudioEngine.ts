@@ -580,7 +580,7 @@ export class StudioEngine {
   if(this.tool==='fill'){void this.fill(p);return;}
   const metadata=brushStrokeMetadata(this.tool==='eraser'?{...this.brush,bbEnabled:false}:this.brush,this.tool==='brush');
   const silk=metadata.silkBlendVersion!==undefined;
-  const fastBlend=this.brush.size>64&&(silk||metadata.brushBlendVersion===6);
+  const fastBlend=this.brush.size>64&&(silk||metadata.brushBlendVersion===7);
   const nativeMix=this.tool==='brush'&&this.brush.nativeMixEnabled&&!silk&&!metadata.natureVersion;
   const workspaceStroke=!silk&&doc.version===6&&!this.mirrorDrawing.enabled&&!this.brush.nativeMixEnabled&&!this.brush.mixColors&&
    supportsSparseStroke({...this.brush,...metadata,tool:this.tool==='eraser'?'eraser':'brush'});

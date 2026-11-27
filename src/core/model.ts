@@ -164,7 +164,7 @@ export function validateProject(value:unknown):Project {
     for(const [key,min,max] of [['stabilization',0,1],['smoothness',0,100],['taperStart',0,1],['taperEnd',0,1],['textureStrength',0,1],['minSize',0,1],['maxSize',0,1],['minOpacity',0,1],['maxOpacity',0,1]] as const)if(o[key]!==undefined&&!bounded(o[key],min,max))throw Error('Invalid stroke setting.');
     if((o.minSize??0)>(o.maxSize??1)||(o.minOpacity??0)>(o.maxOpacity??1))throw Error('Minimum pressure response exceeds maximum.');
     if(o.pressureCurve!==undefined&&(!Array.isArray(o.pressureCurve)||!validCurve(o.pressureCurve)))throw Error('Invalid pressure curve.');
-    if(o.blendRasterVersion!==undefined&&(o.blendRasterVersion!==1&&o.blendRasterVersion!==2||o.tool!=='brush'||o.brushBlendVersion!==6&&o.silkBlendVersion!==2))throw Error('Invalid Blend raster version.');
+    if(o.blendRasterVersion!==undefined&&(o.blendRasterVersion!==1&&o.blendRasterVersion!==2||o.tool!=='brush'||o.brushBlendVersion!==6&&o.brushBlendVersion!==7&&o.silkBlendVersion!==2))throw Error('Invalid Blend raster version.');
     if(o.silkBlendVersion!==undefined&&(o.silkBlendVersion!==1&&o.silkBlendVersion!==2||o.tool!=='brush'||!isSilkMode(o.silkMode)))throw Error('Invalid Silk Blend stroke.');
     if(o.silkMode!==undefined&&(o.silkBlendVersion===undefined||!isSilkMode(o.silkMode)))throw Error('Invalid Silk Blend mode.');
     for(const [key,min,max] of silkLimits)if(o[key]!==undefined&&(o.silkBlendVersion===undefined||!bounded(o[key],min,max)))throw Error('Invalid Silk Blend control.');

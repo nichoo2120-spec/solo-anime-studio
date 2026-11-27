@@ -1,0 +1,194 @@
+import {expect,test} from '@playwright/test';
+
+const targetIds=['blend-mix','water-smooth','water-rough','water-wet','water-flat','water-gradient','water-edge','color-air'];
+
+test('full-resolution Blend masks preserve the edge and each preset has its own material',async({page})=>{
+ test.setTimeout(180_000);
+ await page.goto('/');
+ const result=await page.evaluate(async targetIds=>{
+  const load=(path:string)=>import(path);
+  const {stockPresets}=await load('/src/core/brushes.ts');
+  const {brushStrokeMetadata}=await load('/src/core/paintTips.ts');
+  const {drawStroke}=await load('/src/engine/renderer.ts');
+  const {renderBrushBlend}=await load('/src/engine/brushBlend.ts');
+  const {renderSilkStroke}=await load('/src/engine/silkBlend.ts');
+  const width=1000,height=740,edge=width/2;
+  const canvas=()=>Object.assign(document.createElement('canvas'),{width,height}).getContext('2d',{willReadFrequently:true})!;
+  const mask=canvas(),paint=canvas(),base=canvas();
+  base.fillStyle='#143bab';base.fillRect(0,0,width,height);
+  base.fillStyle='#e02936';base.fillRect(0,0,edge,height);
+  base.clearRect(260,150,120,110);
+  const bytes=(ctx:CanvasRenderingContext2D)=>ctx.getImageData(0,0,width,height).data;
+  const before=bytes(base);
+  const presets=stockPresets.filter((p:any)=>p.category!=='Eraser');
+  const points=[{x:278,y:301,p:.5},{x:393,y:324,p:.5},{x:535,y:349,p:.5},{x:652,y:376,p:.5},{x:755,y:398,p:.5}];
+  const difference=(a:Uint8ClampedArray,b:Uint8ClampedArray)=>{
+   let sum=0,count=0;
+   for(let i=0;i<a.length;i+=4){
+    const delta=Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])+Math.abs(a[i+3]-b[i+3]);
+    if(delta>0){sum+=delta;count++;}
+   }
+   return {mean:sum/Math.max(1,count*4),pixels:count};
+  };
+  const render=(preset:any,size:number,path=points,options:Record<string,unknown>={})=>{
+   const settings={...preset.settings,size,bbEnabled:true,bbPressure:true,pressureWidth:false,opacity:1,...options};
+   const s={...settings,...brushStrokeMetadata(settings),id:'blend-character-'+preset.id,kind:'stroke',tool:'brush',points:path};
+   mask.clearRect(0,0,width,height);paint.clearRect(0,0,width,height);paint.drawImage(base.canvas,0,0);
+   if(s.silkBlendVersion)renderSilkStroke(paint,s);
+   else{drawStroke(mask,s);renderBrushBlend(paint,mask.canvas,s);}
+   return {s,out:bytes(paint),coverage:s.silkBlendVersion?undefined:bytes(mask)};
+  };
+  const cases=[],pairs=[],drag=[],pressure=[];
+  for(const size of [150,400]){
+   const reference=new Map<string,Uint8ClampedArray>();
+   for(const preset of presets){
+    const {s,out,coverage}=render(preset,size);
+    const delta=new Uint8Array(width*height);
+    let outside=0,longest=0,seamRatio=0;
+    for(let i=0,j=0;i<out.length;i+=4,j++){
+     delta[j]=Math.max(Math.abs(out[i]-before[i]),Math.abs(out[i+1]-before[i+1]),Math.abs(out[i+2]-before[i+2]),Math.abs(out[i+3]-before[i+3]));
+     if(delta[j]&&coverage&&!coverage[i+3])outside++;
+    }
+    // Find aligned jumps from visibly changed pixels directly to blank.
+    // A tapered or rotated nib cannot sustain such a jump along an axis.
+    for(const vertical of [false,true]){
+     const columns=vertical?width:height,rows=vertical?height:width;
+     for(let col=1;col<columns-1;col++){
+      let run=0;
+      for(let row=1;row<rows-1;row++){
+       const at=vertical?row*width+col:col*width+row,neighbor=vertical?1:width;
+       if((vertical&&Math.abs(col-edge)<=1)||(!vertical&&[149,150,259,260].includes(col))){run=0;continue;}
+       const a=delta[at],b=delta[at-neighbor];
+       run=Math.abs(a-b)>27&&Math.min(a,b)<2?run+1:0;
+       longest=Math.max(longest,run);
+      }
+     }
+    }
+    // Compare edge steps at the old 64 px seams with their nearby controls.
+    let tile=0,neighbor=0;
+    for(let x=64;x<width-3;x+=64)for(let y=3;y<height-3;y++){
+     const i=y*width+x;tile+=Math.abs(delta[i]-delta[i-1]);
+     neighbor+=(Math.abs(delta[i-2]-delta[i-3])+Math.abs(delta[i+2]-delta[i+1]))*.5;
+    }
+    for(let y=64;y<height-3;y+=64)for(let x=3;x<width-3;x++){
+     const i=y*width+x;tile+=Math.abs(delta[i]-delta[i-width]);
+     neighbor+=(Math.abs(delta[i-2*width]-delta[i-3*width])+Math.abs(delta[i+2*width]-delta[i+width]))*.5;
+    }
+    seamRatio=neighbor?tile/neighbor:0;
+    cases.push({id:preset.id,size,version:s.brushBlendVersion,silk:s.silkBlendVersion,outside,longest,seamRatio,...difference(out,before)});
+    if(targetIds.includes(preset.id))reference.set(preset.id,out);
+    if(['blend-mix','water-rough','water-flat'].includes(preset.id)){
+     const reverse=render(preset,size,[...points].reverse()).out;
+     let sum=0,n=0;
+     for(let x=edge+12;x<edge+70;x++)for(let y=323;y<378;y++){
+      const i=(y*width+x)*4;sum+=out[i]-reverse[i];n++;
+     }
+     drag.push({id:preset.id,size,directionalRed:sum/n});
+    }
+    if(targetIds.includes(preset.id)){
+     const full=render(preset,size,points.map(p=>({...p,p:1}))).out;
+     pressure.push({id:preset.id,size,difference:difference(out,full),mix:difference(out,before)});
+    }
+   }
+   for(const [a,first] of reference)for(const [b,second] of reference)if(a<b)pairs.push({a,b,size,...difference(first,second)});
+  }
+  const mix=stockPresets.find((p:any)=>p.id==='blend-mix');
+  const smear=render(mix,150,points,{bbBlur:0}).out,blur=render(mix,150,points,{bbBlur:1}).out;
+  return {cases,pairs,drag,pressure,blurDifference:difference(smear,blur)};
+ },targetIds);
+ for(const row of result.cases){
+  const label=row.id+' '+row.size;
+  console.log('BLEND_V255_PIXELS '+JSON.stringify(row));
+  expect.soft(row.version??row.silk,label).toBe(row.silk?2:7);
+  expect.soft(row.outside,label+' writes outside the brush mask').toBe(0);
+  expect.soft(row.longest,label+' uninterrupted hard axis edge').toBeLessThanOrEqual(25);
+  expect.soft(row.seamRatio,label+' 64 px seams').toBeLessThan(2.2);
+ }
+ for(const r of result.pairs)expect.soft(r.mean,r.a+' / '+r.b+' '+r.size).toBeGreaterThan(.65);
+ for(const r of result.drag)expect.soft(r.directionalRed,r.id+' '+r.size).toBeGreaterThan(2);
+ for(const r of result.pressure){
+  expect.soft(r.mix.pixels,r.id+' '+r.size+' visible at 50%').toBeGreaterThan(250);
+  expect.soft(r.difference.pixels,r.id+' '+r.size+' full mix from 40%').toBe(0);
+ }
+ expect(result.blurDifference.mean).toBeGreaterThan(3);
+});
+
+test('300 px and 500 px Blend keeps pen-up, undo, and exact worker replay responsive',async({page})=>{
+ test.setTimeout(180_000);
+ await page.goto('/');
+ const rows=await page.evaluate(async ids=>{
+  const load=(path:string)=>import(path);
+  const {newProject,activeLayer}=await load('/src/core/model.ts');
+  const {DocumentStore}=await load('/src/core/history.ts');
+  const {StudioEngine}=await load('/src/engine/StudioEngine.ts');
+  const {LayerRenderer}=await load('/src/engine/renderer.ts');
+  const {stockPresets}=await load('/src/core/brushes.ts');
+  const frame=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+  const results=[];
+  for(const size of [300,500])for(const id of ids){
+   const project=newProject('Blend character performance',1920,1080);
+   const paint=(x:number,color:string)=>({id:color,kind:'stroke',tool:'brush',size:550,pressure:false,response:1,opacity:1,color,
+    points:[{x,y:160,p:1},{x,y:920,p:1}]});
+   activeLayer(project).operations=[paint(560,'#df303c'),paint(1080,'#1a55cf')];
+   const store=new DocumentStore(project),host=document.createElement('div'),canvas=document.createElement('canvas');
+   host.style.cssText='position:fixed;inset:0';canvas.style.cssText='display:block;width:1920px;height:1080px';
+   host.append(canvas);document.body.append(host);
+   let held=false;canvas.setPointerCapture=()=>{held=true;};canvas.hasPointerCapture=()=>held;canvas.releasePointerCapture=()=>{held=false;};
+   const engine=new StudioEngine(canvas,store,()=>{}),preset=stockPresets.find((p:any)=>p.id===id);
+   const recorder=new LayerRenderer(false);
+   try{
+    engine.setView({x:0,y:0,zoom:1,rotation:0});
+    engine.setInput('brush',{...preset.settings,size,opacity:1,pressureWidth:false,bbEnabled:true,bbPressure:true});
+    await frame();await frame();
+    const send=(type:string,x:number,coalesced?:number[])=>{
+     const event=(x:number)=>new PointerEvent(type,{pointerId:9,isPrimary:true,button:0,buttons:type==='pointerup'?0:1,
+      pointerType:'pen',clientX:x,clientY:537+Math.sin(x*.01)*31,pressure:.5});
+     const latest=event(x);
+     if(coalesced)Object.defineProperty(latest,'getCoalescedEvents',{value:()=>coalesced.map(event)});
+     canvas.dispatchEvent(latest);
+    };
+    const timings:number[]=[],render=engine.render.bind(engine);
+    let undo=0,undoStart=0,previews=0;
+    const receive=engine.blendWorker.receive.bind(engine.blendWorker);
+    engine.blendWorker.receive=(reply:{bitmap?:ImageBitmap;final?:boolean})=>{
+     if(reply.bitmap&&!reply.final&&engine.drawing)previews++;
+     receive(reply);
+    };
+    engine.render=()=>{
+     const start=performance.now();render();
+     if(engine.drawing)timings.push(performance.now()-start);
+     if(undoStart){undo=performance.now()-undoStart;undoStart=0;}
+    };
+    send('pointerdown',434);
+    for(let j=1;j<=18;j++){const x=434+j*32;send('pointermove',x,[x-21,x-11,x]);await frame();}
+    const start=performance.now();
+    send('pointerup',1010);const dispatch=performance.now()-start;
+    const drawn=store.getSnapshot(),op=activeLayer(drawn).operations.at(-1);
+    await engine.renderer.whenSettled();const exact=performance.now()-start;
+    const pixels=(renderer:any,p:any)=>renderer.get(activeLayer(p),p).getContext('2d').getImageData(370,284,860,500).data as Uint8ClampedArray;
+    const output=pixels(engine.renderer,drawn),canonical=pixels(recorder,drawn);
+    const parity=output.reduce((n,v,i)=>n+Number(v!==canonical[i]),0);
+    undoStart=performance.now();engine.historyNavigation('undo');await frame();if(undoStart)await frame();
+    const restored=pixels(engine.renderer,store.getSnapshot()),original=pixels(recorder,project);
+    const undoParity=restored.reduce((n,v,i)=>n+Number(v!==original[i]),0);
+    timings.sort((a,b)=>a-b);
+    results.push({id,size,version:op.brushBlendVersion,previews,frames:timings.length,
+     p95:timings[Math.ceil(timings.length*.95)-1],dispatch,exact,undo,parity,undoParity});
+   }finally{engine.dispose();recorder.clear();host.remove();}
+  }
+  return results;
+ },targetIds);
+ for(const r of rows){
+  const label=r.id+' '+r.size;
+  console.log('BLEND_V255_TIMING '+JSON.stringify(r));
+  expect.soft(r.version,label).toBe(7);
+  expect.soft(r.frames,label).toBeGreaterThanOrEqual(15);
+  expect.soft(r.previews,label).toBeGreaterThan(0);
+  expect.soft(r.parity,label+' worker vs replay').toBe(0);
+  expect.soft(r.undoParity,label+' restored original').toBe(0);
+  expect.soft(r.p95,label+' p95').toBeLessThanOrEqual(16);
+  expect.soft(r.dispatch,label+' pen-up dispatch').toBeLessThanOrEqual(50);
+  expect.soft(r.exact,label+' exact pen-up result').toBeLessThanOrEqual(50);
+  expect.soft(r.undo,label+' undo').toBeLessThanOrEqual(50);
+ }
+});

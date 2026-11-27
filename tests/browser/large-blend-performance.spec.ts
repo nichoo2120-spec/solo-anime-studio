@@ -6,6 +6,7 @@ test('large Blend uses frame-sized batches and preserves the appearance of each 
  const rows=await page.evaluate(async()=>{
   const {stockPresets}=await import('/src/core/brushes.ts');
   const {brushStrokeMetadata}=await import('/src/core/paintTips.ts');
+  const {brushBlendSettingsFor}=await import('/src/core/brushBlend.ts');
   const {drawStroke}=await import('/src/engine/renderer.ts');
   const {applyBrushBlendLive,renderBrushBlend,resetBrushBlend}=await import('/src/engine/brushBlend.ts');
   const {applySilkBlend,renderSilkStroke,resetSilkBlend}=await import('/src/engine/silkBlend.ts');
@@ -37,7 +38,9 @@ test('large Blend uses frame-sized batches and preserves the appearance of each 
     const custom=silkMode==='custom'?{tsEnabled:true,tsAngle:45,tsScaleX:1.4,tsScaleY:.64,dbEnabled:true,dbTip:'chalk',dbScatter:.7,dbMode:'subtract',dbAmount:.5}:{};
     const settings={...source,...custom,bbEnabled:true,bbRenderStyle:style,silkMode,pressureWidth:false};
     const points=Array.from({length:45},(_,i)=>({x:310+i*13.5,y:390+Math.sin(i*.07)*68,p:.65+.35*i/45,v:.65}));
-    const normal={...settings,...brushStrokeMetadata(settings),id:'large-blend-'+id,kind:'stroke',tool:'brush',size,points,pressure:false};
+    const metadata=brushStrokeMetadata(settings);
+    const old=metadata.silkBlendVersion?metadata:{...metadata,...brushBlendSettingsFor(settings,6),brushBlendVersion:6,bbBlur:undefined};
+    const normal={...settings,...old,id:'large-blend-'+id,kind:'stroke',tool:'brush',size,points,pressure:false};
     const fast=size>64?{...normal,blendRasterVersion:1}:normal;
     mask.clearRect(0,0,width,height);
     if(style!=='silk')drawStroke(mask,fast);

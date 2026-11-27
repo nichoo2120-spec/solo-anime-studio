@@ -4,6 +4,7 @@ import {useId,useState,useRef,useEffect,type KeyboardEvent} from 'react';
 export type ExactRangeProps={
   live?:boolean;
   name:string;
+  settingId?:string;
   value:number;
   min?:number;
   max?:number;
@@ -18,9 +19,9 @@ export type ExactRangeProps={
  * updates, coalesced to one per animation frame so its sample follows the drag.
  * Live numeric fields publish valid values while typing; Escape restores focus value.
  */
-export function ExactRange({live=false,name,value,min=0,max=100,step=1,unit='',set}:ExactRangeProps){
+export function ExactRange({live=false,name,settingId,value,min=0,max=100,step=1,unit='',set}:ExactRangeProps){
   const id=useId();
-  const pin=useBrushSettingPin(name,{kind:'number',props:{name,value,min,max,step,unit,set}});
+  const pin=useBrushSettingPin(settingId??name,{kind:'number',props:{name,value,min,max,step,unit,set}});
   const [editing,setEditing]=useState(false);
   const [draft,setDraft]=useState('');
   const [sliding,setSliding]=useState<number|null>(null);

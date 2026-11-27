@@ -109,7 +109,7 @@ worker.onmessage=async({data:j})=>{
    // v0.5.238 Silk Blend: incremental; only tiles touched by new dabs come back.
    r=applySilkBlend(tc,bc,s,0,0,undefined,bc)??{x:0,y:0,width:1,height:1};
   }else if(isBrushBlendVersion(s.brushBlendVersion)&&s.tool==='brush'){
-   if(s.blendRasterVersion===2&&!j.final&&!j.resetPoints&&!brushBlendNeedsDab(tc,s)){
+   if(s.brushBlendVersion!==7&&s.blendRasterVersion===2&&!j.final&&!j.resetPoints&&!brushBlendNeedsDab(tc,s)){
     worker.postMessage({token:j.token,serial:j.serial,unchanged:true});
     return;
    }
