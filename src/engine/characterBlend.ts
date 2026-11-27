@@ -192,7 +192,7 @@ function blendFootprint(s:Stroke,transformScale:number){
 /** A saved all-layers sample must retain the same source halo as the worker. */
 export function characterBlendReadReach(s:Stroke,transformScale:number){
  const {pad,kernel}=blendFootprint(s,transformScale);
- if(s.brushBlendVersion===8)return Math.ceil(sharedReach(s,transformScale)+kernel*3+2);
+ if(s.brushBlendVersion===8)return Math.ceil(sharedReach(s,transformScale)+3*Math.max(kernel,s.size*transformScale*.12)+2);
  return pad+Math.ceil(kernel*3)+8;
 }
 
@@ -214,12 +214,27 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
  const x=Math.max(0,Math.floor(left-pad)),y=Math.max(0,Math.floor(top-pad));
  const w=Math.min(ctx.canvas.width,Math.ceil(right+pad))-x,h=Math.min(ctx.canvas.height,Math.ceil(bottom+pad))-y;
  if(w<=0||h<=0){restoreRegion(ctx,read,previous);return previous;}
- const pitch=size>200?4:size>64?2:1,halo=Math.ceil(3*kernel+2);
+ const sigma=blur>0?Math.max(.5,kernel||size*(.035+.08*wet)):0;
+ const pitch=size>200?4:size>64?2:1,halo=Math.ceil(3*sigma+2);
  const gx=Math.floor((x-halo)/pitch)*pitch,gy=Math.floor((y-halo)/pitch)*pitch;
  const cw=Math.ceil((x+w+halo-gx)/pitch),ch=Math.ceil((y+h+halo-gy)/pitch);
  const source=sample?sampleCanvas(sample):read.canvas;
  const input=buffer(sharedSource??=make(),cw,ch,true);
  drawCrop(input,source,sample?.x??0,sample?.y??0,gx,gy,cw,ch,pitch);
+ // Extend document-edge samples into the filter halo. A uniform opaque
+ // page stays opaque even when a large kernel crosses the canvas boundary.
+ const extend=(axis:'x'|'y',start:number,end:number,limit:number)=>{
+  const vertical=axis==='y';
+  for(const [from,to,count] of [[start,0,start],[end-1,end,limit-end]]){
+   if(count<=0||from<0||from>=limit)continue;
+   if(vertical)input.drawImage(sharedSource!,0,from,cw,1,0,to,cw,count);
+   else input.drawImage(sharedSource!,from,0,1,ch,to,0,count,ch);
+  }
+ };
+ if(blur>0){
+  extend('x',Math.max(0,Math.ceil(-gx/pitch)),Math.min(cw,Math.ceil((ctx.canvas.width-gx)/pitch)),cw);
+  extend('y',Math.max(0,Math.ceil(-gy/pitch)),Math.min(ch,Math.ceil((ctx.canvas.height-gy)/pitch)),ch);
+ }
  const color=buffer(sharedColor??=make(),cw,ch,true);
  if(blur<1){
   const coverage=buffer(sharedMask??=make(),cw,ch,true);
@@ -230,8 +245,10 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
   if(carry)for(let i=0;i<carry.length;i++)tank[i%4]+=carry[i]/(carry.length/4)/(i%4===3?255:1);
   const radius=Math.max(1,size*.5/pitch),drag=s.bbStretch??.5;
   const spacing=Math.max(.5,size*Math.max(.025,Math.min(.12,s.tipSpacing??.08)));
-  const transport=1-(s.bbMix??.5),load=s.bbPaintLoad??0;
+  const transport=clamp((1-(s.bbMix??.5))*(.48+.4*(s.bbTextureKeep??.3))),load=s.bbPaintLoad??0;
   const rgb=parseInt(s.color.slice(1),16),paint=[rgb>>16&255,rgb>>8&255,rgb&255];
+  type Contact={x:number;y:number;ox:number;oy:number;tank:Float64Array;strength:number};
+  const contacts:Contact[]=[];
   forDabs(points,spacing,p=>{
    const cx=(p.x-gx)/pitch,cy=(p.y-gy)/pitch,offset=Math.min(p.distance/pitch,radius*(.25+drag));
    picked.fill(0);let sum=0;
@@ -243,29 +260,54 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
     for(let c=0;c<4;c++)picked[c]+=a*sampleAt[c];sum+=a;
    }
    if(sum)for(let c=0;c<4;c++)picked[c]/=sum;
+   else sampleGrid(pixels,cx,cy,picked);
    const pickup=!tank[3]?1:1-Math.exp(-p.step*(s.bbPickup??.5)/Math.max(1,size*(.12+drag+(s.bbColorCarry??.5))));
    for(let c=0;c<4;c++)tank[c]=lerp(tank[c],picked[c],pickup);
-   const reach=pad/pitch;
-   for(let v=Math.max(0,Math.floor(cy-reach));v<Math.min(ch,cy+reach);v++)for(let u=Math.max(0,Math.floor(cx-reach));u<Math.min(cw,cx+reach);u++){
-    const k=(v*cw+u)*4;if(!weight[k+3])continue;
-    const distance=Math.hypot(u+.5-cx,v+.5-cy);
-    if(distance>=reach)continue;
-    sampleGrid(pixels,u+.5-p.dx*offset,v+.5-p.dy*offset,sampleAt);
-    const alpha=lerp(tank[3],sampleAt[3],transport);
-    if(alpha<=0&&!load)continue;
-    const influence=data[k+3]?ease(1-distance/reach)*Math.min(1,p.step/(radius*pitch*.3)):1;
-    for(let c=0;c<3;c++){
-     const pigment=lerp(tank[c],sampleAt[c],transport)/Math.max(.0001,alpha);
-     data[k+c]=lerp(data[k+c],lerp(pigment,paint[c],load),influence);
-    }
-    data[k+3]=lerp(data[k+3],255*lerp(alpha,1,load),influence);
-   }
+   const pressure=s.bbPressure?blendPressureFactor(p.p/.4,s.bbMinPressure??.7,s.bbPressureCurve??'linear'):1;
+   contacts.push({x:cx,y:cy,ox:p.dx*offset,oy:p.dy*offset,tank:tank.slice(),strength:pressure});
   });
+  // Index nearby segments once. Each pixel samples the carried pigment
+  // once regardless of the number of overlapping full-sized brush dabs.
+  const bin=32,cols=Math.ceil(cw/bin),bins=new Map<number,number[]>();
+  const range=Math.max(radius*1.5,s.stampVersion===1?size*stampExtent(s)/pitch:radius*2)+2;
+  for(let i=0;i<contacts.length;i++){
+   const a=contacts[Math.max(0,i-1)],b=contacts[i];
+   const left=Math.max(0,Math.floor((Math.min(a.x,b.x)-range)/bin));
+   const top=Math.max(0,Math.floor((Math.min(a.y,b.y)-range)/bin));
+   const right=Math.min(cols-1,Math.floor((Math.max(a.x,b.x)+range)/bin));
+   const bottom=Math.min(Math.ceil(ch/bin)-1,Math.floor((Math.max(a.y,b.y)+range)/bin));
+   for(let y=top;y<=bottom;y++)for(let x=left;x<=right;x++){
+    const key=y*cols+x,list=bins.get(key);
+    if(list)list.push(i);else bins.set(key,[i]);
+   }
+  }
+  for(const [key,list] of bins){
+   const x=key%cols*bin,y=Math.floor(key/cols)*bin;
+   for(let v=y;v<Math.min(y+bin,ch);v++)for(let u=x;u<Math.min(x+bin,cw);u++){
+    let best=Infinity,index=0,t=0;
+    for(const i of list){
+     const a=contacts[Math.max(0,i-1)],b=contacts[i],dx=b.x-a.x,dy=b.y-a.y;
+     const px=u+.5-a.x,py=v+.5-a.y;
+     const f=clamp((px*dx+py*dy)/(dx*dx+dy*dy||1));
+     const ex=px-f*dx,ey=py-f*dy,d=ex*ex+ey*ey;
+     if(d<=best){best=d;index=i;t=f;}
+    }
+    const a=contacts[Math.max(0,index-1)],b=contacts[index],k=(v*cw+u)*4;
+    sampleGrid(pixels,u+.5-lerp(a.ox,b.ox,t),v+.5-lerp(a.oy,b.oy,t),sampleAt);
+    const alpha=lerp(lerp(a.tank[3],b.tank[3],t),sampleAt[3],transport);
+    if(!alpha&&!load)continue;
+    for(let c=0;c<3;c++){
+     const pigment=lerp(lerp(a.tank[c],b.tank[c],t),sampleAt[c],transport)/Math.max(.0001,alpha);
+     data[k+c]=lerp(pigment,paint[c],load);
+    }
+    data[k+3]=255*lerp(alpha,1,load)*lerp(a.strength,b.strength,t);
+   }
+  }
   color.putImageData(result,0,0);
  }
  if(blur>0){
   const filtered=buffer(sharedBlur??=make(),cw,ch);
-  filtered.save();filtered.filter='blur('+Math.max(.5,(kernel||size*(.035+.08*wet))/pitch)+'px)';
+  filtered.save();filtered.filter='blur('+sigma/pitch+'px)';
   filtered.drawImage(sharedSource,0,0,cw,ch,0,0,cw,ch);filtered.restore();
   color.globalAlpha=blur;color.drawImage(sharedBlur,0,0,cw,ch,0,0,cw,ch);color.globalAlpha=1;
  }

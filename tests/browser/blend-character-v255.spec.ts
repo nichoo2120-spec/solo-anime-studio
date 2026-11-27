@@ -109,8 +109,12 @@ test('full-resolution Blend masks preserve the edge and each preset has its own 
      drag.push({id:preset.id,size,directionalRed:sum/n});
     }
     if(targetIds.includes(preset.id)){
-     const full=render(preset,size,points.map(p=>({...p,p:1}))).out;
-     pressure.push({id:preset.id,size,difference:difference(out,full),mix:difference(out,before)});
+     // Isolate the Blend pressure curve. Paint opacity and flow are
+     // intentionally pressure-sensitive in v8, and have independent coverage tests.
+     const neutral={pressureOpacity:false,pressureFlow:false,pressure:false};
+     const half=render(preset,size,points,neutral).out;
+     const full=render(preset,size,points.map(p=>({...p,p:1})),neutral).out;
+     pressure.push({id:preset.id,size,difference:difference(half,full),mix:difference(out,before)});
     }
    }
    for(const [a,first] of reference)for(const [b,second] of reference)if(a<b)pairs.push({a,b,size,...difference(first,second)});

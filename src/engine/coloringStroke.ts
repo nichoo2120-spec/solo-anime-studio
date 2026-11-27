@@ -22,7 +22,7 @@ type Contact={p:Point;r:number;level:number;co:number;si:number;arc:number;press
  * grayscale mask; opacity therefore cannot accumulate at interpolation joins. */
 export function drawColoring(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnType<typeof strokeGeometry>,region?:RasterRegion,pass?:PaintPass){
  // New Blender simulates pigment directly on the layer; its raw color mask is unused.
- if(s.coloringAppearanceVersion===3&&s.brushTip==='color-blender'&&s.tool!=='eraser')return;
+ if(s.coloringAppearanceVersion===3&&s.brushTip==='color-blender'&&s.tool!=='eraser'&&s.brushBlendVersion!==8)return;
  if(s.coloringAppearanceVersion===3){drawPigmentBrush(ctx,s,g,region,pass);return;}
  const samples=pass?.samples??paintSamples(g,.18),points=samples.points;if(!points.length||s.flow===0)return;
  const nib=s.colorNib??defaultColorNib(s.brushTip),newTexture=s.brushTip==='color-texture'&&s.coloringAppearanceVersion===2&&nib!=='rake',textured=s.brushTip==='color-texture'&&!newTexture,soft=s.brushTip==='color-soft',air=s.brushTip==='color-air',blend=s.brushTip==='color-blender',hard=newTexture?1:s.hardness??1,pad=s.size*.76+5;

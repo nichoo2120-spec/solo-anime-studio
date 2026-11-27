@@ -8,6 +8,8 @@ test('Paint and Blend share coverage and grain on a uniform contrasting pickup',
   const {stockPresets}=await load('/src/core/brushes.ts');
   const {brushStrokeMetadata}=await load('/src/core/paintTips.ts');
   const {drawStroke}=await load('/src/engine/renderer.ts');
+  const {drawPigmentBrush}=await load('/src/engine/pigmentBrush.ts');
+  const {finalGeometry}=await load('/src/engine/geometryCache.ts');
   const {renderBrushBlend,setLiveBlendSample,sampleFromCanvas}=await load('/src/engine/brushBlend.ts');
   const width=750,height=590;
   const canvas=()=>Object.assign(document.createElement('canvas'),{width,height}).getContext('2d',{willReadFrequently:true})!;
@@ -21,7 +23,11 @@ test('Paint and Blend share coverage and grain on a uniform contrasting pickup',
      const common={...preset.settings,id:'fixed-seed',color:'#ffffff',opacity:1,size,
       kind:'stroke',tool:'brush',points:[{x:215,y:255,p:.55},{x:525,y:335,p:.9}]};
      const reference={...common,...brushStrokeMetadata({...common,bbEnabled:false},true)};
-     paint.clearRect(0,0,width,height);drawStroke(paint,reference);
+     paint.clearRect(0,0,width,height);
+     // Native blenders transport existing pigment and have no standalone Paint alpha.
+     // Render their authored Paint nib on transparent paper for this reference.
+     if(reference.brushTip==='color-blender')drawPigmentBrush(paint,reference,finalGeometry(reference));
+     else drawStroke(paint,reference);
      const alpha=paint.getImageData(0,0,width,height).data;
      for(const style of ['smudge','blur','auto']){
       const settings={...common,bbEnabled:true,bbRenderStyle:style,bbSample:'all',bbAmount:1,bbStrength:1,bbPaintLoad:0};
