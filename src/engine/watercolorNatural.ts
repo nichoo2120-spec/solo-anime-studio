@@ -41,8 +41,8 @@ export function drawNaturalWatercolor(ctx:CanvasRenderingContext2D,s:Stroke,g:Re
  // Distance from the continuous boundary supplies a smooth water front.
  // This filters coverage, not pigment RGB, and leaves native paper unblurred.
  for(let i=0;i<distance.length;i++)distance[i]=coverage[i]===0?0:coverage[i]<255?coverage[i]/255:1e6;
- for(let y=0;y<ch;y++)for(let x=0;x<cw;x++){const i=y*cw+x;if(x)distance[i]=Math.min(distance[i],distance[i-1]+1);if(y){distance[i]=Math.min(distance[i],distance[i-cw]+1);if(x)distance[i]=Math.min(distance[i],distance[i-cw-1]+1.4142);if(x+1<cw)distance[i]=Math.min(distance[i],distance[i-cw+1]+1.4142);}}
- for(let y=ch-1;y>=0;y--)for(let x=cw-1;x>=0;x--){const i=y*cw+x;if(x+1<cw)distance[i]=Math.min(distance[i],distance[i+1]+1);if(y+1<ch){distance[i]=Math.min(distance[i],distance[i+cw]+1);if(x)distance[i]=Math.min(distance[i],distance[i+cw-1]+1.4142);if(x+1<cw)distance[i]=Math.min(distance[i],distance[i+cw+1]+1.4142);}}
+ for(let y=0;y<ch;y++)for(let x=0;x<cw;x++){const i=y*cw+x;if(distance[i]<=1)continue;if(x)distance[i]=Math.min(distance[i],distance[i-1]+1);if(y){distance[i]=Math.min(distance[i],distance[i-cw]+1);if(x)distance[i]=Math.min(distance[i],distance[i-cw-1]+1.4142);if(x+1<cw)distance[i]=Math.min(distance[i],distance[i-cw+1]+1.4142);}}
+ for(let y=ch-1;y>=0;y--)for(let x=cw-1;x>=0;x--){const i=y*cw+x;if(distance[i]<=1)continue;if(x+1<cw)distance[i]=Math.min(distance[i],distance[i+1]+1);if(y+1<ch){distance[i]=Math.min(distance[i],distance[i+cw]+1);if(x)distance[i]=Math.min(distance[i],distance[i+cw-1]+1.4142);if(x+1<cw)distance[i]=Math.min(distance[i],distance[i+cw+1]+1.4142);}}
  const field=depositionField(s,samples),deposit:Deposit={radius:0,density:0,water:0,grain:0,dx:0,dy:0,edge:0},rgb=s.color.slice(1).match(/../g)!.map(v=>parseInt(v,16));
  // v0.5.243: edgeDarkness scales the dark wet edge (pool bank); old strokes (no field) keep it fully.
  const edgeK=s.edgeDarkness??1;

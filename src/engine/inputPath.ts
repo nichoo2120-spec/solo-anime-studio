@@ -2,7 +2,7 @@
  * Keep its order and append the terminal sample, never replace a buffered tail. */
 export function pointerBatch(event:PointerEvent,includeTerminal=true,observe?:(count:number)=>void):PointerEvent[]{
  let samples:PointerEvent[]=[];try{samples=event.getCoalescedEvents?.()??[];}catch{/* Some synthetic/older providers expose an unusable method. */}
- observe?.(samples.length);if(!includeTerminal)return samples;const last=samples.at(-1);return last&&last.pointerId===event.pointerId&&last.clientX===event.clientX&&last.clientY===event.clientY&&last.pressure===event.pressure?samples:[...samples,event];
+ observe?.(samples.length);if(!includeTerminal)return samples;const last=samples.at(-1);return last&&last.pointerId===event.pointerId&&last.clientX===event.clientX&&last.clientY===event.clientY&&last.pressure===event.pressure&&(event.pointerType!=='pen'||(last.tiltX===event.tiltX&&last.tiltY===event.tiltY))?samples:[...samples,event];
 }
 export function appendPath<T extends {x:number;y:number;p:number}>(points:T[],point:T,minDistance=0){const last=points.at(-1);if(!last||Math.hypot(point.x-last.x,point.y-last.y)>minDistance||point.p!==last.p)points.push(point);}
 
@@ -16,7 +16,7 @@ export class PointerPath {
  records(limit=4096){return this.samples.slice(0,limit).map(e=>({type:e.type,pointerId:e.pointerId,pointerType:e.pointerType,timeStamp:e.timeStamp,clientX:e.clientX,clientY:e.clientY,pressure:e.pressure,buttons:e.buttons,button:e.button}));}
  onBatch?:(event:PointerEvent,candidates:PointerEvent[],replay:boolean)=>void;
  constructor(readonly id:number,readonly started:number,readonly first:PointerEvent,readonly gestureId=''){this.accept(first);this.samples.push(first);}
- private accept(e:PointerEvent){const key=[e.timeStamp,e.clientX,e.clientY,e.pressure].join(':');if(this.seen.has(key))return false;this.seen.add(key);return true;}
+ private accept(e:PointerEvent){const key=[e.timeStamp,e.clientX,e.clientY,e.pressure,...(e.pointerType==='pen'?[e.tiltX,e.tiltY]:[])].join(':');if(this.seen.has(key))return false;this.seen.add(key);return true;}
  batch(e:PointerEvent,terminal=true){
   this.received++;const candidates=pointerBatch(e,terminal,n=>{this.coalesced+=n;}),added=candidates.filter(s=>{const valid=s.pointerId===this.id&&Number.isFinite(s.clientX)&&Number.isFinite(s.clientY)&&s.timeStamp>=this.started;if(!valid)this.rejected++;return valid;}).filter(s=>{const valid=this.accept(s);if(!valid)this.duplicates++;return valid;}).sort((a,b)=>a.timeStamp-b.timeStamp);
   this.replaying=!!added.length&&added[0].timeStamp<this.samples.at(-1)!.timeStamp;

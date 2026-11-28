@@ -89,7 +89,7 @@ class MixerGL{
  private height=0;
  private previous=new Float32Array(0);
  constructor(readonly canvas:HTMLCanvasElement){
-  const gl=canvas.getContext('webgl2',{alpha:true,antialias:false,premultipliedAlpha:true,powerPreference:'high-performance',depth:false,stencil:false});
+  const gl=canvas.getContext('webgl2',{alpha:true,antialias:false,premultipliedAlpha:true,powerPreference:'high-performance',failIfMajorPerformanceCaveat:true,depth:false,stencil:false});
   if(!gl)throw Error('WebGL2 unavailable');
   this.gl=gl;this.limit=Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE),2*gl.getParameter(gl.MAX_ARRAY_TEXTURE_LAYERS));const info=gl.getExtension('WEBGL_debug_renderer_info');
   status.adapter=String(gl.getParameter(info?info.UNMASKED_RENDERER_WEBGL:gl.RENDERER));

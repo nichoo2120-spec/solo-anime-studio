@@ -19,7 +19,10 @@ function sampleLinear(bytes:Uint8ClampedArray,w:number,h:number,x:number,y:numbe
  for(let j=0;j<2;j++)for(let i=0;i<2;i++){
   const k=(Math.min(h-1,top+j)*w+Math.min(w-1,left+i))*4;
   const a=bytes[k+3]/255*(i?fx:1-fx)*(j?fy:1-fy);
-  for(let c=0;c<3;c++)out[c]+=a*linear[bytes[k+c]];
+  if(a===0)continue;
+  out[0]+=a*linear[bytes[k]];
+  out[1]+=a*linear[bytes[k+1]];
+  out[2]+=a*linear[bytes[k+2]];
   out[3]+=a;
  }
 }
