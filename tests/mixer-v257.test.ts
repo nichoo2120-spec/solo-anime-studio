@@ -4,12 +4,12 @@ import {brushStrokeMetadata} from '../src/core/paintTips';
 import {blendModes,blendRenderStyles} from '../src/core/brushBlend';
 import {mixerPresets,mixerRecipe} from '../src/core/mixerBrush';
 describe('Mixer Brush capture',()=>{
- it('routes every stock paint preset, mode, style and opacity through v9',()=>{
+ it('routes every stock paint preset, mode, style and opacity through v10',()=>{
   for(const preset of stockPresets.filter(p=>p.category!=='Eraser'))
    for(const opacity of [.44,1])for(const bbMode of blendModes)
     for(const bbRenderStyle of Object.keys(blendRenderStyles) as (keyof typeof blendRenderStyles)[]){
      const s=brushStrokeMetadata({...preset.settings,opacity,bbMode,bbRenderStyle,bbEnabled:true} as typeof preset.settings,true);
-     expect(s.brushBlendVersion,preset.id).toBe(9);
+     expect(s.brushBlendVersion,preset.id).toBe(10);
      expect(s.silkBlendVersion).toBeUndefined();
      if(preset.id.startsWith('water-'))expect(s.watercolorEngine).toBe(1);
     }

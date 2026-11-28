@@ -208,7 +208,7 @@ export class StudioEngine {
   if(!isBrushBlendVersion(s.brushBlendVersion))return;
   if(s.tool!=='brush'){for(const k of Object.keys(s))if(k==='brushBlendVersion'||k.startsWith('bb'))delete (s as Record<string,unknown>)[k];return;}
   s.nativeMixVersion=undefined;s.nativeMixPickupVersion=undefined;s.nativeMixAmount=undefined;s.nativeMixPaintLoad=undefined;s.nativeMixRadius=undefined;
-  if(s.brushBlendVersion===9){
+  if((s.brushBlendVersion??0)>=9){
    const key=this.preset.id;
    if(s.bbReload)s.bbPaintLoad=1;
    else if(s.bbLoadToken){
@@ -227,7 +227,7 @@ export class StudioEngine {
   if(last&&target)this.lastBlendEnd={project:target.project,preset:this.preset.id,layer:target.layer,x:last.x,y:last.y,r:Math.max(1,stroke.size*.5)};
   if(stroke.bbSample!=='all'||!page||!stroke.points.length)return stroke;
   const path=blendPath(stroke),scale=blendTransformScale(stroke);
-  const pad=(stroke.brushBlendVersion===7||(stroke.brushBlendVersion===8||stroke.brushBlendVersion===9))?characterBlendReadReach(stroke,scale):
+  const pad=((stroke.brushBlendVersion??0)>=7)?characterBlendReadReach(stroke,scale):
    Math.ceil((isMaterialBrushBlendVersion(stroke.brushBlendVersion)?brushBlendV4Reach(stroke)*scale:stroke.size*.75)+8);let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const p of path){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);}
   // Mirrored copies replay elsewhere on the page, so they keep the whole page.
@@ -256,7 +256,10 @@ export class StudioEngine {
   if(snapshot.silkBlendVersion)return snapshot;
   const geometry=finalGeometry(snapshot),pencil=!!snapshot.brushKind?.startsWith('graphite-');
   if(!this.mirrorDrawing.enabled&&pencil&&!snapshot.brushBlendVersion&&!snapshot.stampVersion){const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===this.strokeTarget?.layer);if(layer)this.renderer.deferPencil(snapshot,this.scratch,layer,doc,()=>this.request());}
-  if(snapshot.liveRefinementVersion===3&&!this.displayInk(snapshot)){
+  if(snapshot.brushBlendVersion===10){
+   const sc=this.scratch.getContext('2d')!;sc.clearRect(0,0,this.scratch.width,this.scratch.height);drawStroke(sc,snapshot,'final',geometry);
+   this.renderer.rememberStrokeRaster(snapshot,this.scratch);
+  }else if(snapshot.liveRefinementVersion===3&&!this.displayInk(snapshot)){
    const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===this.strokeTarget?.layer),bounds=this.pigmentPreviewBounds(snapshot,doc,geometry);
    const sc=this.scratch.getContext('2d')!;
    if(snapshot.natureVersion===1)this.liveRaster.paint(sc,snapshot,geometry);
@@ -592,7 +595,7 @@ export class StudioEngine {
   if(this.tool==='fill'){void this.fill(p);return;}
   const metadata=brushStrokeMetadata(this.tool==='eraser'?{...this.brush,bbEnabled:false}:this.brush,this.tool==='brush');
   const silk=metadata.silkBlendVersion!==undefined;
-  const fastBlend=this.brush.size>64&&(silk||(metadata.brushBlendVersion===7||(metadata.brushBlendVersion===8||metadata.brushBlendVersion===9)));
+  const fastBlend=this.brush.size>64&&(silk||((metadata.brushBlendVersion??0)>=7));
   const nativeMix=this.tool==='brush'&&this.brush.nativeMixEnabled&&!metadata.brushBlendVersion&&!silk&&!metadata.natureVersion;
   const workspaceStroke=!silk&&doc.version===6&&!this.mirrorDrawing.enabled&&!this.brush.nativeMixEnabled&&!this.brush.mixColors&&
    supportsSparseStroke({...this.brush,...metadata,tool:this.tool==='eraser'?'eraser':'brush'});
@@ -696,7 +699,11 @@ export class StudioEngine {
     this.strokeDirty=false;livePainted=!this.blendWorker.available()||!!this.strokeMirror;
    }else if(workerBlendEligible(this.stroke)&&this.blendWorker.available()&&!this.strokeMirror){
     this.strokeDirty=false;livePainted=false;
-  }else if(this.displayInk(this.stroke)&&!(this.initialPressurePending&&this.stroke.points.length===1)){this.liveRaster.reset();if(this.diagnostics.enabled)this.diagnostics.observeLive(this.liveTip);}else{const sc=this.scratch.getContext('2d')!;if(!(this.initialPressurePending&&this.stroke.points.length===1)){const start=this.diagnostics.enabled?performance.now():0;this.performance.measure('liveRasterMs',()=>{const pixels=this.liveRaster.paint(sc,this.stroke!,this.liveGeometry!);this.performance.record('liveDirtyPixels',pixels);});if(this.diagnostics.enabled){this.diagnostics.timing('liveRenderMs',performance.now()-start);this.diagnostics.observeLive(this.liveTip);}}else{sc.clearRect(0,0,this.scratch.width,this.scratch.height);this.liveRaster.reset();}}this.strokeDirty=false;livePainted=true;}
+  }else if(this.stroke.brushBlendVersion===10){
+    const mask=this.scratch.getContext('2d')!;mask.clearRect(0,0,this.scratch.width,this.scratch.height);
+    if(!this.initialPressurePending)drawStroke(mask,this.stroke);
+    this.strokeDirty=false;livePainted=true;
+   }else if(this.displayInk(this.stroke)&&!(this.initialPressurePending&&this.stroke.points.length===1)){this.liveRaster.reset();if(this.diagnostics.enabled)this.diagnostics.observeLive(this.liveTip);}else{const sc=this.scratch.getContext('2d')!;if(!(this.initialPressurePending&&this.stroke.points.length===1)){const start=this.diagnostics.enabled?performance.now():0;this.performance.measure('liveRasterMs',()=>{const pixels=this.liveRaster.paint(sc,this.stroke!,this.liveGeometry!);this.performance.record('liveDirtyPixels',pixels);});if(this.diagnostics.enabled){this.diagnostics.timing('liveRenderMs',performance.now()-start);this.diagnostics.observeLive(this.liveTip);}}else{sc.clearRect(0,0,this.scratch.width,this.scratch.height);this.liveRaster.reset();}}this.strokeDirty=false;livePainted=true;}
   const compositeStarted=this.performance.enabled?performance.now():0;const ctx=this.canvas.getContext('2d')!,nativeDpr=window.devicePixelRatio||1;
   const denseStroke=this.worldOnlyStroke?undefined:this.stroke;
   const corners=[toScreen({x:0,y:0},this.view),toScreen({x:p.width,y:0},this.view),toScreen({x:0,y:p.height},this.view),toScreen({x:p.width,y:p.height},this.view)];
@@ -778,7 +785,7 @@ export class StudioEngine {
    const workerPreview=denseStroke&&l.id===this.strokeTarget?.layer&&!this.strokeMirror&&workerBlendEligible(denseStroke)?this.blendWorker.preview(denseStroke,c,denseStroke.nativeMixVersion!==undefined?denseStroke.points.length:this.liveGeometry,displayed.operations.some(op=>op.kind==='stroke'&&displayCleanInk(op)),displayed.operations.some(op=>op.kind==='stroke'&&displayCleanInk(op))?this.inkDisplay.mixBaseline(ctx,displayed,p,this.renderer):undefined):undefined;
    if(workerPreview){this.blendSource=c;c=workerPreview;}else if(denseStroke?l.id===this.strokeTarget?.layer:l.id===p.activeLayerId&&this.selection.length&&!selectionStable){const preview=this.previewSurface;if(preview.width!==p.width){preview.width=p.width;this.previewStrokeId='';this.previewRestore=undefined;}if(preview.height!==p.height){preview.height=p.height;this.previewStrokeId='';this.previewRestore=undefined;}const pc=preview.getContext('2d')!,samePreview=denseStroke&&this.previewStrokeId===denseStroke.id&&this.previewBase===c&&this.previewBaseOperations===displayed.operations;
     const bounds=denseStroke&&this.liveGeometry?this.pigmentPreviewBounds(denseStroke,p,this.liveGeometry):undefined,restore=this.previewRestore;
-    const dirty=samePreview&&livePainted&&!this.strokeMirror?this.liveRaster.lastRegion:
+    const dirty=samePreview&&livePainted&&!this.strokeMirror&&denseStroke?.brushBlendVersion!==10?this.liveRaster.lastRegion:
      bounds&&restore?.base===c&&restore.operations===displayed.operations?this.previewUnion(restore.bounds,bounds):undefined;
     if(!samePreview||livePainted){
      pc.globalCompositeOperation='source-over';pc.globalAlpha=1;

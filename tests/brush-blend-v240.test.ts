@@ -45,7 +45,7 @@ describe('Paint / Blend switch v0.5.240',()=>{
   for(const p of stockPresets){const m=brushStrokeMetadata({...p.settings,bbEnabled:false}) as Record<string,unknown>;expect(Object.keys(m).filter(k=>k.startsWith('bb')||k==='brushBlendVersion'),p.id).toEqual([]);
    const off=brushStrokeMetadata({...p.settings,bbEnabled:false,bbAmount:.2,bbSample:'all'});if(p.id==='silk-blend')expect(off.silkBlendVersion).toBeUndefined();else expect(JSON.stringify(off),p.id).toBe(JSON.stringify(m));}
   expect(brushBlendMetadata({brushKind:'paint'})).toEqual({});
-  expect(brushStrokeMetadata({...paint.settings,bbEnabled:true})).toMatchObject({brushBlendVersion:9,bbStyle:'soft',...blendDefaultsFor(paint.settings)});
+  expect(brushStrokeMetadata({...paint.settings,bbEnabled:true})).toMatchObject({brushBlendVersion:10,bbStyle:'soft',...blendDefaultsFor(paint.settings)});
  });
  it('Blend mode adds no brush colour and blends the colours already there',()=>{
   const s=stroke(line(120,320,100)),c=run(s),before=scene().data;let changed=0,green=0;

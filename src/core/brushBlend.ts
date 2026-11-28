@@ -16,7 +16,7 @@ export const isBlendMode=(v:unknown):v is BlendMode=>typeof v==='string'&&(blend
 export const blendStyles:readonly BlendStyle[]=['water','dry','pencil','ink','air','oil','marker','texture','soft'];
 export const blendStyleNames:Record<BlendStyle,string>={water:'Watercolor',dry:'Dry brush',pencil:'Pencil',ink:'Ink',air:'Airbrush',oil:'Oil paint',marker:'Marker',texture:'Textured',soft:'Soft paint'};
 export const isBlendStyle=(v:unknown):v is BlendStyle=>typeof v==='string'&&(blendStyles as readonly string[]).includes(v);
-export type BrushBlendVersion=1|2|3|4|5|6|7|8|9;
+export type BrushBlendVersion=1|2|3|4|5|6|7|8|9|10;
 export const blendPressureCurves=['soft','linear','firm'] as const;
 export type BlendPressureCurve=(typeof blendPressureCurves)[number];
 export const blendRenderStyles={auto:'Auto (brush family)',silk:'Silk',blur:'Soft blur',wet:'Wet',smudge:'Smudge',dry:'Dry'} as const;
@@ -40,7 +40,7 @@ export function effectiveBlendStyle(family:BlendStyle,style:BlendRenderStyle='au
   default:return family;
  }
 }
-export const isMaterialBrushBlendVersion=(v:unknown):v is 4|5|6|7|8|9=>v===4||v===5||v===6||v===7||v===8||v===9;
+export const isMaterialBrushBlendVersion=(v:unknown):v is 4|5|6|7|8|9|10=>v===4||v===5||v===6||v===7||v===8||v===9||v===10;
 export const isBrushBlendVersion=(v:unknown):v is BrushBlendVersion=>v===1||v===2||v===3||isMaterialBrushBlendVersion(v);
 export function watercolorBlendTip(tip:unknown){
  return tip==='water-smooth'||tip==='water-wet'||tip==='water-rough'||tip==='water-flat'?tip:undefined;
@@ -131,7 +131,7 @@ export type BrushBlendControls={
 export type BrushBlendSettings=Omit<BrushBlendControls,'watercolorBlendVersion'|'brushBlendVersion'|'bbStyle'|'bbCarry'|'bbSamplePng'|'bbSampleRect'>&{bbEnabled?:boolean};
 export const blendDefaults:Required<Omit<BrushBlendSettings,'bbEnabled'>>={bbLoadToken:0,bbCapacity:.45,bbTaper:.12,bbReload:false,bbSolidLoad:true,bbPressureWet:false,bbPressureMix:false,bbMode:'soft',bbAmount:.85,bbPickup:.5,bbWetness:.4,bbMix:.6,bbFlow:.6,bbStretch:.45,bbSample:'layer',bbClean:true,bbPaintLoad:0,bbPressure:false,bbStrength:1,bbMinPressure:.7,bbPressureCurve:'linear',bbRenderStyle:'auto',bbBlur:0,bbProtectAlpha:false,bbColorCarry:.65,bbSoftness:.5,bbTextureKeep:0,bbSmoothing:0,bbEdgeDarkness:0};
 /** The values exposed for a family become its defaults only when a brush has no custom value saved. */
-export function blendDefaultsFor(s:BlendTip&{stabilization?:number;edgeDarkness?:number},version:BrushBlendVersion=9):typeof blendDefaults{
+export function blendDefaultsFor(s:BlendTip&{stabilization?:number;edgeDarkness?:number},version:BrushBlendVersion=10):typeof blendDefaults{
  const style=blendStyleFor(s),mode=defaultBlendMode(style);
  const family={...blendDefaults,bbMode:mode,bbColorCarry:style==='pencil'?.35:mode==='smudge'?.78:mode==='wet'?.58:.48,
   bbSoftness:mode==='soft'?.78:mode==='wet'?.68:mode==='dry'?.18:.38,
@@ -157,7 +157,7 @@ export function blendDefaultsFor(s:BlendTip&{stabilization?:number;edgeDarkness?
  if(s.nativeMixEnabled)return {...family,...tips['color-blender']};
  return {...family,...(tips[s.brushTip??'']??(style==='soft'?{bbMix:.46,bbBlur:.15}:{}))};
 }
-export function brushBlendSettingsFor(s:Partial<BrushBlendSettings>&BlendTip&{stabilization?:number;edgeDarkness?:number},version:BrushBlendVersion=9):typeof blendDefaults{
+export function brushBlendSettingsFor(s:Partial<BrushBlendSettings>&BlendTip&{stabilization?:number;edgeDarkness?:number},version:BrushBlendVersion=10):typeof blendDefaults{
  const base=blendDefaultsFor(s,version),out={...base};
  if(isSilkBrush(s))out.bbRenderStyle='silk';
  for(const [key,min,max] of blendLimits)out[key]=bounded(s[key],base[key],min,max);
@@ -188,7 +188,7 @@ export function brushBlendMetadata(s:BrushBlendSettings&Shape):BrushBlendControl
  if(!s.bbEnabled||!canBrushBlend(s))return {};
  const settings=brushBlendSettingsFor(s);
  const watercolor=s.brushKind?.startsWith('watercolor')||s.brushTip?.startsWith('wash');
- return {...settings,...(watercolor?{watercolorBlendVersion:1 as const}:{}),brushBlendVersion:9,bbStyle:blendStyleFor(s)};
+ return {...settings,...(watercolor?{watercolorBlendVersion:1 as const}:{}),brushBlendVersion:10,bbStyle:blendStyleFor(s)};
 }
 /** Freeze the pressure channels used by the paint-shaped mask at pen-down.
  * An unshaped Blend nib stays close to its selected size at light pressure.

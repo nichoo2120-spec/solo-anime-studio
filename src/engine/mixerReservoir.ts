@@ -1,4 +1,6 @@
 import {blendPressureFactor,effectiveBlendStyle} from '../core/brushBlend';
+import {widthResponse} from './pressureChannels';
+import {pressureResponse} from './strokeGeometry';
 import type {Point,Stroke} from '../core/model';
 
 /** The pickup image follows the nib. All four channels are linear and premultiplied. */
@@ -53,8 +55,11 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
   const t=length?clamp((distance-start)/length):0,p=a.p+(b.p-a.p)*t;
   const cx=(a.x+(b.x-a.x)*t-originX)/pitch-.5,cy=(a.y+(b.y-a.y)*t-originY)/pitch-.5;
   const dx=length?(b.x-a.x)/length:1,dy=length?(b.y-a.y)/length:0;
-  const contact=wash?Math.sqrt(clamp(p/.4)):p;
-  const r=Math.max(1,extent/pitch),moisture=wet*(s.pressure&&s.bbPressureWet?contact:1);
+  const contact=wash||s.brushBlendVersion===10?Math.sqrt(clamp(p/.4)):p;
+  const reachRadius=Math.max(1,extent/pitch);
+  const widthResponseAtContact=s.brushBlendVersion===10&&s.pressure&&s.pressureWidth!==false?widthResponse(pressureResponse(clamp(p)**s.response,s.pressureCurve),s):1;
+  const r=s.brushBlendVersion===10?Math.max(1,s.size*.5*widthResponseAtContact/pitch):reachRadius;
+  const moisture=wet*(s.pressure&&s.bbPressureWet?contact:1);
   const localMix=mix*(s.pressure&&s.bbPressureMix?contact:1);
   const strength=s.pressure&&s.bbPressure?blendPressureFactor(p/.4,s.bbMinPressure??.7,s.bbPressureCurve??'linear'):1;
   const refill=1-Math.exp(-spacing*(s.bbPickup??.5)*moisture/Math.max(1,s.size*(.18+drag+.35*(s.bbColorCarry??.6))));
@@ -70,7 +75,7 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
     for(let c=0;c<3;c++)pickup[k+c]=linear[Math.min(255,Math.round(carry[n*4+c]/(alpha||1)))]*alpha;
     pickup[k+3]=alpha;
    }
-   const charge=distance||carry?refill:1;
+   const charge=!distance&&carry&&s.brushBlendVersion===10?Math.max(refill,moisture*.5):distance||carry?refill:1;
    for(let c=0;c<4;c++){
     let pigment=pickup[k+c];
     if(wash&&distance){
@@ -87,7 +92,7 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
   const charge=(s.bbPaintLoad??0)*Math.exp(-distance/fadeLength);
   const entry=total&&tail?Math.min(1,(distance+s.size*.15)/(s.size*(.15+tail))):1;
   const exit=total&&tail?Math.min(1,(total-distance+s.size*.15)/(s.size*(.15+tail))):1;
-  const width=entry*exit,reach=r*1.45+2;
+  const width=entry*exit,reach=reachRadius*1.45+2;
   if(!ordinal){previousX=cx;previousY=cy;}
   const sx=cx-previousX,sy=cy-previousY,span=sx*sx+sy*sy||1;
   for(let y=Math.max(0,Math.floor(Math.min(cy,previousY)-reach));y<=Math.min(h-1,Math.ceil(Math.max(cy,previousY)+reach));y++){
@@ -129,7 +134,7 @@ export function mixerField(ctx:CanvasRenderingContext2D,input:ImageData,s:Stroke
     sample[3]=sample[3]*activity+baseAlpha*(1-activity);
     const alpha=sample[3];if(alpha<=0)continue;
     for(let c=0;c<3;c++)output[k+c]=encoded[Math.round(4096*clamp(sample[c]/alpha))];
-    const edge=wash?clamp(1-(nx*nx+ny*ny)):1;
+    const edge=wash&&s.brushBlendVersion!==10?clamp(1-(nx*nx+ny*ny)):1;
     const feather=edge*edge*(3-2*edge);
     output[k+3]=Math.round(255*alpha*flow*strength*feather);
    }

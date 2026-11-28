@@ -34,7 +34,7 @@ export function compositePaintStroke(ctx:CanvasRenderingContext2D,source:HTMLCan
  if((s.silkBlendVersion===1||s.silkBlendVersion===2)&&s.tool==='brush'){applySilkBlend(ctx,source,s,sourceX,sourceY,region,blendBase,true);return;}
  // v0.5.240 Blend mode on any paint brush: the stroke raster is only a mask.
  if(isBrushBlendVersion(s.brushBlendVersion)&&s.tool==='brush'){
-  const read=(s.brushBlendVersion===7||(s.brushBlendVersion===8||s.brushBlendVersion===9))?blendBase?.getContext('2d')??undefined:undefined;
+  const read=((s.brushBlendVersion??0)>=7)?blendBase?.getContext('2d')??undefined:undefined;
   renderBrushBlend(ctx,source,s,sourceX,sourceY,read);
   return;
  }

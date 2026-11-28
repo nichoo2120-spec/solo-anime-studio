@@ -47,7 +47,7 @@ describe('Silk Blend v0.5.238',()=>{
  });
  it('adds Silk metadata only to Silk strokes, so every other brush stays byte-identical',()=>{
   for(const p of stockPresets.filter(p=>p.id!=='silk-blend')){const m=brushStrokeMetadata(p.settings) as Record<string,unknown>;for(const k of ['silkBlendVersion','silkMode','silkStrength','silkPickup','silkWetness','silkTexture'])expect(m[k],p.id+' '+k).toBeUndefined();}
-  expect(brushStrokeMetadata(silk.settings)).toMatchObject({brushBlendVersion:9,bbRenderStyle:'silk',bbMode:'soft',bbStrength:.55,bbPickup:.7,bbWetness:.35,bbTextureKeep:0});
+  expect(brushStrokeMetadata(silk.settings)).toMatchObject({brushBlendVersion:10,bbRenderStyle:'silk',bbMode:'soft',bbStrength:.55,bbPickup:.7,bbWetness:.35,bbTextureKeep:0});
   expect(silkStrokeMetadata({brushKind:'paint'})).toEqual({});
  });
  it('blends the existing paint in all four modes, differently, without adding the brush colour',()=>{
