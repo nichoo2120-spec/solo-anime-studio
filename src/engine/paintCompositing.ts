@@ -39,7 +39,7 @@ export function compositePaintStroke(ctx:CanvasRenderingContext2D,source:HTMLCan
   renderBrushBlend(ctx,source,s,sourceX,sourceY,read);
   return;
  }
- if(s.impastoVersion===2&&(s.oilPickup??0)>0){
+ if((s.impastoVersion??0)>=2&&(s.oilPickup??0)>0){
   const box=region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height);
   const {x,y,width:w,height:h}=box;
   if(!w||!h)return;

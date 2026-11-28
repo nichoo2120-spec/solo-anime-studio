@@ -79,7 +79,7 @@ function screenSpaceGeometry(stroke:Stroke,phase:'live'|'final',calculate:(sourc
 }
 export function strokeGeometry(stroke:Stroke,phase:'live'|'final'='final'){
  // Ink Paint keeps the same path for a given set of samples on either side of pen-up.
- if(stroke.inkEdgeVersion===1||stroke.impastoVersion===2)phase='final';
+ if(stroke.inkEdgeVersion===1||(stroke.impastoVersion??0)>=2)phase='final';
  if(stroke.engineVersion===6||stroke.engineVersion===7||stroke.engineVersion===8||stroke.engineVersion===9||stroke.engineVersion===10){
   const calculation=(source:Point[])=>structuralGeometry(source,stroke.stabilization??0,stroke.smoothness??0,phase,stroke.brushKind==='mapping'?Math.min(24,Math.max(2,stroke.size*1.5))*(stroke.stabilization??0)**2:Infinity,!!stroke.liveRefinementVersion,(stroke.liveRefinementVersion??0)>=2,stroke.liveRefinementVersion!==3,followLiveInkTip(stroke));
   return screenSpaceGeometry(stroke,phase,calculation);

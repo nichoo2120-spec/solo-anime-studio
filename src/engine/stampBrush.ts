@@ -54,19 +54,25 @@ export function stampDabs(s:Stroke,samples:PaintSamples):StampDab[]{
  const out:StampDab[]=[];if(!samples.points.length)return out;
  const raw=s.points,cum:number[]=[0];for(let i=1;i<raw.length;i++)cum.push(cum[i-1]+Math.hypot(raw[i].x-raw[i-1].x,raw[i].y-raw[i-1].y));
  const spacing=Math.max(.02,Math.min(.5,s.tipSpacing??.1)),sx=(s.tsScaleX??1)*(s.tsFlipX?-1:1),sy=(s.tsScaleY??1)*(s.tsRoundness??1)*(s.tsFlipY?-1:1),base=(s.tsAngle??0)*Math.PI/180;
+ const tailSpan=Math.min(samples.total*.38,s.size*(s.oilTip==='flat'?.48:.58));
+ const tailPressure=samples.points.at(-1)?.p??1;
  let segment=1,d=0,index=0;
  const at=(dist:number)=>{
   while(segment<samples.points.length-1&&samples.arc[segment]<dist)segment++;
   const a=samples.points[Math.max(0,segment-1)]??samples.points[0],b=samples.points[segment]??a,start=samples.arc[segment-1]??0,span=(samples.arc[segment]??0)-start,t=span?clamp((dist-start)/span):0;
   const p={x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,p:a.p+(b.p-a.p)*t,v:(a.v??.65)+((b.v??.65)-(a.v??.65))*t};
   const pressure=s.pressure?pressureResponse(p.p**s.response,s.pressureCurve):1;
-  const width=s.pressure&&s.pressureWidth!==false||s.velocityTaper?widthResponse((s.impastoVersion===2?pressure*pressure*(3-2*pressure):pressure)*(s.velocityTaper?p.v:1),s):1;
-  const radius=Math.max(.35,s.size*.5*width*taperFactor(dist,samples.total,s.taperStart,s.taperEnd,Math.max(64,s.size*12)));
+  const eased=s.impastoVersion===3?pressure*(.8+.2*pressure):
+   s.impastoVersion===2?pressure*pressure*(3-2*pressure):pressure;
+  const width=s.pressure&&s.pressureWidth!==false||s.velocityTaper?widthResponse(eased*(s.velocityTaper?p.v:1),s):1;
+  const tipTail=s.impastoVersion===3&&tailSpan>0&&s.pressure&&s.pressureWidth!==false?
+   1-.78*(1-clamp(tailPressure))*(1-clamp((samples.total-dist)/tailSpan)**.65):1;
+  const radius=Math.max(.35,s.size*.5*width*tipTail*taperFactor(dist,samples.total,s.taperStart,s.taperEnd,Math.max(64,s.size*12)));
   let angle=base,rx=radius*Math.abs(sx),ry=radius*Math.abs(sy);
   // Follow: the tip's width lies across the line, like a real flat brush.
     if(s.tsFollow&&samples.points.length>1){
    let start=segment-1,end=segment;
-   if(s.impastoVersion===2){
+   if((s.impastoVersion??0)>=2){
     const span=s.size*.13;
     while(start>0&&dist-samples.arc[start]<span)start--;
     while(end<samples.points.length-1&&samples.arc[end]-dist<span)end++;
@@ -76,7 +82,7 @@ export function stampDabs(s:Stroke,samples:PaintSamples):StampDab[]{
   }
   if(s.tsTilt){const tilt=tiltAt(raw,cum,samples.total?dist/samples.total:0);if(tilt){angle+=tilt.az*Math.PI/180;const lean=1-clamp(tilt.alt/90);rx*=1+1.5*lean;}}
   const level=clamp((s.flow??1)*(s.pressure&&s.pressureFlow?pressure:1)*(s.pressure&&s.pressureOpacity?opacityResponse(pressure,s):1));
-  out.push({x:p.x,y:p.y,rx:rx*Math.sign(sx||1),ry:ry*Math.sign(sy||1),angle,level,pressure:s.impastoVersion===2?pressure:undefined,index:index++});return radius;
+  out.push({x:p.x,y:p.y,rx:rx*Math.sign(sx||1),ry:ry*Math.sign(sy||1),angle,level,pressure:(s.impastoVersion??0)>=2?pressure*tipTail:undefined,index:index++});return radius;
  };
  for(;;){const r=at(Math.min(d,samples.total));if(d>=samples.total)break;d+=Math.max(.4,2*r*Math.min(Math.abs(sx),Math.abs(sy),1)*spacing);}
  return out;

@@ -13,7 +13,7 @@ let lit:HTMLCanvasElement|undefined;
 export function oilNib(s:Stroke,pressure=1){
  const rectangular=s.oilTip==='bristle'||s.oilTip==='flat';
  const softness=s.oilSoftness??.2,pickup=s.oilPickup??.08;
- const dry=s.impastoVersion===2?1-Math.round(clamp(pressure)*8)/8:0;
+ const dry=(s.impastoVersion??0)>=2?1-Math.round(clamp(pressure)*8)/8:0;
  const key=[s.impastoVersion,s.oilTip,softness,pickup,dry].join(':');
  const cached=tipCache.get(key);
  if(cached)return cached;
@@ -25,7 +25,7 @@ export function oilNib(s:Stroke,pressure=1){
   const bristle=(Math.sin(y*2.71)*.65+Math.sin(y*.67)*.35)*.025;
     const edge=clamp((1-distance+bristle)/(.025+.13*softness));
   const lane=(.5+.5*Math.sin(x*1.74+Math.sin(x*.35)*1.25))**2;
-  const thin=s.impastoVersion===2?clamp((distance-.69)/.29)*(.22+.78*dry)*lane:0;
+  const thin=(s.impastoVersion??0)>=2?clamp((distance-.69)/.29)*(.22+.78*dry)*lane:0;
   const k=(y*128+x)*4;
   pixels.data[k]=pixels.data[k+1]=pixels.data[k+2]=255;
   pixels.data[k+3]=Math.round(255*edge*(1-pickup*(1-edge))*(1-thin*.83));
@@ -47,7 +47,7 @@ function bristleHeight(s:Stroke,dabs:StampDab[],box:RasterRegion){
  const c=height??=surface(),ctx=fit(c,box.width,box.height);
  const body=s.oilDepth??.65,base=Math.round(115*body);
  ctx.fillStyle='rgb('+base+' '+base+' '+base+')';ctx.fillRect(0,0,box.width,box.height);
- const count=lanes[s.oilTip??'filbert'],relief=s.impastoVersion===2?1.25:1,depth=body*(s.oilBristles??.75);
+ const count=lanes[s.oilTip??'filbert'],relief=s.impastoVersion===3?1.52:s.impastoVersion===2?1.25:1,depth=body*(s.oilBristles??.75);
  if(!depth||dabs.length===0)return c;
  const rails=dabs.map((d,i)=>{
   const a=dabs[Math.max(0,i-1)],b=dabs[Math.min(dabs.length-1,i+1)];
@@ -63,12 +63,17 @@ function bristleHeight(s:Stroke,dabs:StampDab[],box:RasterRegion){
  for(let i=0;i<count;i++){
   const center=(i+.5)*2/count-1+(Math.sin(i*6.17)*.28)/count;
   const width=(.35+.24*Math.sin(i*1.91)**2)/count;
-  const value=Math.min(255,Math.round(base+115*relief*depth*(s.impastoVersion===2?.40+.60*Math.sin(i*2.32+.4)**2:.45+.55*Math.sin(i*2.32+.4)**2)));
-  ctx.fillStyle='rgb('+value+' '+value+' '+value+')';
-  ctx.beginPath();ctx.moveTo(...at(-1,center-width));
-  for(let j=0;j<=rails.length;j++)ctx.lineTo(...at(j,center-width));
-  for(let j=rails.length;j>=-1;j--)ctx.lineTo(...at(j,center+width));
-  ctx.closePath();ctx.fill();
+  const value=Math.min(255,Math.round(base+115*relief*depth*((s.impastoVersion??0)>=2?.40+.60*Math.sin(i*2.32+.4)**2:.45+.55*Math.sin(i*2.32+.4)**2)));
+  const profile=s.impastoVersion===3?[.43,.75,1]:[1];
+  for(const [band,weight] of profile.entries()){
+   const halfWidth=width*(1-band*.22);
+   const gray=Math.round(base+(value-base)*weight);
+   ctx.fillStyle='rgb('+gray+' '+gray+' '+gray+')';
+   ctx.beginPath();ctx.moveTo(...at(-1,center-halfWidth));
+   for(let j=0;j<=rails.length;j++)ctx.lineTo(...at(j,center-halfWidth));
+   for(let j=rails.length;j>=-1;j--)ctx.lineTo(...at(j,center+halfWidth));
+   ctx.closePath();ctx.fill();
+  }
  }
  return c;
 }
@@ -156,7 +161,8 @@ function cpuLight(source:HTMLCanvasElement,rgb:number[],light:Light){
 
 export function shadeImpasto(mask:CanvasRenderingContext2D,s:Stroke,dabs:StampDab[],box:RasterRegion,heightOnly=false){
  const c=bristleHeight(s,dabs,box),angle=(s.oilLight??-135)*Math.PI/180;
- const light={x:Math.cos(angle),y:Math.sin(angle),weave:s.oilCanvas?1:0,jitter:s.impastoVersion===2?s.oilJitter??.065:0,offsetX:box.x,offsetY:box.y};
+ const gain=s.impastoVersion===3?1.44:1;
+ const light={x:Math.cos(angle)*gain,y:Math.sin(angle)*gain,weave:s.oilCanvas?1:0,jitter:(s.impastoVersion??0)>=2?s.oilJitter??.065:0,offsetX:box.x,offsetY:box.y};
  const color=parseInt(s.color.slice(1),16),rgb=[color>>16&255,color>>8&255,color&255];
  const colorLayer=heightOnly?c:typeof window!=='undefined'?gpuLight(c,rgb,light)??cpuLight(c,rgb,light):cpuLight(c,rgb,light);
  mask.globalCompositeOperation='source-in';mask.drawImage(colorLayer,0,0);mask.globalCompositeOperation='source-over';
