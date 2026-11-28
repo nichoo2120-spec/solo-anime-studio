@@ -62,10 +62,10 @@ export function stampDabs(s:Stroke,samples:PaintSamples):StampDab[]{
   const a=samples.points[Math.max(0,segment-1)]??samples.points[0],b=samples.points[segment]??a,start=samples.arc[segment-1]??0,span=(samples.arc[segment]??0)-start,t=span?clamp((dist-start)/span):0;
   const p={x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,p:a.p+(b.p-a.p)*t,v:(a.v??.65)+((b.v??.65)-(a.v??.65))*t};
   const pressure=s.pressure?pressureResponse(p.p**s.response,s.pressureCurve):1;
-  const eased=s.impastoVersion===3?pressure*(.8+.2*pressure):
+  const eased=(s.impastoVersion??0)>=3?pressure*(.8+.2*pressure):
    s.impastoVersion===2?pressure*pressure*(3-2*pressure):pressure;
   const width=s.pressure&&s.pressureWidth!==false||s.velocityTaper?widthResponse(eased*(s.velocityTaper?p.v:1),s):1;
-  const tipTail=s.impastoVersion===3&&tailSpan>0&&s.pressure&&s.pressureWidth!==false?
+  const tipTail=(s.impastoVersion??0)>=3&&tailSpan>0&&s.pressure&&s.pressureWidth!==false?
    1-.78*(1-clamp(tailPressure))*(1-clamp((samples.total-dist)/tailSpan)**.65):1;
   const radius=Math.max(.35,s.size*.5*width*tipTail*taperFactor(dist,samples.total,s.taperStart,s.taperEnd,Math.max(64,s.size*12)));
   let angle=base,rx=radius*Math.abs(sx),ry=radius*Math.abs(sy);

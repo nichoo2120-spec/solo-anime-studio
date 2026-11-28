@@ -45,10 +45,11 @@ function fit(c:HTMLCanvasElement,w:number,h:number){
  * Each lane has its own spacing and height. The nib mask clips the ends. */
 function bristleHeight(s:Stroke,dabs:StampDab[],box:RasterRegion){
  const c=height??=surface(),ctx=fit(c,box.width,box.height);
- const body=s.oilDepth??.65,base=Math.round(115*body);
- ctx.fillStyle='rgb('+base+' '+base+' '+base+')';ctx.fillRect(0,0,box.width,box.height);
+ const body=s.oilDepth??.65,base=Math.round(115*body),sculpted=s.impastoVersion===4;
+ const floor=sculpted?Math.round(base*.36):base;
+ ctx.fillStyle='rgb('+floor+' '+floor+' '+floor+')';ctx.fillRect(0,0,box.width,box.height);
  const count=lanes[s.oilTip??'filbert'],relief=s.impastoVersion===3?1.52:s.impastoVersion===2?1.25:1,depth=body*(s.oilBristles??.75);
- if(!depth||dabs.length===0)return c;
+ if((sculpted?!body:!depth)||dabs.length===0)return c;
  const rails=dabs.map((d,i)=>{
   const a=dabs[Math.max(0,i-1)],b=dabs[Math.min(dabs.length-1,i+1)];
   const dir=a===b?d.angle-Math.PI/2:Math.atan2(b.y-a.y,b.x-a.x);
@@ -60,6 +61,32 @@ function bristleHeight(s:Stroke,dabs:StampDab[],box:RasterRegion){
   const p=rails[Math.max(0,Math.min(rails.length-1,i))],end=i<0?-1:i>=rails.length?1:0;
   return [p.x+p.nx*p.width*offset+end*p.tx*p.lead,p.y+p.ny*p.width*offset+end*p.ty*p.lead] as const;
  };
+ const band=(left:number,right:number,gray:number)=>{
+  ctx.fillStyle='rgb('+gray+' '+gray+' '+gray+')';
+  ctx.beginPath();ctx.moveTo(...at(-1,left));
+  for(let j=0;j<=rails.length;j++)ctx.lineTo(...at(j,left));
+  for(let j=rails.length;j>=-1;j--)ctx.lineTo(...at(j,right));
+  ctx.closePath();ctx.fill();
+ };
+ if(sculpted){
+  // Sweep the rounded paint body first, then deposit bristle ridges on top.
+  const rounded=s.oilTip!=='bristle'&&s.oilTip!=='flat';
+  const shoulders=rounded?[.96,.89,.80,.68,.49]:[.98,.94,.89,.83,.73];
+  for(let i=0;i<shoulders.length;i++){
+   const half=shoulders[i],offset=.015*i;
+   band(offset-half,offset+half,Math.round(base*(.59+i*.16)));
+  }
+  ctx.globalCompositeOperation='lighter';
+  for(let i=0;i<count;i++){
+   const center=(i+.5)*2/count-1+Math.sin(i*6.17)*.32/count;
+   const width=(.54+.31*Math.sin(i*1.91)**2)/count;
+   const deposit=Math.round(113*depth*(.26+.74*Math.sin(i*2.32+.4)**2));
+   band(center-width,center+width,Math.round(deposit*.53));
+   band(center-width*.35,center+width*.62,Math.round(deposit*.47));
+  }
+  ctx.globalCompositeOperation='source-over';
+  return c;
+ }
  for(let i=0;i<count;i++){
   const center=(i+.5)*2/count-1+(Math.sin(i*6.17)*.28)/count;
   const width=(.35+.24*Math.sin(i*1.91)**2)/count;
@@ -78,14 +105,14 @@ function bristleHeight(s:Stroke,dabs:StampDab[],box:RasterRegion){
  return c;
 }
 
-type Light={x:number;y:number;weave:number;jitter:number;offsetX:number;offsetY:number};
+type Light={x:number;y:number;weave:number;jitter:number;offsetX:number;offsetY:number;sculpted:boolean};
 const gpuVertex='#version 300 es\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0.,1.);}';
 const gpuFragment=`#version 300 es
 precision highp float;
 uniform sampler2D heights;
 uniform vec2 direction, origin;
 uniform vec3 pigment;
-uniform float weave,jitter;
+uniform float weave,jitter,sculpted;
 out vec4 outColor;
 float h(ivec2 p){return texelFetch(heights,clamp(p,ivec2(0),textureSize(heights,0)-1),0).r;}
 void main(){
@@ -94,9 +121,17 @@ void main(){
  vec2 q=vec2(p)+origin;
  float grain=weave*sin(q.x*1.57)*sin(q.y*1.57)*.033;
  float light=clamp(-slope+grain+(h(p)-.48)*jitter,-.44,.36);
- outColor=vec4(light>=0.?pigment+(1.-pigment)*light:pigment*(1.+light),1.);
+ if(sculpted>.5){
+  float shoulder=dot(vec2(h(p+ivec2(3,0))-h(p-ivec2(3,0)),h(p+ivec2(0,3))-h(p-ivec2(0,3))),direction);
+  float diffuse=clamp(-slope*.52-shoulder*.74+grain,-.40,.20);
+  float sheen=clamp(max(0.,-shoulder-.065)*1.3+max(0.,-slope-.15)*.40,0.,.26);
+  vec3 colour=pigment*(1.+diffuse+(h(p)-.43)*jitter);
+  outColor=vec4(colour+(1.-colour)*sheen,1.);
+ }else{
+  outColor=vec4(light>=0.?pigment+(1.-pigment)*light:pigment*(1.+light),1.);
+ }
 }`;
-let gpu:{canvas:HTMLCanvasElement;gl:WebGL2RenderingContext;program:WebGLProgram;texture:WebGLTexture;maxSize:number;direction:WebGLUniformLocation|null;origin:WebGLUniformLocation|null;pigment:WebGLUniformLocation|null;weave:WebGLUniformLocation|null;jitter:WebGLUniformLocation|null}|undefined;
+let gpu:{canvas:HTMLCanvasElement;gl:WebGL2RenderingContext;program:WebGLProgram;texture:WebGLTexture;maxSize:number;direction:WebGLUniformLocation|null;origin:WebGLUniformLocation|null;pigment:WebGLUniformLocation|null;weave:WebGLUniformLocation|null;jitter:WebGLUniformLocation|null;sculpted:WebGLUniformLocation|null}|undefined;
 let gpuUnavailable=false;
 function gpuLight(source:HTMLCanvasElement,rgb:number[],light:Light){
  if(gpuUnavailable)return;
@@ -119,7 +154,7 @@ function gpuLight(source:HTMLCanvasElement,rgb:number[],light:Light){
    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
       gpu={canvas,gl,program,texture,maxSize:gl.getParameter(gl.MAX_TEXTURE_SIZE),
     direction:gl.getUniformLocation(program,'direction'),origin:gl.getUniformLocation(program,'origin'),
-    pigment:gl.getUniformLocation(program,'pigment'),weave:gl.getUniformLocation(program,'weave'),jitter:gl.getUniformLocation(program,'jitter')};
+    pigment:gl.getUniformLocation(program,'pigment'),weave:gl.getUniformLocation(program,'weave'),jitter:gl.getUniformLocation(program,'jitter'),sculpted:gl.getUniformLocation(program,'sculpted')};
   }
   const {canvas,gl,program,texture}=gpu;
   if(source.width>gpu.maxSize||source.height>gpu.maxSize)return;
@@ -133,7 +168,8 @@ function gpuLight(source:HTMLCanvasElement,rgb:number[],light:Light){
   gl.uniform3f(gpu.pigment,rgb[0]/255,rgb[1]/255,rgb[2]/255);
   gl.uniform1f(gpu.weave,light.weave);
   gl.uniform1f(gpu.jitter,light.jitter);
-  gl.drawArrays(gl.TRIANGLES,0,3);
+  gl.uniform1f(gpu.sculpted,Number(light.sculpted));
+ gl.drawArrays(gl.TRIANGLES,0,3);
   if(gl.isContextLost()||gl.getError()!==gl.NO_ERROR)return;
   return canvas;
  }catch{gpuUnavailable=true;}
@@ -145,12 +181,24 @@ function cpuLight(source:HTMLCanvasElement,rgb:number[],light:Light){
  const grainX=light.weave?Array.from({length:w},(_,x)=>Math.sin((x+light.offsetX)*1.57)*.033):undefined;
  for(let y=0;y<h;y++){
   const row=y*w,up=Math.max(0,y-1)*w,down=Math.min(h-1,y+1)*w;
+  const farUp=Math.max(0,y-3)*w,farDown=Math.min(h-1,y+3)*w;
   const grainY=grainX?Math.sin((y+light.offsetY)*1.57):0;
   for(let x=0;x<w;x++){
    const dx=data[4*(row+Math.min(w-1,x+1))]-data[4*(row+Math.max(0,x-1))];
    const dy=data[4*(down+x)]-data[4*(up+x)];
-   const shade=Math.max(-.44,Math.min(.36,-(dx*light.x+dy*light.y)/255+(grainX?grainX[x]*grainY:0)+(data[4*(row+x)]/255-.48)*light.jitter));
    const k=4*(row+x);
+   if(light.sculpted){
+    const farDx=data[4*(row+Math.min(w-1,x+3))]-data[4*(row+Math.max(0,x-3))];
+    const farDy=data[4*(farDown+x)]-data[4*(farUp+x)];
+    const slope=(dx*light.x+dy*light.y)/255,shoulder=(farDx*light.x+farDy*light.y)/255;
+    const diffuse=Math.max(-.40,Math.min(.20,-slope*.52-shoulder*.74+(grainX?grainX[x]*grainY:0)));
+    const sheen=Math.min(.26,Math.max(0,-shoulder-.065)*1.3+Math.max(0,-slope-.15)*.40);
+    const tint=1+diffuse+(data[k]/255-.43)*light.jitter;
+    for(let i=0;i<3;i++){const value=rgb[i]*tint;out[k+i]=value+(255-value)*sheen;}
+    out[k+3]=255;
+    continue;
+   }
+   const shade=Math.max(-.44,Math.min(.36,-(dx*light.x+dy*light.y)/255+(grainX?grainX[x]*grainY:0)+(data[4*(row+x)]/255-.48)*light.jitter));
    for(let i=0;i<3;i++)out[k+i]=shade>=0?rgb[i]+(255-rgb[i])*shade:rgb[i]*(1+shade);
    out[k+3]=255;
   }
@@ -161,8 +209,8 @@ function cpuLight(source:HTMLCanvasElement,rgb:number[],light:Light){
 
 export function shadeImpasto(mask:CanvasRenderingContext2D,s:Stroke,dabs:StampDab[],box:RasterRegion,heightOnly=false){
  const c=bristleHeight(s,dabs,box),angle=(s.oilLight??-135)*Math.PI/180;
- const gain=s.impastoVersion===3?1.44:1;
- const light={x:Math.cos(angle)*gain,y:Math.sin(angle)*gain,weave:s.oilCanvas?1:0,jitter:(s.impastoVersion??0)>=2?s.oilJitter??.065:0,offsetX:box.x,offsetY:box.y};
+ const sculpted=s.impastoVersion===4,gain=sculpted?1.72:s.impastoVersion===3?1.44:1;
+ const light={x:Math.cos(angle)*gain,y:Math.sin(angle)*gain,weave:s.oilCanvas?1:0,jitter:(s.impastoVersion??0)>=2?s.oilJitter??.065:0,offsetX:box.x,offsetY:box.y,sculpted};
  const color=parseInt(s.color.slice(1),16),rgb=[color>>16&255,color>>8&255,color&255];
  const colorLayer=heightOnly?c:typeof window!=='undefined'?gpuLight(c,rgb,light)??cpuLight(c,rgb,light):cpuLight(c,rgb,light);
  mask.globalCompositeOperation='source-in';mask.drawImage(colorLayer,0,0);mask.globalCompositeOperation='source-over';

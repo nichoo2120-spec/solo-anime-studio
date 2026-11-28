@@ -146,7 +146,7 @@ export function validateProject(value:unknown):Project {
     if(o.pigmentPooling!==undefined&&!bounded(o.pigmentPooling,0,1))throw Error('Invalid pigment pooling.');
     if(o.mixStops!==undefined&&(!Array.isArray(o.mixStops)||o.mixStops.length>200000||!o.mixStops.every((v:any)=>v&&bounded(v.x,-1e6,1e6)&&bounded(v.y,-1e6,1e6)&&/^#[\da-f]{6}$/i.test(v.color))))throw Error('Invalid pigment samples.');
     if(o.impastoVersion!==undefined){
-     if((o.impastoVersion!==1&&o.impastoVersion!==2&&o.impastoVersion!==3)||o.impastoVersion>=2&&!bounded(o.oilJitter,0,1)||o.stampVersion!==1||!oilTips.includes(o.oilTip)||
+     if((o.impastoVersion!==1&&o.impastoVersion!==2&&o.impastoVersion!==3&&o.impastoVersion!==4)||o.impastoVersion>=2&&!bounded(o.oilJitter,0,1)||o.stampVersion!==1||!oilTips.includes(o.oilTip)||
         !bounded(o.oilDepth,0,1)||!bounded(o.oilLight,-180,180)||!bounded(o.oilBristles,0,1)||
         !bounded(o.oilSoftness,0,1)||!bounded(o.oilPickup,0,1)||typeof o.oilCanvas!=='boolean')throw Error('Invalid impasto material.');
     }
