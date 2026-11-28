@@ -43,7 +43,7 @@ export function drawStroke(ctx:CanvasRenderingContext2D,s:Stroke,phase:'live'|'f
   drawStroke(ctx,{...s,id:s.rasterSourceId??s.id,perspective:undefined,transform:undefined,points:warped.points},phase,warped);return;
  }
  // v0.5.241 Tip shape / Dual Brush strokes use the stamp engine only.
- if(s.brushBlendVersion!==10&&s.watercolorBlendVersion===1&&s.bbWetness!==0&&s.pressure&&!s.transform){
+ if((s.brushBlendVersion??0)<10&&s.watercolorBlendVersion===1&&s.bbWetness!==0&&s.pressure&&!s.transform){
   // Lift the light end of the response while keeping each authored pressure channel.
   s={...s,response:Math.max(.1,(s.response??1)*.45)};
  }

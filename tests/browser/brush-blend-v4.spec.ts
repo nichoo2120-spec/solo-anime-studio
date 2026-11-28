@@ -229,8 +229,8 @@ test('pen-down captures Blend settings independently of ordinary Paint pressure'
   ]);
  });
  expect(result).toEqual([
-  [10,1,false,'linear',true,true,true,.1],
-  [10,1.6,true,'firm',true,true,true,.1],
+  [11,1,false,'linear',true,true,true,.1],
+  [11,1.6,true,'firm',true,true,true,.1],
   [null,null,null,null,true,true,true,.1],
  ]);
 });
@@ -371,7 +371,7 @@ test('Silk fallback previews update and its watercolor strokes undo and redo byt
   return {version:operation.brushBlendVersion,style:operation.bbMode,otherVersion:operation.silkBlendVersion??null,mix:operation.nativeMixVersion??null,
    liveChanged,changed:diff(before,after),undo:diff(before,undone),redo:diff(after,redone)};
  });
- expect(result).toMatchObject({version:10,style:'smudge',otherVersion:null,mix:null,undo:0,redo:0});
+ expect(result).toMatchObject({version:11,style:'smudge',otherVersion:null,mix:null,undo:0,redo:0});
  expect(result.changed).toBeGreaterThan(100);
  expect(result.liveChanged).toBeGreaterThan(100);
 });

@@ -52,7 +52,7 @@ export class LiveBlendWorker{
   if(!this.job||this.job.id!==s.id||this.job.source!==source||this.job.signature!==signature||this.job.ownershipBase!==ownershipBase){
    this.cancel(true);const token=++this.token,j:Job={token,id:s.id,ownershipBase,source,signature,ready:false,inFlight:false,pointCount:0};this.job=j;
    if(this.surfaceReadback!==nativeDelta){this.surface=canvas(1,1);this.surfaceReadback=nativeDelta;}
-   if(s.brushBlendVersion===10&&!nativeDelta&&!s.nativeMixVersion){
+   if((s.brushBlendVersion??0)>=10&&!nativeDelta&&!s.nativeMixVersion){
     this.mixerPreview=new MixerPreview(source);
     return this.paintMixer(s,source);
    }

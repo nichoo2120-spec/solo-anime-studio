@@ -1,3 +1,5 @@
+import {gpuField,markCpuMixer,preference} from './gpuMixer';
+import {blendTiming} from './blendTiming';
 import {compositePaintStroke,strokeRasterBounds} from './paintCompositing';
 import {mixerField} from './mixerReservoir';
 import {dryRasterPadding} from '../core/dryBrush';
@@ -201,7 +203,7 @@ export function characterBlendReadReach(s:Stroke,transformScale:number){
 
 function sharedTipRadius(s:Stroke,scale:number){
  if(s.dryBristleVersion)return Math.ceil(dryRasterPadding(s)*scale+2);
- if(s.brushBlendVersion===10&&!s.stampVersion&&(s.watercolorEngine===1||s.coloringEngine===1))return Math.ceil((s.size*.76+5)*scale+2);
+ if((s.brushBlendVersion??0)>=10&&!s.stampVersion&&(s.watercolorEngine===1||s.coloringEngine===1))return Math.ceil((s.size*.76+5)*scale+2);
  const extent=s.stampVersion===1?stampExtent(s):s.paintTipVersion===2?.76:1.5;
  return Math.ceil(s.size*scale*extent+8);
 }
@@ -210,6 +212,7 @@ function sharedReach(s:Stroke,scale:number){
 }
 
 let sharedMask:HTMLCanvasElement|undefined, sharedSource:HTMLCanvasElement|undefined;
+let gpuSource:HTMLCanvasElement|undefined;
 let sharedColor:HTMLCanvasElement|undefined, sharedBlur:HTMLCanvasElement|undefined;
 
 /** Coverage comes entirely from the ordinary Paint raster. The field stores
@@ -223,11 +226,14 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
  const w=Math.min(ctx.canvas.width,Math.ceil(right+pad))-x,h=Math.min(ctx.canvas.height,Math.ceil(bottom+pad))-y;
  if(w<=0||h<=0){restoreRegion(ctx,read,previous);return previous;}
  const sigma=blur>0?Math.max(.5,(kernel||size*(.035+.08*wet))*(.6+.8*(s.bbSoftness??.5))):0;
- const pitch=s.brushBlendVersion===10?Math.max(1,Math.floor(size/20)):s.brushBlendVersion===9?Math.max(1,Math.min(10,Math.floor(size/32))):size>200?4:size>64?2:1,halo=Math.ceil(3*sigma+size*.65+2);
+ const pitch=(s.brushBlendVersion??0)>=10?Math.max(1,Math.floor(size/20)):s.brushBlendVersion===9?Math.max(1,Math.min(10,Math.floor(size/32))):size>200?4:size>64?2:1,halo=Math.ceil(3*sigma+size*.65+2);
  const gx=Math.floor((x-halo)/pitch)*pitch,gy=Math.floor((y-halo)/pitch)*pitch;
  const cw=Math.ceil((x+w+halo-gx)/pitch),ch=Math.ceil((y+h+halo-gy)/pitch);
+ const pickupStart=blendTiming.start();
  const source=sample?sampleCanvas(sample):read.canvas;
- const input=buffer(sharedSource??=make(),cw,ch,true);
+ const accelerated=s.brushBlendVersion===11&&typeof window!=='undefined'&&preference()!=='CPU';
+ const sourceGrid=accelerated?(gpuSource??=make()):(sharedSource??=make());
+ const input=buffer(sourceGrid,cw,ch,!accelerated);
  drawCrop(input,source,sample?.x??0,sample?.y??0,gx,gy,cw,ch,pitch);
  // Extend document-edge samples into the filter halo. A uniform opaque
  // page stays opaque even when a large kernel crosses the canvas boundary.
@@ -235,18 +241,26 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
   const vertical=axis==='y';
   for(const [from,to,count] of [[start,0,start],[end-1,end,limit-end]]){
    if(count<=0||from<0||from>=limit)continue;
-   if(vertical)input.drawImage(sharedSource!,0,from,cw,1,0,to,cw,count);
-   else input.drawImage(sharedSource!,from,0,1,ch,to,0,count,ch);
+   if(vertical)input.drawImage(sourceGrid,0,from,cw,1,0,to,cw,count);
+   else input.drawImage(sourceGrid,from,0,1,ch,to,0,count,ch);
   }
  };
  if(blur>0){
   extend('x',Math.max(0,Math.ceil(-gx/pitch)),Math.min(cw,Math.ceil((ctx.canvas.width-gx)/pitch)),cw);
   extend('y',Math.max(0,Math.ceil(-gy/pitch)),Math.min(ch,Math.ceil((ctx.canvas.height-gy)/pitch)),ch);
  }
- const color=buffer(sharedColor??=make(),cw,ch,true);
+ blendTiming.end('pickup',pickupStart);
+ const mixStart=blendTiming.start();
+ let pigment=sharedColor??=make();
+ const color=buffer(pigment,cw,ch,true);
  if((s.brushBlendVersion??0)>=9&&blur<1){
-  const inputPixels=input.getImageData(0,0,cw,ch);
-  color.putImageData(mixerField(color,inputPixels,s,points,gx,gy,pitch,pad,carry),0,0);
+  const gpu=gpuField(sourceGrid,s,points,gx,gy,pitch,pad,cw,ch,carry);
+  if(gpu&&blur===0)pigment=gpu;
+  else if(gpu)color.drawImage(gpu,0,0);
+  else{
+   const inputPixels=input.getImageData(0,0,cw,ch);
+   color.putImageData(mixerField(color,inputPixels,s,points,gx,gy,pitch,pad,carry),0,0);
+  }
  }else if(blur<1){
   const coverage=buffer(sharedMask??=make(),cw,ch,true);
   drawCrop(coverage,mask,maskX,maskY,gx,gy,cw,ch,pitch);
@@ -327,12 +341,15 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
  if(blur>0){
   const filtered=buffer(sharedBlur??=make(),cw,ch);
   filtered.save();filtered.filter='blur('+sigma/pitch+'px)';
-  filtered.drawImage(sharedSource,0,0,cw,ch,0,0,cw,ch);filtered.restore();
+  filtered.drawImage(sourceGrid,0,0,cw,ch,0,0,cw,ch);filtered.restore();
   color.globalAlpha=blur;color.drawImage(sharedBlur,0,0,cw,ch,0,0,cw,ch);color.globalAlpha=1;
  }
+ blendTiming.end('mix',mixStart);
+ const compositeStart=blendTiming.start();
+ if(s.brushBlendVersion===11&&blur>=1)markCpuMixer('Canvas blur');
  const target=buffer(patch??=make(),w,h);
  if(s.watercolorBlendVersion===1)target.imageSmoothingQuality='high';
- target.drawImage(sharedColor,0,0,cw,ch,gx-x,gy-y,cw*pitch,ch*pitch);
+ target.drawImage(pigment,0,0,cw,ch,gx-x,gy-y,cw*pitch,ch*pitch);
  target.globalCompositeOperation='destination-in';
  if(!drawCrop(target,mask,maskX,maskY,x,y,w,h))target.clearRect(0,0,w,h);
  target.globalCompositeOperation='source-over';
@@ -342,12 +359,13 @@ function renderPaintMasked(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Po
  restoreRegion(ctx,read,dirty);
  ctx.save();ctx.globalAlpha=clamp(s.opacity*(s.bbAmount??1)*(s.bbStrength??1)*((s.brushBlendVersion??0)>=9?1:Math.min(1,(s.bbFlow??.6)/.6)));
  ctx.globalCompositeOperation=s.bbProtectAlpha?'source-atop':'source-over';
- ctx.drawImage(patch,0,0,w,h,x,y,w,h);ctx.restore();return dirty;
+ ctx.drawImage(patch,0,0,w,h,x,y,w,h);ctx.restore();blendTiming.end('composite',compositeStart);return dirty;
 }
 
 export function renderCharacterBlend(ctx:Ctx,mask:CanvasSource,s:Stroke,points:readonly Point[],
  maskX:number,maskY:number,read:Ctx=ctx,previous?:RasterRegion,sample?:BlendSnapshot,carry?:Float32Array,transformScale=1):RasterRegion|undefined{
  if((s.brushBlendVersion??0)>=9&&s.bbWetness===0){
+  if(s.brushBlendVersion===11)markCpuMixer('dry Paint');
   const box=strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height);
   restoreRegion(ctx,read,previous);restoreRegion(ctx,read,box);
   compositePaintStroke(ctx,mask as HTMLCanvasElement,{...s,brushBlendVersion:undefined},maskX,maskY);

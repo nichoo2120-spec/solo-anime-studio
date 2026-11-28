@@ -1,3 +1,5 @@
+import {createHash} from 'node:crypto';
+import replayHashes from './fixtures/silk-v238-replay-hashes.json';
 import {describe,it,expect} from 'vitest';
 import {stockPresets,newBrushLibrary,restoreBrushLibrary,updatePreset,activePreset} from '../src/core/brushes';
 import {brushStrokeMetadata} from '../src/core/paintTips';
@@ -44,10 +46,11 @@ const v1=(mode:SilkMode,points:Point[],patch:Partial<Stroke>={})=>({...stroke(mo
 describe('Silk Blend v0.5.239 watercolor Wet',()=>{
  it('new strokes are version 2; saved version 1 strokes render byte-identically to v0.5.238 in every mode',()=>{
   expect(stroke('wet',line(100,300,100)).silkBlendVersion).toBe(2);
-  for(const mode of ['soft','wet','smudge','dry'] as SilkMode[])for(const kind of ['split','edge','stripes'] as const)for(const pts of [line(80,340,100),curve()]){
-   for(const patch of [{},{silkWetness:.9,silkTexture:.5,size:110},{silkStrength:1,silkPickup:.2,size:24,pressure:false}] as Partial<Stroke>[]){
-    const a=scene(kind),b=scene(kind);renderSilkStroke(a.ctx,v1(mode,pts,patch));renderV238(b.ctx,v1(mode,pts,patch));
-    expect(hash(a.data),mode+' '+kind).toBe(hash(b.data));
+  for(const mode of ['soft','wet','smudge','dry'] as SilkMode[])for(const kind of ['split','edge','stripes'] as const)for(const [pathIndex,pts] of [line(80,340,100),curve()].entries()){
+   for(const [settingsIndex,patch] of [{},{silkWetness:.9,silkTexture:.5,size:110},{silkStrength:1,silkPickup:.2,size:24,pressure:false}].entries()){
+    const a=scene(kind);renderSilkStroke(a.ctx,v1(mode,pts,patch));
+    const fixture=[mode,kind,pathIndex,settingsIndex].join('/') as keyof typeof replayHashes;
+    expect(createHash('sha256').update(a.data).digest('hex'),fixture).toBe(replayHashes[fixture]);
    }
   }
  });

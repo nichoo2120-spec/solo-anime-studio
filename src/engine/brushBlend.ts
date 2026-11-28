@@ -1,3 +1,4 @@
+import {blendTiming} from './blendTiming';
 import {renderCharacterBlend} from './characterBlend';
 import type {DabBounds} from './blendDabBatch';
 /** v0.5.240 Blend mode for every paint brush.
@@ -282,7 +283,10 @@ const union=(a:RasterRegion|undefined,b:RasterRegion|undefined)=>{if(!a)return b
  * holds the brush's own final stroke raster at (maskX, maskY). */
 export function renderBrushBlend(ctx:Ctx,mask:Readable,s:Stroke,maskX=0,maskY=0,read?:Ctx,previous?:RasterRegion):RasterRegion|undefined{
  if(s.opacity<=0||!s.points.length)return undefined;
- if(((s.brushBlendVersion??0)>=7))return renderCharacterBlend(ctx,mask as HTMLCanvasElement,s,blendPath(s),maskX,maskY,read,previous,blendSampleFor(s),decodeCarry(s.bbCarry),blendTransformScale(s));
+ if((s.brushBlendVersion??0)>=7){
+  const start=blendTiming.start(),points=blendPath(s);blendTiming.end('dabs',start);
+  return renderCharacterBlend(ctx,mask as HTMLCanvasElement,s,points,maskX,maskY,read,previous,blendSampleFor(s),decodeCarry(s.bbCarry),blendTransformScale(s));
+ }
  const W=ctx.canvas.width,H=ctx.canvas.height,reader=new MaskReader(mask.getContext('2d') as Ctx,maskX,maskY,W,H,s.blendRasterVersion===2);
  const g=gestureFor(s,W,H,read??ctx,reader);g.advance(blendPath(s));return g.flush(ctx,true,previous);
 }

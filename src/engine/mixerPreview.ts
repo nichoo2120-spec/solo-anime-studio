@@ -1,3 +1,4 @@
+import {blendTiming} from './blendTiming';
 import type {Stroke} from '../core/model';
 import {renderBrushBlend} from './brushBlend';
 import {strokeRasterBounds} from './paintCompositing';
@@ -30,9 +31,12 @@ export class MixerPreview {
  paint(s:Stroke,source:HTMLCanvasElement){
   const path=JSON.stringify(s.points);
   if(path===this.path)return this.surface;
+  blendTiming.begin(s.points.length,s.size);
+  const start=blendTiming.start();
   const mask=this.mask.getContext('2d')!;
   mask.clearRect(0,0,this.mask.width,this.mask.height);
   drawStroke(mask,s);
+  blendTiming.end('mask',start);
   this.region=renderBrushBlend(this.surface.getContext('2d')!,this.mask,s,0,0,
    source.getContext('2d')!,this.region);
   this.revision++;

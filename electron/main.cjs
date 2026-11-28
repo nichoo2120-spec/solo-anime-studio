@@ -101,6 +101,7 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
   app.whenReady().then(() => {
+    app.getGPUInfo('basic').then(info=>console.info('Studio GPU',info.gpuDevice,app.getGPUFeatureStatus())).catch(e=>console.warn('GPU information unavailable',e.message));
     registerAppProtocol();
     session.defaultSession.on('will-download', (_e, item) => { if (process.env.SAS_DOWNLOAD_DIR) item.setSavePath(path.join(process.env.SAS_DOWNLOAD_DIR, item.getFilename())); });
     session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(['clipboard-read', 'clipboard-sanitized-write', 'fullscreen', 'persistent-storage', 'pointerLock'].includes(perm)));

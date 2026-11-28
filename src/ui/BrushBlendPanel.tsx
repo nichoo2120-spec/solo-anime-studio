@@ -1,6 +1,7 @@
+import {blendStatus,preference,selectEngine,type BlendEngine} from '../engine/gpuMixer';
 import {mixerPresets,mixerRecipe} from '../core/mixerBrush';
 import {BrushSettingAction,BrushSettingInput,BrushSettingSelect} from './BrushQuickSettings';
-import {memo,useEffect,useRef} from 'react';
+import {memo,useEffect,useRef,useState} from 'react';
 import {ExactRange} from './ExactRange';
 import {blendDefaultsFor,blendModes,blendPresets,brushBlendSettingsFor,blendPressureCurves,prepareBlendMaskPressure,blendRenderStyles,blendStrengthPresets,canBrushBlend,isBlendMode,isBlendSample,blendStyleFor,blendStyleNames,type BlendPressureCurve,type BlendRenderStyle,type BlendMode,type BlendStyle} from '../core/brushBlend';
 import {brushStrokeMetadata} from '../core/paintTips';
@@ -22,6 +23,12 @@ export const BrushBlendToggle=memo(function BrushBlendToggle({settings:s,patch,s
   <button type="button" aria-pressed={on} className={on?'active':''} title={'Blend: the brush blends the colours already there, using its own tip and texture'+key} onClick={()=>patch({bbEnabled:true})}>Blend</button>
  </div>;
 });
+function EngineChoice(){
+ const [selected,setSelected]=useState(preference);
+ const [active,setActive]=useState(()=>({...blendStatus()}));
+ useEffect(()=>{const update=()=>setActive({...blendStatus()});window.addEventListener('solo-blend-status',update);return ()=>window.removeEventListener('solo-blend-status',update);},[]);
+ return <label>Blend engine <select value={selected} onChange={e=>{const v=e.target.value as BlendEngine;selectEngine(v);setSelected(v);}}>{['Auto','GPU','CPU'].map(v=><option key={v}>{v}</option>)}</select> <small title={active.detail||active.adapter}>Active: {active.active}</small></label>;
+}
 const pct=(v:number|undefined,fallback:number)=>Math.round((v??fallback)*100);
 function BlendPreview({settings:s}:{settings:BrushSettings}){
  const ref=useRef<HTMLCanvasElement>(null);
@@ -77,6 +84,7 @@ export const BrushBlendSettingsPanel=memo(function BrushBlendSettingsPanel({sett
  const copyFromSilk=()=>patch({bbEnabled:true,bbMode:isBlendMode(silkSettings?.silkMode)?silkSettings.silkMode:familyDefaults.bbMode,bbAmount:silkSettings?.silkStrength??defaults.bbAmount,bbPickup:silkSettings?.silkPickup??defaults.bbPickup,bbWetness:silkSettings?.silkWetness??defaults.bbWetness,bbTextureKeep:silkSettings?.silkTexture??defaults.bbTextureKeep,bbSmoothing:silkSettings?.stabilization??defaults.bbSmoothing,bbEdgeDarkness:silkSettings?.edgeDarkness??0});
  const saveAs=()=>{const name=window.prompt('Name this brush in My brushes',s.brushKind?`${s.brushKind} blend`: 'Custom blend brush')?.trim();if(name)onSaveAs?.(name.slice(0,60));};
  return <div className="brush-blend-panel" role="group" aria-label="Blend settings">
+  <EngineChoice/>
   <BrushBlendToggle settings={s} patch={patch} shortcut={shortcut}/>
   {!s.bbEnabled?<p className="hint">Switch to Blend to adjust this brush’s blending. Its family look stays <strong>{blendStyleNames[style]}</strong>.</p>:<>
    <BlendPreview settings={s}/>
