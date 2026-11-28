@@ -112,6 +112,11 @@ export const BrushStudio=memo(function BrushStudio({library,eraser,onChange,noti
   <Slider name="Light angle" min={-180} max={180} value={s.oilLight??-135} unit="°" set={oilLight=>patch({oilLight})}/>
   <Slider name="Bristle strength" value={Math.round((s.oilBristles??.75)*100)} unit="%" set={v=>patch({oilBristles:v/100})}/>
   <Slider name="Oil edge softness" value={Math.round((s.oilSoftness??.2)*100)} unit="%" set={v=>patch({oilSoftness:v/100})}/>
+  {s.impastoVersion===5&&<>
+   <label className="check-row"><span>Pressure → Paint load</span><BrushSettingInput type="checkbox" checked={s.oilPressureLoad!==false} onChange={e=>patch({oilPressureLoad:e.target.checked})}/></label>
+   <Slider name="Minimum paint load" value={Math.round((s.oilMinLoad??0)*100)} unit="%" set={v=>patch({oilMinLoad:Math.min(s.oilMaxLoad??1,v/100)})}/>
+   <Slider name="Maximum paint load" value={Math.round((s.oilMaxLoad??1)*100)} unit="%" set={v=>patch({oilMaxLoad:Math.max(s.oilMinLoad??0,v/100)})}/>
+  </>}
   <Slider name="Wet pickup" value={Math.round((s.oilPickup??.15)*100)} unit="%" set={v=>patch({oilPickup:v/100})}/>
   <Slider name="Bristle lightness jitter" value={Math.round((s.oilJitter??.065)*100)} unit="%" set={v=>patch({oilJitter:v/100})}/>
   <label className="check-row"><span>Canvas texture</span><BrushSettingInput type="checkbox" checked={!!s.oilCanvas} onChange={e=>patch({oilCanvas:e.target.checked})}/></label>

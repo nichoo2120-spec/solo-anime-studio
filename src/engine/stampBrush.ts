@@ -1,4 +1,5 @@
 import {oilNib,shadeImpasto} from './impasto';
+import {oilPaintLoad,oilUsesPressureLoad} from '../core/impasto';
 import {secondaryBitmapTip} from './bitmapTips';
 import type {BitmapMask} from '../core/bitmapBrush';
 /** v0.5.241 Stamp engine for Tip shape (stretch / squeeze) and Dual Brush.
@@ -29,7 +30,7 @@ const make=(w:number,h:number):Canvasish=>{const c=document.createElement('canva
 let surfaceA:Canvasish|undefined,surfaceB:Canvasish|undefined;
 const fit=(c:Canvasish|undefined,w:number,h:number)=>{if(!c)return make(w,h);if(c.width!==w)c.width=w;if(c.height!==h)c.height=h;return c;};
 
-export type StampDab={x:number;y:number;rx:number;ry:number;angle:number;level:number;index:number;pressure?:number};
+export type StampDab={x:number;y:number;rx:number;ry:number;angle:number;level:number;index:number;pressure?:number;paintLoad?:number;heading?:number};
 /** The largest half-extent of a stamp relative to the brush size (bounds padding). */
 export function stampExtent(s:Stroke){
  if(s.natureVersion===1)return natureExtent(s);
@@ -56,7 +57,8 @@ export function stampDabs(s:Stroke,samples:PaintSamples):StampDab[]{
  const spacing=Math.max(.02,Math.min(.5,s.tipSpacing??.1)),sx=(s.tsScaleX??1)*(s.tsFlipX?-1:1),sy=(s.tsScaleY??1)*(s.tsRoundness??1)*(s.tsFlipY?-1:1),base=(s.tsAngle??0)*Math.PI/180;
  const tailSpan=Math.min(samples.total*.38,s.size*(s.oilTip==='flat'?.48:.58));
  const tailPressure=samples.points.at(-1)?.p??1;
- let segment=1,d=0,index=0;
+ const loadByPressure=oilUsesPressureLoad(s);
+ let segment=1,d=0,index=0,heading=0;
  const at=(dist:number)=>{
   while(segment<samples.points.length-1&&samples.arc[segment]<dist)segment++;
   const a=samples.points[Math.max(0,segment-1)]??samples.points[0],b=samples.points[segment]??a,start=samples.arc[segment-1]??0,span=(samples.arc[segment]??0)-start,t=span?clamp((dist-start)/span):0;
@@ -69,8 +71,8 @@ export function stampDabs(s:Stroke,samples:PaintSamples):StampDab[]{
    1-.78*(1-clamp(tailPressure))*(1-clamp((samples.total-dist)/tailSpan)**.65):1;
   const radius=Math.max(.35,s.size*.5*width*tipTail*taperFactor(dist,samples.total,s.taperStart,s.taperEnd,Math.max(64,s.size*12)));
   let angle=base,rx=radius*Math.abs(sx),ry=radius*Math.abs(sy);
-  // Follow: the tip's width lies across the line, like a real flat brush.
-    if(s.tsFollow&&samples.points.length>1){
+  // Keep the direction available for pigment transport even if tip rotation is disabled.
+  if((s.tsFollow||loadByPressure)&&samples.points.length>1){
    let start=segment-1,end=segment;
    if((s.impastoVersion??0)>=2){
     const span=s.size*.13;
@@ -78,11 +80,15 @@ export function stampDabs(s:Stroke,samples:PaintSamples):StampDab[]{
     while(end<samples.points.length-1&&samples.arc[end]-dist<span)end++;
    }
    const from=samples.points[start]??a,to=samples.points[end]??b;
-   angle+=Math.atan2(to.y-from.y,to.x-from.x)+Math.PI/2;
+   const dx=to.x-from.x,dy=to.y-from.y;
+   if(s.impastoVersion!==5||!s.pressure||dx*dx+dy*dy>.04)heading=Math.atan2(dy,dx);
+   if(s.tsFollow)angle+=heading+Math.PI/2;
   }
   if(s.tsTilt){const tilt=tiltAt(raw,cum,samples.total?dist/samples.total:0);if(tilt){angle+=tilt.az*Math.PI/180;const lean=1-clamp(tilt.alt/90);rx*=1+1.5*lean;}}
   const level=clamp((s.flow??1)*(s.pressure&&s.pressureFlow?pressure:1)*(s.pressure&&s.pressureOpacity?opacityResponse(pressure,s):1));
-  out.push({x:p.x,y:p.y,rx:rx*Math.sign(sx||1),ry:ry*Math.sign(sy||1),angle,level,pressure:(s.impastoVersion??0)>=2?pressure*tipTail:undefined,index:index++});return radius;
+  const dab={x:p.x,y:p.y,rx:rx*Math.sign(sx||1),ry:ry*Math.sign(sy||1),angle,level,pressure:(s.impastoVersion??0)>=2?pressure*tipTail:undefined,index:index++};
+  out.push(loadByPressure?{...dab,paintLoad:oilPaintLoad(s,pressure),heading}:dab);
+  return radius;
  };
  for(;;){const r=at(Math.min(d,samples.total));if(d>=samples.total)break;d+=Math.max(.4,2*r*Math.min(Math.abs(sx),Math.abs(sy),1)*spacing);}
  return out;
@@ -110,6 +116,48 @@ function stamp(ctx:CanvasRenderingContext2D,dabs:StampDab[],tip:Parameters<typeo
   ctx.setTransform(1,0,0,1,0,0);ctx.translate(d.x-ox,d.y-oy);ctx.rotate(d.angle);ctx.scale(d.rx*2,d.ry*2);ctx.globalAlpha=d.level;if(oil){ctx.drawImage(oilNib(oil,d.pressure),-.5,-.5,1,1);}else if(image){const w=image.width/max,h=image.height/max;ctx.drawImage(image,-w*.5,-h*.5,w,h);}else if(atlas){const p=natureTipPixels;ctx.drawImage(atlas,0,0,p,p,-.5,-.5,1,1);}else{const nib=paintingNib(tip,hardness,texture,d.index&3,0);ctx.drawImage(nib.canvas,nib.x,nib.y,nib.w,nib.h);}}
  ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;
 }
+// Normalize partial load by spacing so dense dabs do not turn low load opaque.
+function oilDabCoverage(load:number,spacing:number){
+ return load>=1?1:1-(1-load)**(2*Math.max(.02,Math.min(.5,spacing)));
+}
+let pickupMask:HTMLCanvasElement|undefined;
+export function drawOilPickup(ctx:CanvasRenderingContext2D,base:HTMLCanvasElement,s:Stroke,g:ReturnType<typeof strokeGeometry>,box:RasterRegion,baseX=0,baseY=0){
+ if(!s.stampTip||!box.width||!box.height)return;
+ const wet=s.oilPickup??.15;
+ if(!wet)return;
+ const {x,y,width,height}=box;
+ const canvas=pickupMask=fit(pickupMask,width,height),mask=canvas.getContext('2d')!;
+ const buckets:StampDab[][]=Array.from({length:8},()=>[]);
+ const dirs=Math.PI/4;
+ for(const d of stampPlan(s,g).dabs){
+  const transport=(1-(d.paintLoad??1))*(.43+.49*wet);
+  if(transport<=0)continue;
+  const direction=Math.round((d.heading??0)/dirs);
+  buckets[(direction+8)%8].push({...d,level:d.level*oilDabCoverage(transport,s.tipSpacing??.055)});
+ }
+ const travel=Math.max(1,Math.min(18,s.size*.22));
+ for(const [index,dabs] of buckets.entries()){
+  if(!dabs.length)continue;
+  mask.clearRect(0,0,width,height);
+  mask.save();
+  const m=s.transform;
+  const transformed=m?dabs.map(d=>{
+   const cx=Math.cos(d.angle),cy=Math.sin(d.angle);
+   return {...d,x:m[0]*d.x+m[2]*d.y+m[4],y:m[1]*d.x+m[3]*d.y+m[5],
+    angle:Math.atan2(m[1]*cx+m[3]*cy,m[0]*cx+m[2]*cy),
+    rx:d.rx*Math.hypot(m[0]*cx+m[2]*cy,m[1]*cx+m[3]*cy),
+    ry:d.ry*Math.hypot(-m[0]*cy+m[2]*cx,-m[1]*cy+m[3]*cx)};
+  }):dabs;
+  stamp(mask,transformed,s.stampTip,s.stampHardness??.7,s.stampTexture??0,x,y,undefined,undefined,s);
+  mask.restore();
+  const angle=index*dirs,dx=Math.cos(angle)*travel,dy=Math.sin(angle)*travel;
+  const offsetX=m?m[0]*dx+m[2]*dy:dx,offsetY=m?m[1]*dx+m[3]*dy:dy;
+  mask.globalCompositeOperation='source-in';
+  mask.drawImage(base,baseX-x+offsetX,baseY-y+offsetY);
+  mask.globalCompositeOperation='source-over';
+  ctx.drawImage(canvas,x,y);
+ }
+}
 const combine=(mode:DualMode,a:number,b:number,amount:number)=>{
  let r:number;
  switch(mode){
@@ -124,11 +172,27 @@ const combine=(mode:DualMode,a:number,b:number,amount:number)=>{
  return a+(r-a)*amount;
 };
 /** Bounds of a stamp stroke on a canvas. */
-export function stampBounds(s:Stroke,width:number,height:number,g:ReturnType<typeof strokeGeometry>):RasterRegion{
+export function stampBounds(s:Stroke,width:number,height:number,g:ReturnType<typeof strokeGeometry>,plan?:StampPlan):RasterRegion{
+ if(s.impastoVersion===5&&plan&&!s.dbTip&&!s.stampTexture)return oilDabBounds(s,plan.dabs,width,height);
  const pad=Math.ceil(s.size*stampExtent(s)+6);let l=Infinity,t=Infinity,r=-Infinity,b=-Infinity;
  for(const p of [...g.points,...g.cubics.flatMap(c=>[c.c1,c.c2])]){l=Math.min(l,p.x);t=Math.min(t,p.y);r=Math.max(r,p.x);b=Math.max(b,p.y);}
  if(!Number.isFinite(l))return {x:0,y:0,width:0,height:0};
  const x=Math.max(0,Math.floor(l-pad)),y=Math.max(0,Math.floor(t-pad));return {x,y,width:Math.max(0,Math.min(width,Math.ceil(r+pad))-x),height:Math.max(0,Math.min(height,Math.ceil(b+pad))-y)};
+}
+/** Actual oil nib extents, including the three-pixel lighting stencil. */
+function oilDabBounds(s:Stroke,dabs:StampDab[],width:number,height:number):RasterRegion{
+ const flat=s.oilTip==='bristle'||s.oilTip==='flat',pad=5;
+ let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
+ for(const d of dabs){
+  const cos=Math.cos(d.angle),sin=Math.sin(d.angle),x1=d.rx*cos,x2=d.ry*sin,y1=d.rx*sin,y2=d.ry*cos;
+  const rx=flat?Math.abs(x1)+Math.abs(x2):Math.hypot(x1,x2);
+  const ry=flat?Math.abs(y1)+Math.abs(y2):Math.hypot(y1,y2);
+  left=Math.min(left,d.x-rx-pad);top=Math.min(top,d.y-ry-pad);
+  right=Math.max(right,d.x+rx+pad);bottom=Math.max(bottom,d.y+ry+pad);
+ }
+ if(!dabs.length)return {x:0,y:0,width:0,height:0};
+ const x=Math.max(0,Math.floor(left)),y=Math.max(0,Math.floor(top));
+ return {x,y,width:Math.max(0,Math.min(width,Math.ceil(right))-x),height:Math.max(0,Math.min(height,Math.ceil(bottom))-y)};
 }
 /** Draw the whole stamp stroke (colour with coverage alpha) onto ctx. */
 export type StampPlan={samples:PaintSamples;dabs:StampDab[];dual:StampDab[]};
@@ -145,19 +209,20 @@ export function stampChange(before:StampDab[],after:StampDab[]):RasterRegion|und
  if(!Number.isFinite(l))return undefined;const x=Math.floor(l),y=Math.floor(t);return {x,y,width:Math.ceil(r)-x,height:Math.ceil(b)-y};
 }
 const touches=(d:StampDab,box:RasterRegion)=>{const e=dabReach(d);return d.x+e>=box.x&&d.x-e<=box.x+box.width&&d.y+e>=box.y&&d.y-e<=box.y+box.height;};
-export function drawStampStroke(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnType<typeof strokeGeometry>,clip?:RasterRegion,given?:StampPlan,heightOnly=false):RasterRegion|undefined{
+export function drawStampStroke(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnType<typeof strokeGeometry>,clip?:RasterRegion,given?:StampPlan,heightOnly=false,deposit=false):RasterRegion|undefined{
  // Work in document space; the context's transform is applied when drawing.
  if(s.natureVersion===1){drawNatureStroke(ctx,s,g,clip);return clip;}
  const m=ctx.getTransform(),inv=m.inverse(),corners=[[0,0],[ctx.canvas.width,0],[0,ctx.canvas.height],[ctx.canvas.width,ctx.canvas.height]].map(([x,y])=>({x:inv.a*x+inv.c*y+inv.e,y:inv.b*x+inv.d*y+inv.f}));
  const vl=Math.floor(Math.min(...corners.map(c=>c.x))),vt=Math.floor(Math.min(...corners.map(c=>c.y))),vr=Math.ceil(Math.max(...corners.map(c=>c.x))),vb=Math.ceil(Math.max(...corners.map(c=>c.y)));
- const full=stampBounds(s,1e7,1e7,g);let x0=Math.max(full.x,vl),y0=Math.max(full.y,vt),x1=Math.min(full.x+full.width,vr),y1=Math.min(full.y+full.height,vb);
+ const prepared=given??(s.impastoVersion===5?stampPlan(s,g):undefined);
+ const full=stampBounds(s,1e7,1e7,g,prepared);let x0=Math.max(full.x,vl),y0=Math.max(full.y,vt),x1=Math.min(full.x+full.width,vr),y1=Math.min(full.y+full.height,vb);
  // Live redraw of only the changed area: the result is per pixel the same as a full redraw.
  if(clip&&!s.impastoVersion){x0=Math.max(x0,clip.x);y0=Math.max(y0,clip.y);x1=Math.min(x1,clip.x+clip.width);y1=Math.min(y1,clip.y+clip.height);}
  const box={x:x0,y:y0,width:Math.max(0,x1-x0),height:Math.max(0,y1-y0)};
  if(!box.width||!box.height||!s.stampTip)return undefined;
- const plan=given??stampPlan(s,g),dabs=clip&&!s.impastoVersion?plan.dabs.filter(d=>touches(d,box)):plan.dabs,dual=clip&&!s.impastoVersion?plan.dual.filter(d=>touches(d,box)):plan.dual;
+ const plan=prepared??stampPlan(s,g),dabs=clip&&!s.impastoVersion?plan.dabs.filter(d=>touches(d,box)):plan.dabs,dual=clip&&!s.impastoVersion?plan.dual.filter(d=>touches(d,box)):plan.dual;
  const A=surfaceA=fit(surfaceA,box.width,box.height),ac=A.getContext('2d',{willReadFrequently:!!s.dbTip})!;ac.clearRect(0,0,box.width,box.height);
- stamp(ac,dabs,s.stampTip,s.stampHardness??.7,s.stampTexture??0,box.x,box.y,undefined,undefined,s.impastoVersion?s:undefined);
+ stamp(ac,(deposit||heightOnly)&&oilUsesPressureLoad(s)?dabs.map(d=>({...d,level:d.level*oilDabCoverage(d.paintLoad??1,s.tipSpacing??.055)})):dabs,s.stampTip,s.stampHardness??.7,s.stampTexture??0,box.x,box.y,undefined,undefined,s.impastoVersion?s:undefined);
  if(s.dbTip){
   const B=surfaceB=fit(surfaceB,box.width,box.height),bc=B.getContext('2d',{willReadFrequently:true})!;bc.clearRect(0,0,box.width,box.height);
   stamp(bc,dual,s.dbTip,s.dbHardness??.7,s.dbTexture??0,box.x,box.y,s.dbNatureTip,s.dbBitmap);

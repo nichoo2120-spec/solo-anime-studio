@@ -1,4 +1,5 @@
 import type {Stroke} from '../core/model';
+import type {ImpastoControls} from '../core/impasto';
 import type {StampDab} from './stampBrush';
 import type {RasterRegion} from './liveRaster';
 
@@ -10,10 +11,11 @@ let height:HTMLCanvasElement|undefined;
 let lit:HTMLCanvasElement|undefined;
 
 /** The normal Paint dab plan still supplies position, angle, pressure and taper. */
-export function oilNib(s:Stroke,pressure=1){
+export function oilNib(s:ImpastoControls,pressure=1){
  const rectangular=s.oilTip==='bristle'||s.oilTip==='flat';
  const softness=s.oilSoftness??.2,pickup=s.oilPickup??.08;
  const dry=(s.impastoVersion??0)>=2?1-Math.round(clamp(pressure)*8)/8:0;
+ const softer=s.impastoVersion===5?dry:0;
  const key=[s.impastoVersion,s.oilTip,softness,pickup,dry].join(':');
  const cached=tipCache.get(key);
  if(cached)return cached;
@@ -23,9 +25,9 @@ export function oilNib(s:Stroke,pressure=1){
   const u=Math.abs((x+.5)/64-1),v=Math.abs((y+.5)/64-1);
   const distance=rectangular?Math.max(u,v):Math.hypot(u,v);
   const bristle=(Math.sin(y*2.71)*.65+Math.sin(y*.67)*.35)*.025;
-    const edge=clamp((1-distance+bristle)/(.025+.13*softness));
+    const edge=clamp((1-distance+bristle)/(.025+.13*softness+softer*.065));
   const lane=(.5+.5*Math.sin(x*1.74+Math.sin(x*.35)*1.25))**2;
-  const thin=(s.impastoVersion??0)>=2?clamp((distance-.69)/.29)*(.22+.78*dry)*lane:0;
+  const thin=(s.impastoVersion??0)>=2?clamp((distance-.69+softer*.10)/(.29+softer*.10))*(.22+.78*dry)*lane:0;
   const k=(y*128+x)*4;
   pixels.data[k]=pixels.data[k+1]=pixels.data[k+2]=255;
   pixels.data[k+3]=Math.round(255*edge*(1-pickup*(1-edge))*(1-thin*.83));
@@ -45,7 +47,7 @@ function fit(c:HTMLCanvasElement,w:number,h:number){
  * Each lane has its own spacing and height. The nib mask clips the ends. */
 function bristleHeight(s:Stroke,dabs:StampDab[],box:RasterRegion){
  const c=height??=surface(),ctx=fit(c,box.width,box.height);
- const body=s.oilDepth??.65,base=Math.round(115*body),sculpted=s.impastoVersion===4;
+ const body=s.oilDepth??.65,base=Math.round(115*body),sculpted=(s.impastoVersion??0)>=4;
  const floor=sculpted?Math.round(base*.36):base;
  ctx.fillStyle='rgb('+floor+' '+floor+' '+floor+')';ctx.fillRect(0,0,box.width,box.height);
  const count=lanes[s.oilTip??'filbert'],relief=s.impastoVersion===3?1.52:s.impastoVersion===2?1.25:1,depth=body*(s.oilBristles??.75);
@@ -209,7 +211,7 @@ function cpuLight(source:HTMLCanvasElement,rgb:number[],light:Light){
 
 export function shadeImpasto(mask:CanvasRenderingContext2D,s:Stroke,dabs:StampDab[],box:RasterRegion,heightOnly=false){
  const c=bristleHeight(s,dabs,box),angle=(s.oilLight??-135)*Math.PI/180;
- const sculpted=s.impastoVersion===4,gain=sculpted?1.72:s.impastoVersion===3?1.44:1;
+ const sculpted=(s.impastoVersion??0)>=4,gain=sculpted?1.72:s.impastoVersion===3?1.44:1;
  const light={x:Math.cos(angle)*gain,y:Math.sin(angle)*gain,weave:s.oilCanvas?1:0,jitter:(s.impastoVersion??0)>=2?s.oilJitter??.065:0,offsetX:box.x,offsetY:box.y,sculpted};
  const color=parseInt(s.color.slice(1),16),rgb=[color>>16&255,color>>8&255,color&255];
  const colorLayer=heightOnly?c:typeof window!=='undefined'?gpuLight(c,rgb,light)??cpuLight(c,rgb,light):cpuLight(c,rgb,light);

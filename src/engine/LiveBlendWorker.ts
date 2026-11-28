@@ -73,7 +73,13 @@ export class LiveBlendWorker{
    const begin=(bitmap?:ImageBitmap)=>{if(this.job!==j){bitmap?.close();return;}this.worker!.postMessage({kind:'begin',token,width:source.width,height:source.height,base:bitmap,readFrequently:!cpuMixer&&!s.nativeMixVersion,nativeDelta,deltaPixels,deltaRegion:ownershipBase?.region,seeded:!!ownershipBase?.seed,compactReplies:nativeDelta,blendSample:isBrushBlendVersion(s.brushBlendVersion)&&s.bbSample==='all'?this.blendSample:undefined},[...(bitmap?[bitmap]:[]),...(deltaPixels?[deltaPixels.buffer as ArrayBuffer]:[])]);j.ready=true;this.flush(j);};createImageBitmap(source).then(begin).catch(()=>this.fail());
   }
   if(this.mixerPreview)return this.paintMixer(s,source);
-  const j=this.job!;if(j.geometry!==geometry){j.geometry=geometry;j.queued={stroke:s,final:false};this.flush(j);}return this.surface;
+  this.submit(s,geometry);return this.surface;
+ }
+ /** Submit new input without repainting a frame that still has the same bitmap. */
+ submit(s:Stroke,geometry:unknown){
+  const j=this.job;
+  if(!j||j.id!==s.id||this.mixerPreview||j.geometry===geometry)return;
+  j.geometry=geometry;j.queued={stroke:s,final:false};this.flush(j);
  }
  private paintMixer(s:Stroke,source:HTMLCanvasElement){
   const mixer=this.mixerPreview!,revision=mixer.revision;

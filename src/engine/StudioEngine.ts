@@ -151,7 +151,12 @@ export class StudioEngine {
  // Comparing only the immediately previous event replays overlapping batches
  // backwards and makes fitted curves double back into hooks and slivers.
  private vectorStartPressure=.5;private vectorFirstPressureTime=Infinity;
- private rawMove=(event:Event)=>{const e=event as PointerEvent;if(this.pointerId===e.pointerId&&this.vectors.drawing)this.acceptVectorMovement(e);};
+ private rawMove=(event:Event)=>{
+  const e=event as PointerEvent;
+  if(this.pointerId!==e.pointerId)return;
+  if(this.vectors.drawing)this.acceptVectorMovement(e);
+  else if(this.stroke?.impastoVersion===5&&e.pointerType==='pen')this.move(e);
+ };
  private windowMove=(e:PointerEvent)=>{if(this.pointerId===e.pointerId&&this.vectors.drawing&&e.target!==this.canvas)this.acceptVectorMovement(e);};
  private acceptVectorMovement(e:PointerEvent){
   if(!this.vectors.drawing||e.pointerId!==this.pointerId)return;
@@ -245,6 +250,9 @@ export class StudioEngine {
   const rect={x,y,width:w,height:h};registerBlendSample(png,{data:img.data,...rect});
   return {...stroke,bbSamplePng:png,bbSampleRect:rect};
  }
+ private forgetOilPreview(){
+  this.previewStrokeId='';this.oilPreviewPoints=undefined;this.previewBase=undefined;this.previewBaseOperations=undefined;
+ }
  private finalizeStroke(stroke?:Stroke){
   this.finalLayerResult=undefined;this.finalBlendResult=undefined;if(!stroke)return undefined;
   const start=performance.now();
@@ -300,7 +308,7 @@ export class StudioEngine {
     this.finalLayerResult={stroke:snapshot,base,canvas:preview,bounds};
    }else this.renderer.rememberStrokeRaster(snapshot,this.scratch);
   }
-  if(this.strokeMirror&&snapshot.liveRefinementVersion!==3){const sc=this.scratch.getContext('2d')!;sc.clearRect(0,0,this.scratch.width,this.scratch.height);drawStroke(sc,snapshot,'final',geometry);this.renderer.rememberStrokeRaster(snapshot,this.scratch);}
+  if(this.strokeMirror&&snapshot.liveRefinementVersion!==3){const sc=this.scratch.getContext('2d')!;sc.clearRect(0,0,this.scratch.width,this.scratch.height);drawStroke(sc,snapshot,'final',geometry,false,!snapshot.brushBlendVersion);this.renderer.rememberStrokeRaster(snapshot,this.scratch);}
   const ms=performance.now()-start;this.performance.record('finalProcessingMs',ms);this.diagnostics.timing('finalProcessingMs',ms);return snapshot;
  }
  private displayInk(stroke:Stroke){return !stroke.transform&&displayCleanInk(stroke)&&!this.mirrorDrawing.enabled&&!this.selection.length&&!this.strokeIds.length;}
@@ -325,7 +333,7 @@ export class StudioEngine {
  private rasterCacheTimer?:ReturnType<typeof setTimeout>;
  private scheduleRasterCache(){if(this.rasterCacheTimer)clearTimeout(this.rasterCacheTimer);this.rasterCacheTimer=setTimeout(async()=>{this.rasterCacheTimer=undefined;if(this.disposed||this.drawing)return;const p=this.store.getSnapshot(),renderer=this.renderer;await renderer.whenSettled();if(!this.disposed&&!this.drawing&&this.store.getSnapshot()===p)void cacheProjectRasters(p,renderer);},3000);}
  private commitStroke(stroke:Stroke|undefined,target:typeof this.strokeTarget){const ready=this.finalLayerResult,async=this.finalBlendResult;this.finalLayerResult=undefined;this.finalBlendResult=undefined;if(!stroke||!target)return false;const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===target.layer);if(doc.id!==target.project||!layer||layer.locked||!layer.visible){this.notify('Stroke canceled because its target layer changed.');return false;}let next=appendOperation({...doc,activeLayerId:target.layer},stroke);if(this.strokeMirror){const other=strokeSnapshot(reflectedStroke(stroke,this.strokeMirror.matrix,this.strokeMirror.id)),c=makeCanvas(doc.width,doc.height),cc=c.getContext('2d')!;cc.transform(...this.strokeMirror.matrix);cc.drawImage(this.scratch,0,0);this.renderer.rememberStrokeRaster(other,c);c.width=c.height=0;next=appendOperation(next,other);}this.strokeMirror=undefined;this.store.commit({...next,activeLayerId:doc.activeLayerId});if(async?.stroke===stroke){const p=this.store.getSnapshot(),layer=p.layers.find(l=>l.id===target.layer);if(layer){async.setTarget?.(layer,p);this.inkDisplay.setPendingNativeLayer(layer,p);this.renderer.deferLayerResult(layer,p,stroke,async.base,async.preview,async.done,()=>this.request(),result=>{const current=this.store.getSnapshot();if(current.id===p.id&&current.animation?.activeFrameId!==p.animation?.activeFrameId){if(result){const overrides=new Map([[layer.id,result]]);this.onion.capture(p,this.renderer,overrides);this.flipbook.capture(p,this.renderer,overrides);}else if(p.animation){this.onion.refresh(p.animation.activeFrameId);this.flipbook.refresh(p.animation.activeFrameId);}}},async.canonicalBase);}}if(ready?.stroke===stroke){const p=this.store.getSnapshot(),layer=p.layers.find(l=>l.id===target.layer),old=layer&&this.renderer.adoptLayerResult(layer,p,stroke,ready.base,ready.canvas);if(old){this.previewSurface=old;this.previewRestore=ready.bounds&&layer?{base:ready.canvas,operations:layer.operations,bounds:ready.bounds}:undefined;this.previewStrokeId='';this.previewBase=undefined;this.previewBaseOperations=undefined;}else this.renderer.rememberStrokeRaster(stroke,this.scratch);}return true;}
- finishGesture(reason='interrupted'){const stroke=this.finalizeStroke(this.stroke),target=this.strokeTarget;this.recorder.event('gesture-end',{reason,id:this.capture?.gestureId,pointerId:this.pointerId,sourcePoints:stroke?.points.length??this.lasso?.length??0,captured:this.capture?.count});this.diagnostics.finish(reason,stroke,this.lasso,this.audit());if(this.strokePending){this.lasso=undefined;this.strokePending=undefined;}else this.finishSelection();const mirror=this.strokeMirror;this.cancelGesture();this.strokeMirror=mirror;const committed=this.commitStroke(stroke,target);if(stroke)this.diagnostics.committed(stroke.id,committed);}
+ finishGesture(reason='interrupted'){const stroke=this.finalizeStroke(this.stroke),target=this.strokeTarget;this.recorder.event('gesture-end',{reason,id:this.capture?.gestureId,pointerId:this.pointerId,sourcePoints:stroke?.points.length??this.lasso?.length??0,captured:this.capture?.count});this.diagnostics.finish(reason,stroke,this.lasso,this.audit());if(this.strokePending){this.lasso=undefined;this.strokePending=undefined;}else this.finishSelection();const mirror=this.strokeMirror;this.cancelGesture();this.strokeMirror=mirror;const committed=this.commitStroke(stroke,target);if(stroke?.impastoVersion===5)this.forgetOilPreview();if(stroke)this.diagnostics.committed(stroke.id,committed);}
  setBrushCursorStyle(style: BrushCursorStyle) {
   this.cursorStyle = style;
   this.paintCursor();
@@ -369,13 +377,21 @@ export class StudioEngine {
   const position=toScreen(this.stroke&&this.liveTip&&!this.stroke.impastoVersion?this.liveTip:this.cursor,this.view),b=this.stroke??this.brush,p=this.stroke?.points.at(-1);
   const response=this.stroke?.pressure?pressureResponse(Math.pow(p?.p??1,b.response),b.pressureCurve):1;
   const velocity=this.stroke?.velocityTaper?p?.v??1:1;
-  const factor=this.stroke&&(this.stroke.pressure&&b.pressureWidth!==false||this.stroke.velocityTaper)?widthResponse(response*velocity,b):1;
-  const previous=this.stroke?.points.at(-2);
+  const oil=this.stroke?.impastoVersion===5;
+  const factor=this.stroke&&(this.stroke.pressure&&b.pressureWidth!==false||this.stroke.velocityTaper)?
+   widthResponse((oil?response*(.8+.2*response):response)*velocity,b):1;
+  let previous=this.stroke?.points.at(-2);
+  if(oil&&p&&this.stroke){
+   const points=this.stroke.points;
+   let i=points.length-2;
+   while(i>0&&Math.hypot(points[i].x-p.x,points[i].y-p.y)<Math.max(1,b.size*.13))i--;
+   previous=points[i];
+  }
   const direction=previous&&p&&Math.hypot(p.x-previous.x,p.y-previous.y)>0
    ?Math.atan2(p.y-previous.y,p.x-previous.x):this.cursorDirection;
   const tilt=(p??this.cursor) as Point&{az?:number;alt?:number};
   const tip=this.cursorStyle==='tip'||this.cursorStyle==='tip-crosshair'
-   ?this.cursorTip({direction,pressure:response,speed:p?.v??1,az:tilt.az,alt:tilt.alt})
+   ?this.cursorTip({direction,pressure:response,speed:p?.v??1,drawing:!!previous,az:tilt.az,alt:tilt.alt})
    :roundBrushCursor({direction:0,pressure:1,speed:1});
   const {x,y}=position;
   const r=paintBrushTipCursor(ctx,this.cursorStyle,tip,x,y,b.size*this.view.zoom*factor,this.view.rotation);
@@ -621,8 +637,12 @@ export class StudioEngine {
   if(!silk&&this.tool==='brush'&&this.brush.brushTip==='color-blender'&&layer.operations.length===0){this.notify('Blender works on paint in the active layer. Select your painted layer first.');return;}
   const workerPaint=this.tool==='brush'&&(nativeMix||workerBlendEligible({...this.brush,...metadata,tool:'brush'}));this.cancelDrawingWarmup();if(workerPaint)this.blendWorker.retryForNewGesture();if(!(workerPaint&&this.blendWorker.available()&&this.renderer.hasPendingLayerResult()))this.renderer.prepareForInput(doc);this.clearSelection();if(!this.worldOnlyStroke)this.resizeStrokeScratch(doc);
   this.strokeMirror=this.mirrorDrawing.enabled?{matrix:mirrorMatrix(this.mirrorDrawing,doc),id:uid()}:undefined;this.strokeTarget={project:doc.id,layer:layer.id};this.pressureRequested=this.brush.pressure;this.initialPressurePending=this.brush.pressure&&e.pointerType==='pen'&&!(Number.isFinite(e.pressure)&&e.pressure>0);this.sampleTime=e.timeStamp;if(this.initialPressurePending)this.diagnostics.note('Initial pressure is unknown; defer the provisional dot until contact or release.');if(this.brush.velocityTaper&&e.pointerType!=='pen')p.v=1;
+  if(metadata.impastoVersion===5){
+   this.cursor=p;this.cursorDirection=0;this.strokeDirty=false;this.liveTip=undefined;this.liveGeometry=undefined;
+   this.forgetOilPreview();
+  }
   this.pickup=undefined;this.stroke={id:this.capture.gestureId,kind:'stroke',worldStroke:workspaceStroke?true:undefined,tool:this.tool,points:[p],size:this.brush.size,opacity:this.brush.opacity,color:this.brush.color,pressure:this.brush.pressure&&e.pointerType==='pen',response:this.brush.response,...metadata,...(fastBlend?{blendRasterVersion:2 as const}:{}),captureZoom:this.view.zoom,stabilization:this.brush.stabilization,smoothness:this.brush.smoothness??0,pressureWidth:this.brush.pressureWidth??true,pressureOpacity:metadata.inkEdgeVersion?false:this.brush.pressureOpacity??false,pressureCurve:this.brush.pressureCurve?.map(p=>({...p})),taperStart:this.brush.taperStart??0,taperEnd:this.brush.taperEnd??0,brushKind:this.brush.brushKind,textureStrength:this.brush.textureStrength,nativeMixVersion:nativeMix?3:undefined,nativeMixPickupVersion:nativeMix?3:undefined,nativeMixAmount:nativeMix?(this.brush.mixAmount??.58):undefined,nativeMixPaintLoad:nativeMix?Math.max(0,Math.min(1,this.brush.mixPaintLoad??0)):undefined,nativeMixRadius:nativeMix?Math.max(.02,Math.min(1,(this.brush.mixPickupLen??1)/2)):undefined,minSize:this.brush.minSize,maxSize:this.brush.maxSize,minOpacity:this.brush.minOpacity,maxOpacity:this.brush.maxOpacity,velocityTaper:this.brush.velocityTaper&&e.pointerType!=='pen'};this.prepareBrushBlend(this.stroke,layer,doc);if(this.stroke.stampVersion===1){if(this.tool!=='brush'){for(const k of Object.keys(this.stroke))if(k==='stampVersion'||/^(stamp|ts|db)[A-Z]/.test(k))delete (this.stroke as Record<string,unknown>)[k];}else{this.stroke.nativeMixVersion=undefined;this.stroke.nativeMixPickupVersion=undefined;this.stroke.nativeMixAmount=undefined;this.stroke.nativeMixPaintLoad=undefined;this.stroke.nativeMixRadius=undefined;}}if((this.stroke.dryBristleVersion===1||this.stroke.dryBristleVersion===2||this.stroke.dryBristleVersion===3)){this.stroke.dryBristleSeed=watercolorSeedFor(this.stroke.id);p.v=.65;}if(this.stroke.coloringEngine===1){this.stroke.colorSeed=watercolorSeedFor(this.stroke.id);p.v=.65;}if(this.stroke.watercolorMaterialVersion===2||this.stroke.watercolorEngine===1){this.stroke.watercolorSeed=watercolorSeedFor(this.stroke.id);p.v=.65;}if(this.tool==='brush'&&!silk&&!this.stroke.inkEdgeVersion&&!this.stroke.nativeMixVersion&&!this.stroke.brushBlendVersion&&!this.stroke.stampVersion&&this.stroke.brushTip!=='color-blender'&&(this.stroke.watercolorMode==='wet'||!this.stroke.watercolorMode&&this.brush.mixColors)&&layer.operations.length>0){this.stroke.mixStops=[];this.pickup=new Pickup(this.renderer.get(layer,doc),this.brush.mixAmount??.55);this.pickup.update(this.stroke);}this.geometryDirty=true;this.liveGeometry=undefined;this.liveTip=p;if(this.diagnostics.enabled&&this.diagnostics.perEventGeometry)this.refreshLiveGeometry();this.strokeDirty=true;
-  if(this.stroke.brushBlendVersion===11&&!this.initialPressurePending){
+  if((this.stroke.brushBlendVersion===11||this.stroke.impastoVersion===5&&e.pointerType==='pen')&&!this.initialPressurePending){
    if(this.frame){cancelAnimationFrame(this.frame);this.frame=0;}this.performance.measure('renderMs',()=>this.render());this.performance.visible();
   }else this.request();
  };
@@ -631,7 +651,7 @@ export class StudioEngine {
   if(this.stroke?.brushBlendVersion)blendTiming.input();
   if(this.pointerId!==undefined&&(e.pointerId!==this.pointerId||e.timeStamp<(this.capture?.started??0)))return;const cursor=this.point(e);
   if(this.cursor&&(cursor.x!==this.cursor.x||cursor.y!==this.cursor.y))this.cursorDirection=Math.atan2(cursor.y-this.cursor.y,cursor.x-this.cursor.x);
-  this.cursor=cursor;if(this.stroke?.impastoVersion)this.paintCursor();const local=this.local(e);
+  this.cursor=cursor;if(this.stroke?.impastoVersion&&this.stroke.impastoVersion!==5)this.paintCursor();const local=this.local(e);
   if(this.pointerId===undefined&&this.tool==='transform'&&this.selection.length&&this.cursor){
    const c=controls(this.selection,this.transform,this.view.zoom),index=c.corners.findIndex(q=>Math.hypot(q.x-this.cursor!.x,q.y-this.cursor!.y)<11/this.view.zoom);
    this.canvas.style.cursor=this.areaTransformMode==='rotate'?'grab':this.areaTransformMode==='scale'?(index<0?'crosshair':index%2===0?'nwse-resize':'nesw-resize'):'move';
@@ -651,20 +671,21 @@ export class StudioEngine {
   if(this.strokePending){const now=this.point(e),start=this.strokePending;if(Math.hypot(now.x-start.x,now.y-start.y)*this.view.zoom>3){if(this.strokeMode==='lasso'||this.strokeShape==='lasso'){if(!this.lasso)this.lasso=[{x:start.x,y:start.y,p:1}];appendPath(this.lasso,now);}else this.lasso=rectangle({x:start.x,y:start.y,p:1},now);this.request();}return;}
   if(this.vectors.drawing){this.acceptVectorMovement(e);return;}
   if(!this.drawing){this.paintCursor();return;}this.consume(e);
+  if(this.stroke?.impastoVersion===5)this.paintCursor();
   this.request();
  };
  private consume(e:PointerEvent,canceled=false){this.performance.input();const started=this.performance.enabled?performance.now():0;try{this.consumeInput(e,canceled);}finally{if(this.performance.enabled)this.performance.record('inputBatchMs',performance.now()-started);}}
- private consumeInput(e:PointerEvent,canceled=false){const capture=this.capture;if(!capture)return;const batch=capture.batch(e,!canceled);if(capture.replaying){this.geometricDuplicates=0;this.sampleTime=capture.started;if(this.stroke){this.stroke.points=[{...this.stroke.points[0],p:capture.first.pointerType==='pen'?mapPenPressure(capture.first.pressure):1}];this.initialPressurePending=this.pressureRequested&&capture.first.pointerType==='pen'&&!(Number.isFinite(capture.first.pressure)&&capture.first.pressure>0);this.stroke.pressure=this.pressureRequested&&capture.first.pointerType==='pen';}if(this.lasso)this.lasso=[this.lasso[0]];}const rect=this.canvas.getBoundingClientRect();for(const event of batch){const p=this.point(event,rect);if(this.lasso){if(this.rectangleStart)this.lasso=rectangle(this.rectangleStart,p);else{const n=this.lasso.length;appendPath(this.lasso,p);if(n===this.lasso.length)this.geometricDuplicates++;}}if(this.stroke){if(process.env.NODE_ENV!=='production'&&event.pointerType==='pen')window.dispatchEvent(new CustomEvent('solo-pen-pressure',{detail:event.pressure}));if(this.initialPressurePending&&event.pointerType==='pen'&&Number.isFinite(event.pressure)&&event.pressure>0){for(const point of this.stroke.points)point.p=p.p;this.initialPressurePending=false;}const last=this.stroke.points.at(-1)!;if(event.pointerType==='pen'&&!event.pressure)p.p=last.p;if(((this.stroke.dryBristleVersion===1||this.stroke.dryBristleVersion===2||this.stroke.dryBristleVersion===3)||this.stroke.coloringEngine===1||this.stroke.watercolorMaterialVersion===2||this.stroke.watercolorEngine===1)&&!this.stroke.velocityTaper){p.v=watercolorVelocity(Math.hypot(p.x-last.x,p.y-last.y)*this.view.zoom,event.timeStamp-this.sampleTime,last.v??.65);}if(this.stroke.velocityTaper){const d=Math.hypot(p.x-last.x,p.y-last.y);p.v=d?velocityWidth(d,event.timeStamp-this.sampleTime,last.v):last.v??1;}this.sampleTime=Math.max(this.sampleTime,event.timeStamp);const n=this.stroke.points.length;appendPath(this.stroke.points,p);if(n===this.stroke.points.length)this.geometricDuplicates++;this.strokeDirty=true;}}if(this.stroke){this.pickup?.update(this.stroke,capture.replaying);this.geometryDirty=true;if(this.diagnostics.enabled&&this.diagnostics.perEventGeometry){this.refreshLiveGeometry();this.diagnostics.observeLive(this.liveTip);}} }
+ private consumeInput(e:PointerEvent,canceled=false){const capture=this.capture;if(!capture)return;const oil=this.stroke?.impastoVersion===5;const batch=capture.batch(e,!canceled&&!(oil&&e.pointerType==='pen'&&e.type==='pointerup'&&e.pressure===0),oil);if(capture.replaying){this.geometricDuplicates=0;this.sampleTime=capture.started;if(this.stroke){this.stroke.points=[{...this.stroke.points[0],p:capture.first.pointerType==='pen'?mapPenPressure(capture.first.pressure):1}];this.initialPressurePending=this.pressureRequested&&capture.first.pointerType==='pen'&&!(Number.isFinite(capture.first.pressure)&&capture.first.pressure>0);this.stroke.pressure=this.pressureRequested&&capture.first.pointerType==='pen';}if(this.lasso)this.lasso=[this.lasso[0]];}const rect=this.canvas.getBoundingClientRect();for(const event of batch){const p=this.point(event,rect);if(this.lasso){if(this.rectangleStart)this.lasso=rectangle(this.rectangleStart,p);else{const n=this.lasso.length;appendPath(this.lasso,p);if(n===this.lasso.length)this.geometricDuplicates++;}}if(this.stroke){if(process.env.NODE_ENV!=='production'&&event.pointerType==='pen')window.dispatchEvent(new CustomEvent('solo-pen-pressure',{detail:event.pressure}));if(this.initialPressurePending&&event.pointerType==='pen'&&Number.isFinite(event.pressure)&&event.pressure>0){for(const point of this.stroke.points)point.p=p.p;this.initialPressurePending=false;}const last=this.stroke.points.at(-1)!;if(event.pointerType==='pen'&&!event.pressure)p.p=last.p;if(((this.stroke.dryBristleVersion===1||this.stroke.dryBristleVersion===2||this.stroke.dryBristleVersion===3)||this.stroke.coloringEngine===1||this.stroke.watercolorMaterialVersion===2||this.stroke.watercolorEngine===1)&&!this.stroke.velocityTaper){p.v=watercolorVelocity(Math.hypot(p.x-last.x,p.y-last.y)*this.view.zoom,event.timeStamp-this.sampleTime,last.v??.65);}if(this.stroke.velocityTaper){const d=Math.hypot(p.x-last.x,p.y-last.y);p.v=d?velocityWidth(d,event.timeStamp-this.sampleTime,last.v):last.v??1;}this.sampleTime=Math.max(this.sampleTime,event.timeStamp);const n=this.stroke.points.length;appendPath(this.stroke.points,p);if(n===this.stroke.points.length)this.geometricDuplicates++;this.strokeDirty=true;}}if(this.stroke){this.pickup?.update(this.stroke,capture.replaying);this.geometryDirty=true;if(this.diagnostics.enabled&&this.diagnostics.perEventGeometry){this.refreshLiveGeometry();this.diagnostics.observeLive(this.liveTip);}} }
  private up=(e:PointerEvent)=>{
   if(e.pointerId!==this.pointerId||e.timeStamp<(this.capture?.started??0))return;if(this.mirrorPivotDrag){this.setMirrorPivot(this.point(e));this.mirrorPivotDrag=false;this.diagnostics.finish('mirror-pivot');this.recorder.event('mirror-pivot',{pivot:this.mirrorDrawing.pivot});this.releaseCapture();this.onMirrorChange();this.request();return;}if(e.pointerType==='pen'&&(e.buttons&1)!==0&&e.button!==0){if(this.vectors.drawing)this.acceptVectorMovement(e);else this.consume(e);this.request();this.recorder.event('barrel-release',{pointerId:e.pointerId,buttons:e.buttons,button:e.button});return;}if(this.vectors.drawing)this.acceptVectorMovement(e);else this.consume(e);if(this.drag)this.move(e);
-  if(this.stroke?.impastoVersion)this.cursor=this.point(e);
+  if(this.stroke?.impastoVersion)this.cursor=this.stroke.impastoVersion===5&&e.pointerType==='pen'?this.stroke.points.at(-1):this.point(e);
   if(this.vectors.drawing){const end=this.point(e);// Keep the last REAL pen pressure; the provisional draft still contains only the down-point.
    if(e.pointerType==='pen')end.p=mapPenPressure(e.pressure,undefined,this.vectors.lastPressure);
    this.vectors.up(end);}
   if(this.navigation){if(this.tool==='zoom'&&!this.navigation.moved)this.zoomTo(this.view.zoom*(this.navigation.alt?.8:1.25));this.navigation=undefined;}
   const stroke=this.finalizeStroke(this.stroke),target=this.strokeTarget;this.recorder.event('gesture-end',{reason:'release',id:this.capture?.gestureId,pointerId:this.pointerId,sourcePoints:stroke?.points.length??this.lasso?.length??0,captured:this.capture?.count});this.diagnostics.finish('release',stroke,this.lasso,this.audit());this.stroke=undefined;this.pickup=undefined;this.strokeTarget=undefined;this.liveGeometry=undefined;this.liveTip=undefined;
   if(this.strokePending){const pending=this.strokePending;if(this.lasso&&this.lasso.length>=3){const found=this.marqueeStrokeIds(this.lasso);this.setStrokeIds(pending.shift?[...new Set([...this.strokeIds,...found])]:found);}else if(!pending.shift)this.clearSelection();this.lasso=undefined;this.strokePending=undefined;}else this.finishSelection();
-  this.pan=undefined;this.drag=undefined;this.canvas.style.cursor='';this.paintCursor();this.releaseCapture();const committed=this.commitStroke(stroke,target);if(stroke)this.diagnostics.committed(stroke.id,committed);this.request();
+  this.pan=undefined;this.drag=undefined;this.canvas.style.cursor='';this.paintCursor();this.releaseCapture();const committed=this.commitStroke(stroke,target);if(stroke?.impastoVersion===5)this.forgetOilPreview();if(stroke)this.diagnostics.committed(stroke.id,committed);this.request();
  };
  private cancel=(e:PointerEvent)=>{if(e.pointerId===this.pointerId&&e.timeStamp>=(this.capture?.started??0)){this.consume(e,true);this.finishGesture('pointercancel');}};private lostCapture=(e:PointerEvent)=>{this.diagnostics.record(e,[],false);if(e.pointerId===this.pointerId&&e.timeStamp>=(this.capture?.started??0)&&!this.canvas.hasPointerCapture(e.pointerId)&&this.drawing)this.finishGesture('lostpointercapture');};private leave=()=>{if(!this.drawing){this.cursor=undefined;this.cursorDirection=0;this.paintCursor();}};
  private wheel=(e:WheelEvent)=>{e.preventDefault();if(this.drawing||this.busy)return;const next=wheelZoom(this.view,this.local(e),e.deltaY,e.deltaMode,this.height,this.minimumZoom);if(next===this.view)return;this.setView(next,true,true);};
@@ -750,6 +771,12 @@ export class StudioEngine {
   const previous=this.lastExactFrame;
   const exactStart=denseStroke?.inkEdgeVersion===1&&!!previous?.exact&&!previous.extra&&previous.p===p&&previous.revision===this.renderer.displayRevision&&previous.W===W&&previous.H===H&&previous.dpr===dpr&&previous.x===this.view.x&&previous.y===this.view.y&&previous.zoom===this.view.zoom&&previous.rotation===this.view.rotation;
   const changedFrame=cachedDrawing?this.drawingFrames.begin({project:p,renderer:this.renderer,revision:this.renderer.displayRevision,target:this.strokeTarget!.layer,width:W,height:H,dpr,view:this.view},denseStroke!,this.liveGeometry!,blendDirty??(livePainted?this.liveRaster.lastRegion:undefined),exactStart):undefined;
+  if(workingBlend&&changedFrame&&!blendDirty?.width&&!this.busy&&!this.renderer.hasPendingLayerResult()){
+   this.blendWorker.submit(denseStroke!,denseStroke!.nativeMixVersion!==undefined?denseStroke!.points.length:this.liveGeometry);
+   this.drawingFrames.finish(denseStroke!,this.liveGeometry!);
+   this.paintCursor();
+   return;
+  }
   // Canvas scan conversion can change by a few RGBA levels when the left
   // clip origin moves, including integer zoom on 4K surfaces. Keep its origin
   // fixed and limit the vertical band instead; preserve exact native pixels.

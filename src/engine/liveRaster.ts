@@ -75,8 +75,9 @@ export class LiveStrokeRaster{
   // its old and new footprint (the stamp engine is a pure function of the path).
   if(stroke.stampVersion===1){
    const m=ctx.getTransform(),identity=m.a===1&&m.b===0&&m.c===0&&m.d===1&&m.e===0&&m.f===0;
-   const now=identity?stampBounds(stroke,ctx.canvas.width,ctx.canvas.height,geometry):undefined,prev=this.id===stroke.id?this.stampRegion:undefined;
-   const plan=stampPlan(stroke,geometry),old=this.id===stroke.id&&this.stampCanvas===ctx.canvas?this.stampPlan:undefined;this.stampCanvas=ctx.canvas;
+   const plan=stampPlan(stroke,geometry);
+   const now=identity?stampBounds(stroke,ctx.canvas.width,ctx.canvas.height,geometry,plan):undefined,prev=this.id===stroke.id?this.stampRegion:undefined;
+   const old=this.id===stroke.id&&this.stampCanvas===ctx.canvas?this.stampPlan:undefined;this.stampCanvas=ctx.canvas;
    // Same stroke, no pen tilt: redraw only where dabs changed (exactly the same pixels as a full redraw).
    if(now&&old&&!stroke.tsTilt&&!stroke.impastoVersion){
     const a=stampChange(old.dabs,plan.dabs),b=stampChange(old.dual,plan.dual),change=a&&b?union(a,b):a??b;
@@ -85,9 +86,12 @@ export class LiveStrokeRaster{
     this.stampRegion=now;this.stampPlan=plan;this.id=stroke.id;this.previous=geometry;this.hadSingle=!geometry.cubics.length;this.lastRegion=clip&&clip.width&&clip.height?clip:{x:0,y:0,width:0,height:0};
     return clip?clip.width*clip.height:0;
    }
+   if(stroke.impastoVersion===5&&this.id!==stroke.id&&this.stampRegion&&identity){
+    const oldBox=this.stampRegion;ctx.clearRect(oldBox.x,oldBox.y,oldBox.width,oldBox.height);
+   }
    const region=now?(prev?union(prev,now):now):undefined;
    if(region){ctx.clearRect(region.x,region.y,region.width,region.height);}else{ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);ctx.restore();}
-   drawStampStroke(ctx,stroke,geometry,undefined,plan);
+   drawStampStroke(ctx,stroke,geometry,undefined,plan,false,!stroke.brushBlendVersion);
    this.stampPlan=plan;this.stampRegion=now;this.id=stroke.id;this.previous=geometry;this.hadSingle=!geometry.cubics.length;this.lastRegion=region;
    return region?region.width*region.height:ctx.canvas.width*ctx.canvas.height;
   }

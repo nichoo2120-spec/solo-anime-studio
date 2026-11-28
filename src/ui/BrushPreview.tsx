@@ -28,9 +28,11 @@ export function renderBrushPreview(c:HTMLCanvasElement,mask:HTMLCanvasElement,{s
   nativeMixVersion:mix?3:undefined,nativeMixPickupVersion:mix?3:undefined,nativeMixAmount:mix?settings.mixAmount??.58:undefined,nativeMixRadius:mix?Math.max(.02,Math.min(1,(settings.mixPickupLen??1)/2)):undefined,nativeMixPaintLoad:mix?settings.mixPaintLoad??0:undefined};
  // Mixing and erasing need existing paint to act on; a blank thumbnail hides
  // their controls. Keep this sample local and independent of the artist's scene.
- if(blend||mix||pickup||eraser||blender){const colors=['#53828f','#ba8b74','#7f829f'];for(let i=0;i<3;i++){ctx.fillStyle=colors[i];ctx.fillRect((10+i*(width-20)/3)*scale,6*scale,(width-20)/3*scale,(height-12)*scale);}}
+ const oil=s.impastoVersion===5;
+ if(blend||mix||pickup||eraser||blender||oil&&s.oilPressureLoad!==false){const colors=['#53828f','#ba8b74','#7f829f'];for(let i=0;i<3;i++){ctx.fillStyle=colors[i];ctx.fillRect((10+i*(width-20)/3)*scale,6*scale,(width-20)/3*scale,(height-12)*scale);}}
  if(pickup){s.mixStops=[];s.mixVersion=2;new Pickup(c,settings.mixAmount??.55).update(s);}
  if(blend){prepareBlendMaskPressure(s);drawStroke(mc,s);}
+ else if(oil)drawStroke(mc,s,'final',undefined,false,true);
  else if(!s.silkBlendVersion)drawModernStroke(mc,s);
  if(blender&&!mix&&!eraser){
   // Blender's live compositor retains a gesture for its target surface. Each

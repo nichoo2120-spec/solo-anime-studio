@@ -2,7 +2,8 @@ import {isBrushBlendVersion} from '../core/brushBlend';
 import {applyNativeBrushMix} from './nativeBrushMix';
 import {applySilkBlend} from './silkBlend';
 import {renderBrushBlend} from './brushBlend';
-import {stampExtent} from './stampBrush';
+import {drawOilPickup,stampExtent} from './stampBrush';
+import {oilUsesPressureLoad} from '../core/impasto';
 import {applyWetSmudge} from './wetSmudge';
 import {applyGentleBlend} from './gentleBlend';
 import {dryRasterPadding} from '../core/dryBrush';
@@ -38,6 +39,24 @@ export function compositePaintStroke(ctx:CanvasRenderingContext2D,source:HTMLCan
   const read=((s.brushBlendVersion??0)>=7)?blendBase?.getContext('2d')??undefined:undefined;
   renderBrushBlend(ctx,source,s,sourceX,sourceY,read);
   return;
+ }
+ if(oilUsesPressureLoad(s)){
+  const geometry=finalGeometry(s),box=region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height,geometry);
+  ctx.save();ctx.globalAlpha=s.opacity;ctx.globalCompositeOperation='source-over';
+  if(blendBase)drawOilPickup(ctx,blendBase,s,geometry,box);
+  else if((s.oilPickup??0)>0&&box.width&&box.height){
+   const sample=oilPickupSurface??=document.createElement('canvas');
+   // Gutter includes the pigment sampled behind the nib.
+   const pad=20,left=Math.max(0,box.x-pad),top=Math.max(0,box.y-pad);
+   const right=Math.min(ctx.canvas.width,box.x+box.width+pad),bottom=Math.min(ctx.canvas.height,box.y+box.height+pad);
+   const w=right-left,h=bottom-top;
+   if(sample.width!==w)sample.width=w;if(sample.height!==h)sample.height=h;
+   const sc=sample.getContext('2d')!;sc.clearRect(0,0,w,h);
+   sc.drawImage(ctx.canvas,left,top,w,h,0,0,w,h);
+   drawOilPickup(ctx,sample,s,geometry,box,left,top);
+  }
+  if(box.width&&box.height)ctx.drawImage(source,box.x-sourceX,box.y-sourceY,box.width,box.height,box.x,box.y,box.width,box.height);
+  ctx.restore();return;
  }
  if((s.impastoVersion??0)>=2&&(s.oilPickup??0)>0){
   const box=region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height);

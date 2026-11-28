@@ -1,3 +1,4 @@
+import {oilNib} from './impasto';
 import type {BitmapMask} from '../core/bitmapBrush';
 import type {BrushShapeControls} from '../core/brushShape';
 import type {BrushCursorStyle} from '../core/brushCursor';
@@ -16,7 +17,7 @@ import {TipOutlineCache, tipTransform, type OutlinePoint, type TipMaskSource} fr
 import {watercolorShapePath} from './watercolorShapes';
 import type {BrushSettings} from './StudioEngine';
 
-type Sample = {direction: number; pressure: number; speed: number; az?: number; alt?: number};
+type Sample = {direction: number; pressure: number; speed: number; drawing?: boolean; az?: number; alt?: number};
 type Tip = {mask?: TipMaskSource; path?: () => Path2D; x: number; y: number; angle: number; scatter?: number};
 type BrushTip = (sample: Sample) => Tip;
 const tau = Math.PI * 2, degrees = Math.PI / 180;
@@ -92,7 +93,7 @@ export function brushCursorTip(brush: BrushSettings, eraser: boolean): BrushTip 
       x: (stamp.tsScaleX ?? 1) * (stamp.tsFlipX ? -1 : 1) * lean,
       y: (stamp.tsScaleY ?? 1) * (stamp.tsRoundness ?? 1) * (stamp.tsFlipY ? -1 : 1),
       angle: (stamp.tsAngle ?? 0) * degrees + (tilt ? sample.az! * degrees : 0)
-        + (stamp.tsFollow ? sample.direction + Math.PI / 2 : n?.follow ? sample.direction : 0),
+        + (stamp.tsFollow && (stamp.impastoVersion!==5||sample.drawing) ? sample.direction + Math.PI / 2 : n?.follow ? sample.direction : 0),
     };
   };
   if (n) {
@@ -119,6 +120,22 @@ export function brushCursorTip(brush: BrushSettings, eraser: boolean): BrushTip 
     const mask = tip === 'soft-round' ? undefined : sampledMask(['paint',tip,hardness,texture,variant].join(':'), (u,v) => paintingCoverage(tip,u,v,hardness,texture,variant,isWatercolorTip(tip)));
     return sample => shaped ? {...shape(sample), mask} : {...round, angle, mask};
   };
+  if (!eraser && stamp.impastoVersion===5) {
+    return sample=>{
+      const pressure=Math.round(sample.pressure*8)/8;
+      const mask:TipMaskSource={
+        key:['oil',stamp.oilTip,stamp.oilSoftness,stamp.oilPickup,pressure].join(':'),
+        mask(){
+          const nib=oilNib(stamp,pressure),{width,height}=nib;
+          const pixels=nib.getContext('2d')!.getImageData(0,0,width,height).data;
+          const alpha=new Uint8Array(width*height);
+          for(let i=0;i<alpha.length;i++)alpha[i]=pixels[4*i+3];
+          return {width,height,alpha};
+        },
+      };
+      return {...shape(sample),mask};
+    };
+  }
   if (!eraser && stamp.stampTip) return paint(stamp.stampTip, 0, 0, stamp.stampHardness, stamp.stampTexture, true);
   if (stamp.inkEdgeVersion === 1 || brush.inkTipVersion === 1) {
     if (brush.inkTipShape !== 'oval') return roundBrushCursor;

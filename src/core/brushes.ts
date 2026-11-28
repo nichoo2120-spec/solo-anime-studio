@@ -27,7 +27,7 @@ export const retiredBlendPresetIds=['color-blender','smudge-bristle','blender-so
 export const isRetiredBlendPresetId=(id:string)=>retiredBlendPresetIds.includes(id as typeof retiredBlendPresetIds[number]);
 function oil(id:NonNullable<ImpastoControls['oilTip']>,name:string,depth:number,size:number,rounded:boolean):BrushPreset{
  const sketch=id==='sketch';
- return preset('oil-'+id,name,oilCategory,{impastoVersion:4,oilJitter:.065,oilTip:id,oilDepth:depth,oilBristles:id==='bristle'?.95:.7,
+ return preset('oil-'+id,name,oilCategory,{impastoVersion:5,oilPressureLoad:true,oilMinLoad:0,oilMaxLoad:1,oilJitter:.065,oilTip:id,oilDepth:depth,oilBristles:id==='bristle'?.95:.7,
   oilLight:-135,oilSoftness:rounded?.27:.12,oilPickup:.15,oilCanvas:sketch,tsEnabled:true,tsFollow:true,
   tsScaleX:id==='flat'?1.18:1,tsScaleY:rounded?.66:.44,brushTip:rounded?'soft-round':'flat-bristle',
   size,opacity:sketch?.69:1,flow:1,hardness:1,textureStrength:0,tipSpacing:.055,minSize:.09,stabilization:.12});
