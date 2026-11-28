@@ -12,7 +12,7 @@ it('replays saved version 9 brush pixels',()=>{
  vi.stubGlobal('Path2D',Path2D);
  try {
   const hash=createHash('sha256');
-  for(const preset of stockPresets.filter(p=>p.category!=='Eraser')){
+  for(const preset of stockPresets.filter(p=>p.category!=='Eraser'&&!p.settings.impastoVersion)){
    const settings={...preset.settings,bbEnabled:true};
    const s:Stroke={...settings,...brushStrokeMetadata(settings,true),brushBlendVersion:9,kind:'stroke',
     tool:'brush',id:'historical-seed',size:96,color:'#212a6e',opacity:.8,pressure:true,

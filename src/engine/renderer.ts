@@ -34,22 +34,22 @@ export function paintVectorLayer(ctx:CanvasRenderingContext2D,layer:Layer){
  const c=vectorSurface??=makeCanvas(ctx.canvas.width,ctx.canvas.height);if(c.width!==ctx.canvas.width)c.width=ctx.canvas.width;if(c.height!==ctx.canvas.height)c.height=ctx.canvas.height;const vc=context(c);vc.resetTransform();vc.clearRect(0,0,c.width,c.height);vc.setTransform(ctx.getTransform());for(const op of layer.operations)if(op.kind==='vector')drawVector(vc,op);ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.globalCompositeOperation=blendOperation(layer.blend);ctx.drawImage(c,0,0);ctx.restore();
 }
 export function polygonPath(ctx:CanvasRenderingContext2D,points:Point[]){ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();}
-export function drawStroke(ctx:CanvasRenderingContext2D,s:Stroke,phase:'live'|'final'='final',geometry?:ReturnType<typeof strokeGeometry>){
+export function drawStroke(ctx:CanvasRenderingContext2D,s:Stroke,phase:'live'|'final'='final',geometry?:ReturnType<typeof strokeGeometry>,heightOnly=false){
  if(phase==='final'&&s.nativeMixVersion===3&&s.dryBristleVersion===3)resetDryBristleV3MixModel(s);
- if(s.rasterTransformVersion===1&&s.transform&&!preservesFlowContour(s)){const c=reflectedSurface??=makeCanvas(ctx.canvas.width,ctx.canvas.height);if(c.width!==ctx.canvas.width)c.width=ctx.canvas.width;if(c.height!==ctx.canvas.height)c.height=ctx.canvas.height;const cc=c.getContext('2d')!;cc.clearRect(0,0,c.width,c.height);drawStroke(cc,{...s,id:s.rasterSourceId??s.id,transform:undefined,rasterTransformVersion:undefined},phase,geometry);ctx.save();ctx.transform(...s.transform);ctx.drawImage(c,0,0);ctx.restore();return;}
+ if(s.rasterTransformVersion===1&&s.transform&&!preservesFlowContour(s)){const c=reflectedSurface??=makeCanvas(ctx.canvas.width,ctx.canvas.height);if(c.width!==ctx.canvas.width)c.width=ctx.canvas.width;if(c.height!==ctx.canvas.height)c.height=ctx.canvas.height;const cc=c.getContext('2d')!;cc.clearRect(0,0,c.width,c.height);drawStroke(cc,{...s,id:s.rasterSourceId??s.id,transform:undefined,rasterTransformVersion:undefined},phase,geometry,heightOnly);ctx.save();ctx.transform(...s.transform);ctx.drawImage(c,0,0);ctx.restore();return;}
  if(s.perspective){
   if(drawProjectiveFlowInk(ctx,s,geometry??finalGeometry(s),Math.hypot(ctx.getTransform().a,ctx.getTransform().b)))return;
   const warped=projectiveInkGeometry(s,geometry??finalGeometry(s));
-  drawStroke(ctx,{...s,id:s.rasterSourceId??s.id,perspective:undefined,transform:undefined,points:warped.points},phase,warped);return;
+  drawStroke(ctx,{...s,id:s.rasterSourceId??s.id,perspective:undefined,transform:undefined,points:warped.points},phase,warped,heightOnly);return;
  }
  // v0.5.241 Tip shape / Dual Brush strokes use the stamp engine only.
  if((s.brushBlendVersion??0)<10&&s.watercolorBlendVersion===1&&s.bbWetness!==0&&s.pressure&&!s.transform){
   // Lift the light end of the response while keeping each authored pressure channel.
   s={...s,response:Math.max(.1,(s.response??1)*.45)};
  }
- if(s.stampVersion===1){drawStampStroke(ctx,s,geometry??finalGeometry(s));return;
+ if(s.stampVersion===1){drawStampStroke(ctx,s,geometry??finalGeometry(s),undefined,undefined,heightOnly);return;
  }
- if(s.transform){ctx.save();ctx.transform(...s.transform);drawStroke(ctx,{...s,transform:undefined},phase,geometry);ctx.restore();return;}
+ if(s.transform){ctx.save();ctx.transform(...s.transform);drawStroke(ctx,{...s,transform:undefined},phase,geometry,heightOnly);ctx.restore();return;}
  if((s.dryBristleVersion===1||s.dryBristleVersion===2||s.dryBristleVersion===3)){drawModernStroke(ctx,s,phase,geometry);return;}
  if(s.engineVersion===2||s.engineVersion===3||s.engineVersion===4||s.engineVersion===5||s.engineVersion===6||s.engineVersion===7||s.engineVersion===8||s.engineVersion===9||s.engineVersion===10){drawModernStroke(ctx,s,phase,geometry);return;}
  ctx.save();ctx.fillStyle=s.color;ctx.strokeStyle=s.color;ctx.lineCap='round';ctx.lineJoin='round';
@@ -66,6 +66,39 @@ export function applyTransform(canvas:HTMLCanvasElement,polygon:Point[],matrix:M
  ctx.save();ctx.transform(...matrix);ctx.drawImage(selection,0,0);ctx.restore();
 }
 export class LayerRenderer {
+ private readonly heightPlanes=new WeakMap<Layer['operations'],HTMLCanvasElement>();
+ /** Layer height is reconstructed from versioned stroke deposits in saved
+  * operation order. The separate plane never enters the ordinary color cache. */
+ getImpastoHeight(layer:Layer,p:Project){
+  const old=this.heightPlanes.get(layer.operations);
+  if(old&&old.width===p.width&&old.height===p.height)return old;
+  if(!layer.operations.some(op=>op.kind==='stroke'&&!!op.impastoVersion))return;
+  const plane=makeCanvas(p.width,p.height),ctx=plane.getContext('2d')!;
+  const scratch=makeCanvas(p.width,p.height),mask=scratch.getContext('2d')!;
+  for(const op of layer.operations){
+   if(op.kind==='stroke'){
+    if(op.worldStroke&&!this.strokeMeetsPage(op,p))continue;
+    mask.clearRect(0,0,p.width,p.height);
+    const oil=!!op.impastoVersion&&!op.brushBlendVersion;
+    drawStroke(mask,op,'final',undefined,oil);
+    ctx.save();ctx.globalAlpha=op.opacity;
+    ctx.globalCompositeOperation=oil?'source-over':'destination-out';
+    ctx.drawImage(scratch,0,0);ctx.restore();
+   }else if(op.kind==='clear'){
+    ctx.save();ctx.globalCompositeOperation='destination-out';
+    polygonPath(ctx,op.polygon);ctx.fill();ctx.restore();
+   }else if(op.kind==='transform')applyTransform(plane,op.polygon,op.matrix);
+   else if(op.kind==='fill'||op.kind==='image'){
+    const bitmap=this.bitmaps.get(op.png);
+    if(!bitmap||op.kind==='fill'&&op.under)continue;
+    const origin=op.kind==='fill'?bitmapOrigin(p,op):undefined;
+    ctx.save();ctx.globalCompositeOperation='destination-out';
+    ctx.drawImage(bitmap,origin?.x??0,origin?.y??0);ctx.restore();
+   }
+  }
+  this.heightPlanes.set(layer.operations,plane);
+  return plane;
+ }
  private strokeMeetsPage(stroke:Stroke,p:Project){
   const bounds=strokeRasterBounds(stroke,p.width,p.height);
   return bounds.width>0&&bounds.height>0;

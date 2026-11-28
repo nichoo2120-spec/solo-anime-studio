@@ -1,3 +1,4 @@
+import {impastoMetadata,type ImpastoControls} from './impasto';
 import {natureTipFromKind,natureSettings,type NatureControls} from './natureBrush';
 import {silkStrokeMetadata,type SilkBlendControls} from './silkBlend';
 import {brushBlendMetadata,type BrushBlendSettings} from './brushBlend';
@@ -59,7 +60,7 @@ function paintStrokeMetadata(s:InkFlowControls&WatercolorControls&ColoringContro
 
 
 /** Ink Paint capture and preview opt in to the versioned edge renderer. */
-export function brushStrokeMetadata(s:NatureControls&InkFlowControls&WatercolorControls&ColoringControls&DryBristleControls&TipMixControls&SilkBlendControls&BrushBlendSettings&BrushShapeSettings&{brushKind?:string;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;textureStrength?:number;stabilization?:number;pressureFlow?:boolean;mixColors?:boolean;nativeMixEnabled?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number},inkPaint=false):Partial<ReturnType<typeof paintStrokeMetadata>>&SilkBlendControls&InkEdgeControls&NatureControls&{pressureOpacity?:false}{
+export function brushStrokeMetadata(s:ImpastoControls&NatureControls&InkFlowControls&WatercolorControls&ColoringControls&DryBristleControls&TipMixControls&SilkBlendControls&BrushBlendSettings&BrushShapeSettings&{brushKind?:string;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;textureStrength?:number;stabilization?:number;pressureFlow?:boolean;mixColors?:boolean;nativeMixEnabled?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number},inkPaint=false):Partial<ReturnType<typeof paintStrokeMetadata>>&SilkBlendControls&InkEdgeControls&NatureControls&{pressureOpacity?:false}{
  const silk=silkStrokeMetadata(s);
  if(silk.silkBlendVersion){
   s={...s,bbEnabled:true,bbMode:silk.silkMode,bbStrength:silk.silkStrength,bbPickup:silk.silkPickup,
@@ -85,6 +86,6 @@ export function brushStrokeMetadata(s:NatureControls&InkFlowControls&WatercolorC
  // v0.5.241 Tip shape / Dual Brush: the stamp engine draws this stroke, so it
  // carries only the stamp fields (plus Blend), never another engine's routing.
  const shape=brushShapeMetadata(s);
- if(shape.stampVersion===1)return {...brushBlendMetadata(s),...shape,tipSpacing:s.tipSpacing,flow:s.flow,pressureFlow:s.pressureFlow} as unknown as ReturnType<typeof paintStrokeMetadata>;
+ if(shape.stampVersion===1)return {...impastoMetadata(s),...brushBlendMetadata(s),...shape,tipSpacing:s.tipSpacing,flow:s.flow,pressureFlow:s.pressureFlow} as unknown as ReturnType<typeof paintStrokeMetadata>;
  return paintStrokeMetadata(s);
 }

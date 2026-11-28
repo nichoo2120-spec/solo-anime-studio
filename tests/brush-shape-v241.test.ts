@@ -16,7 +16,7 @@ function stroke(patch:Record<string,unknown>,extra:Partial<Stroke>={}):Stroke{
 }
 describe('Tip shape + Dual Brush v0.5.241',()=>{
  it('only strokes with Tip shape or Dual brush on get stamp fields (old and normal strokes stay byte-identical)',()=>{
-  for(const p of stockPresets.filter(p=>!p.settings.nature)){const m=brushStrokeMetadata(p.settings) as Record<string,unknown>;expect(Object.keys(m).filter(k=>k==='stampVersion'||/^(stamp|ts|db)[A-Z]/.test(k)),p.id).toEqual([]);
+  for(const p of stockPresets.filter(p=>!p.settings.impastoVersion&&!p.settings.nature)){const m=brushStrokeMetadata(p.settings) as Record<string,unknown>;expect(Object.keys(m).filter(k=>k==='stampVersion'||/^(stamp|ts|db)[A-Z]/.test(k)),p.id).toEqual([]);
    const off=brushStrokeMetadata({...p.settings,tsEnabled:false,tsRoundness:.2,dbEnabled:false,dbTip:'chalk'});expect(JSON.stringify(off),p.id).toBe(JSON.stringify(m));}
   const m=brushStrokeMetadata({...paint.settings,tsEnabled:true,tsRoundness:.3}) as Record<string,unknown>;
   expect(m).toMatchObject({stampVersion:1,stampTip:'bristle',tsRoundness:.3,tsAngle:0,tsScaleX:1,tsScaleY:1,tsFlipX:false,tsFlipY:false,tsFollow:false,tsTilt:false});

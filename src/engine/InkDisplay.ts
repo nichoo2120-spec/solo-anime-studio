@@ -58,7 +58,7 @@ export class InkDisplay{
  private mixGroups=new Map<string,MixGroup>();private mixGroupBytes=0;private readonly mixGroupBudget=64*1024*1024;
  private nativeFallback?:{base:Key;stroke:string;rect?:Box};
  private nativePreview?:{base:Key;stroke:string;result:HTMLCanvasElement;delta:BlendDelta;group?:MixGroup;target?:{layer:Layer;project:string;frame?:string};box?:Box;cutMask:HTMLCanvasElement;cutPatch:HTMLCanvasElement;rect?:Box;revision:number};
- private lastLive?:{id:string;base:Key;picture:HTMLCanvasElement};private worker?:Worker;private pending?:Pending;private serial=0;
+ private lastLive?:{id:string;base:Key;picture:HTMLCanvasElement;points?:string};private worker?:Worker;private pending?:Pending;private serial=0;
  constructor(private request:()=>void=()=>{}){}
  private prepared=new Map<Stroke,Prepared>();private preparedWeight=0;private pathBatches=0;
  private viewWorker?:Worker;private viewPending?:ViewPending;private viewSerial=0;private viewFailed=false;
@@ -417,6 +417,17 @@ export class InkDisplay{
   }
   data.bitmap.close();
  }
+ private adoptInkPreview(s:Stroke,key:Key,w:number,h:number){
+  const live=this.lastLive;
+  if(s.inkEdgeVersion!==1||this.pending||!live||live.id!==s.id||live.base!==key||live.points!==JSON.stringify(s.points))return false;
+  const previous=this.surface!;
+  const surface=document.createElement('canvas');surface.width=w;surface.height=h;
+  surface.getContext('2d')!.drawImage(live.picture,0,0);
+  this.surface=surface;
+  previous.width=previous.height=0;
+  this.lastLive=undefined;this.liveKey=undefined;
+  return true;
+ }
  private deferFinal(layer:Layer,s:Stroke,key:Key,m:DOMMatrix,w:number,h:number){
   if(this.pending||s.points.length<160||native(s)||s.flatNibVersion===1||s.transform||s.perspective||!this.lastLive||this.lastLive.id!==s.id||this.lastLive.base!==key||w*h*4>32*1024*1024||typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined'||typeof createImageBitmap==='undefined')return false;
   try{
@@ -440,8 +451,9 @@ export class InkDisplay{
    if(!restored){
    if(!append){out.clearRect(0,0,w,h);if(firstClean&&renderer)this.paintPrefix(out,layer,p,firstClean,renderer,m,w,h);out.resetTransform();}
    const added=append?layer.operations.slice(key!.operations.length):[],last=added[0];
-   const deferred=added.length===1&&last.kind==='stroke'&&this.deferFinal(layer,last,key!,m,w,h);
-   if(!deferred){
+   const adopted=added.length===1&&last.kind==='stroke'&&this.adoptInkPreview(last,key!,w,h);
+   const deferred=!adopted&&added.length===1&&last.kind==='stroke'&&this.deferFinal(layer,last,key!,m,w,h);
+   if(!adopted&&!deferred){
     // A pen commit changes only its footprint on this display-resolution layer.
     // Cache exact before/after pixels so undo can avoid replaying every preceding stroke.
     const ink=added.length===1&&last.kind==='stroke'&&!this.pending&&!this.viewHistory.has(last)&&!last.transform&&!last.perspective?last:undefined;
@@ -489,7 +501,7 @@ export class InkDisplay{
    }
    picture=this.preview!;
    }
-   this.lastLive={id:live.id,base:this.key!,picture};
+   this.lastLive={id:live.id,base:this.key!,picture,points:live.inkEdgeVersion===1?JSON.stringify(live.points):undefined};
   }
   if(present){ctx.save();ctx.resetTransform();ctx.globalAlpha=layer.opacity;ctx.globalCompositeOperation=blendOperation(layer.blend);ctx.drawImage(picture,0,0);ctx.restore();}
  }

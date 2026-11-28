@@ -1,3 +1,4 @@
+import {oilNib,shadeImpasto} from './impasto';
 import {secondaryBitmapTip} from './bitmapTips';
 import type {BitmapMask} from '../core/bitmapBrush';
 /** v0.5.241 Stamp engine for Tip shape (stretch / squeeze) and Dual Brush.
@@ -28,7 +29,7 @@ const make=(w:number,h:number):Canvasish=>{const c=document.createElement('canva
 let surfaceA:Canvasish|undefined,surfaceB:Canvasish|undefined;
 const fit=(c:Canvasish|undefined,w:number,h:number)=>{if(!c)return make(w,h);if(c.width!==w)c.width=w;if(c.height!==h)c.height=h;return c;};
 
-export type StampDab={x:number;y:number;rx:number;ry:number;angle:number;level:number;index:number};
+export type StampDab={x:number;y:number;rx:number;ry:number;angle:number;level:number;index:number;pressure?:number};
 /** The largest half-extent of a stamp relative to the brush size (bounds padding). */
 export function stampExtent(s:Stroke){
  if(s.natureVersion===1)return natureExtent(s);
@@ -59,14 +60,23 @@ export function stampDabs(s:Stroke,samples:PaintSamples):StampDab[]{
   const a=samples.points[Math.max(0,segment-1)]??samples.points[0],b=samples.points[segment]??a,start=samples.arc[segment-1]??0,span=(samples.arc[segment]??0)-start,t=span?clamp((dist-start)/span):0;
   const p={x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,p:a.p+(b.p-a.p)*t,v:(a.v??.65)+((b.v??.65)-(a.v??.65))*t};
   const pressure=s.pressure?pressureResponse(p.p**s.response,s.pressureCurve):1;
-  const width=s.pressure&&s.pressureWidth!==false||s.velocityTaper?widthResponse(pressure*(s.velocityTaper?p.v:1),s):1;
+  const width=s.pressure&&s.pressureWidth!==false||s.velocityTaper?widthResponse((s.impastoVersion===2?pressure*pressure*(3-2*pressure):pressure)*(s.velocityTaper?p.v:1),s):1;
   const radius=Math.max(.35,s.size*.5*width*taperFactor(dist,samples.total,s.taperStart,s.taperEnd,Math.max(64,s.size*12)));
   let angle=base,rx=radius*Math.abs(sx),ry=radius*Math.abs(sy);
   // Follow: the tip's width lies across the line, like a real flat brush.
-  if(s.tsFollow&&samples.points.length>1)angle+=Math.atan2(b.y-a.y,b.x-a.x)+Math.PI/2;
+    if(s.tsFollow&&samples.points.length>1){
+   let start=segment-1,end=segment;
+   if(s.impastoVersion===2){
+    const span=s.size*.13;
+    while(start>0&&dist-samples.arc[start]<span)start--;
+    while(end<samples.points.length-1&&samples.arc[end]-dist<span)end++;
+   }
+   const from=samples.points[start]??a,to=samples.points[end]??b;
+   angle+=Math.atan2(to.y-from.y,to.x-from.x)+Math.PI/2;
+  }
   if(s.tsTilt){const tilt=tiltAt(raw,cum,samples.total?dist/samples.total:0);if(tilt){angle+=tilt.az*Math.PI/180;const lean=1-clamp(tilt.alt/90);rx*=1+1.5*lean;}}
   const level=clamp((s.flow??1)*(s.pressure&&s.pressureFlow?pressure:1)*(s.pressure&&s.pressureOpacity?opacityResponse(pressure,s):1));
-  out.push({x:p.x,y:p.y,rx:rx*Math.sign(sx||1),ry:ry*Math.sign(sy||1),angle,level,index:index++});return radius;
+  out.push({x:p.x,y:p.y,rx:rx*Math.sign(sx||1),ry:ry*Math.sign(sy||1),angle,level,pressure:s.impastoVersion===2?pressure:undefined,index:index++});return radius;
  };
  for(;;){const r=at(Math.min(d,samples.total));if(d>=samples.total)break;d+=Math.max(.4,2*r*Math.min(Math.abs(sx),Math.abs(sy),1)*spacing);}
  return out;
@@ -86,12 +96,12 @@ export function dualDabs(s:Stroke,samples:PaintSamples):StampDab[]{
  }
  return out;
 }
-function stamp(ctx:CanvasRenderingContext2D,dabs:StampDab[],tip:Parameters<typeof paintingNib>[0],hardness:number,texture:number,ox:number,oy:number,nature?:NatureTip,bitmap?:BitmapMask){
+function stamp(ctx:CanvasRenderingContext2D,dabs:StampDab[],tip:Parameters<typeof paintingNib>[0],hardness:number,texture:number,ox:number,oy:number,nature?:NatureTip,bitmap?:BitmapMask,oil?:Stroke){
  const image=bitmap?secondaryBitmapTip(bitmap):undefined;
  const max=image?Math.max(image.width,image.height):1;
  const atlas=nature?secondaryNatureAtlas(nature,texture):undefined;
- for(const d of dabs){if(d.level<=0)continue;const nib=paintingNib(tip,hardness,texture,d.index&3,0);
-  ctx.setTransform(1,0,0,1,0,0);ctx.translate(d.x-ox,d.y-oy);ctx.rotate(d.angle);ctx.scale(d.rx*2,d.ry*2);ctx.globalAlpha=d.level;if(image){const w=image.width/max,h=image.height/max;ctx.drawImage(image,-w*.5,-h*.5,w,h);}else if(atlas){const p=natureTipPixels;ctx.drawImage(atlas,0,0,p,p,-.5,-.5,1,1);}else ctx.drawImage(nib.canvas,nib.x,nib.y,nib.w,nib.h);}
+ for(const d of dabs){if(d.level<=0)continue;
+  ctx.setTransform(1,0,0,1,0,0);ctx.translate(d.x-ox,d.y-oy);ctx.rotate(d.angle);ctx.scale(d.rx*2,d.ry*2);ctx.globalAlpha=d.level;if(oil){ctx.drawImage(oilNib(oil,d.pressure),-.5,-.5,1,1);}else if(image){const w=image.width/max,h=image.height/max;ctx.drawImage(image,-w*.5,-h*.5,w,h);}else if(atlas){const p=natureTipPixels;ctx.drawImage(atlas,0,0,p,p,-.5,-.5,1,1);}else{const nib=paintingNib(tip,hardness,texture,d.index&3,0);ctx.drawImage(nib.canvas,nib.x,nib.y,nib.w,nib.h);}}
  ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;
 }
 const combine=(mode:DualMode,a:number,b:number,amount:number)=>{
@@ -129,19 +139,19 @@ export function stampChange(before:StampDab[],after:StampDab[]):RasterRegion|und
  if(!Number.isFinite(l))return undefined;const x=Math.floor(l),y=Math.floor(t);return {x,y,width:Math.ceil(r)-x,height:Math.ceil(b)-y};
 }
 const touches=(d:StampDab,box:RasterRegion)=>{const e=dabReach(d);return d.x+e>=box.x&&d.x-e<=box.x+box.width&&d.y+e>=box.y&&d.y-e<=box.y+box.height;};
-export function drawStampStroke(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnType<typeof strokeGeometry>,clip?:RasterRegion,given?:StampPlan):RasterRegion|undefined{
+export function drawStampStroke(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnType<typeof strokeGeometry>,clip?:RasterRegion,given?:StampPlan,heightOnly=false):RasterRegion|undefined{
  // Work in document space; the context's transform is applied when drawing.
  if(s.natureVersion===1){drawNatureStroke(ctx,s,g,clip);return clip;}
  const m=ctx.getTransform(),inv=m.inverse(),corners=[[0,0],[ctx.canvas.width,0],[0,ctx.canvas.height],[ctx.canvas.width,ctx.canvas.height]].map(([x,y])=>({x:inv.a*x+inv.c*y+inv.e,y:inv.b*x+inv.d*y+inv.f}));
  const vl=Math.floor(Math.min(...corners.map(c=>c.x))),vt=Math.floor(Math.min(...corners.map(c=>c.y))),vr=Math.ceil(Math.max(...corners.map(c=>c.x))),vb=Math.ceil(Math.max(...corners.map(c=>c.y)));
  const full=stampBounds(s,1e7,1e7,g);let x0=Math.max(full.x,vl),y0=Math.max(full.y,vt),x1=Math.min(full.x+full.width,vr),y1=Math.min(full.y+full.height,vb);
  // Live redraw of only the changed area: the result is per pixel the same as a full redraw.
- if(clip){x0=Math.max(x0,clip.x);y0=Math.max(y0,clip.y);x1=Math.min(x1,clip.x+clip.width);y1=Math.min(y1,clip.y+clip.height);}
+ if(clip&&!s.impastoVersion){x0=Math.max(x0,clip.x);y0=Math.max(y0,clip.y);x1=Math.min(x1,clip.x+clip.width);y1=Math.min(y1,clip.y+clip.height);}
  const box={x:x0,y:y0,width:Math.max(0,x1-x0),height:Math.max(0,y1-y0)};
  if(!box.width||!box.height||!s.stampTip)return undefined;
- const plan=given??stampPlan(s,g),dabs=clip?plan.dabs.filter(d=>touches(d,box)):plan.dabs,dual=clip?plan.dual.filter(d=>touches(d,box)):plan.dual;
+ const plan=given??stampPlan(s,g),dabs=clip&&!s.impastoVersion?plan.dabs.filter(d=>touches(d,box)):plan.dabs,dual=clip&&!s.impastoVersion?plan.dual.filter(d=>touches(d,box)):plan.dual;
  const A=surfaceA=fit(surfaceA,box.width,box.height),ac=A.getContext('2d',{willReadFrequently:!!s.dbTip})!;ac.clearRect(0,0,box.width,box.height);
- stamp(ac,dabs,s.stampTip,s.stampHardness??.7,s.stampTexture??0,box.x,box.y);
+ stamp(ac,dabs,s.stampTip,s.stampHardness??.7,s.stampTexture??0,box.x,box.y,undefined,undefined,s.impastoVersion?s:undefined);
  if(s.dbTip){
   const B=surfaceB=fit(surfaceB,box.width,box.height),bc=B.getContext('2d',{willReadFrequently:true})!;bc.clearRect(0,0,box.width,box.height);
   stamp(bc,dual,s.dbTip,s.dbHardness??.7,s.dbTexture??0,box.x,box.y,s.dbNatureTip,s.dbBitmap);
@@ -151,7 +161,9 @@ export function drawStampStroke(ctx:CanvasRenderingContext2D,s:Stroke,g:ReturnTy
   ac.putImageData(ai,0,0);
  }
  if((s.stampTexture??0)>0)erodePaintingGrain(ac,s.stampTip,(s.stampTexture??0)*.6,box.x,box.y,box.width,box.height);
- ac.globalCompositeOperation='source-in';ac.fillStyle=s.color;ac.fillRect(0,0,box.width,box.height);ac.globalCompositeOperation='source-over';
- ctx.drawImage(A,box.x,box.y);
+ if(!!s.impastoVersion)shadeImpasto(ac,s,dabs,box,heightOnly);
+ else{ac.globalCompositeOperation='source-in';ac.fillStyle=s.color;ac.fillRect(0,0,box.width,box.height);ac.globalCompositeOperation='source-over';}
+ if(clip&&!!s.impastoVersion){ctx.save();ctx.beginPath();ctx.rect(clip.x,clip.y,clip.width,clip.height);ctx.clip();ctx.drawImage(A,box.x,box.y);ctx.restore();}
+ else ctx.drawImage(A,box.x,box.y);
  return box;
 }

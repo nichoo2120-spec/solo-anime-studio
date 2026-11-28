@@ -1,3 +1,4 @@
+import type {ImpastoControls} from '../core/impasto';
 import {loadPenSettings,mapPenPressure} from '../core/penPressure';
 import {blendTiming} from './blendTiming';
 import {warmMixer} from './gpuMixer';
@@ -68,7 +69,7 @@ import {rejectCanvasContact,endsCanvasCaptureOnControl} from './penContact';
 import {hitStroke,idsInMarquee,boundsOf,selectable,transformedStroke,projectiveStroke,mapPoint,nearSelection,polyline,IDENTITY, type Selectable,type PickMode} from './strokeSelection';
 import {transformVector,projectiveVector} from './vector';
 import {affineH,multiplyH,projectPoint,homography,quadValid,type XY,type H} from './perspectiveWarp';
-export type BrushSettings=NatureControls&InkEdgeControls&{size:number;opacity:number;color:string;stabilization:number;pressure:boolean;response:number;tolerance:number;smoothness?:number;pressureWidth?:boolean;pressureOpacity?:boolean;pressureCurve?:{x:number;y:number}[];taperStart?:number;taperEnd?:number;brushKind?:string;textureStrength?:number;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;pressureFlow?:boolean;mixColors?:boolean;mixAmount?:number;mixTipA?:PaintTip;mixTipB?:PaintTip;mixBlend?:number;mixPickupLen?:number;mixHoldLen?:number;mixStreak?:number;mixPaintLoad?:number;nativeMixEnabled?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number}&InkFlowControls&PressureSettings&WatercolorControls&ColoringControls&DryBristleControls&SilkBlendControls&BrushBlendSettings&BrushShapeSettings;
+export type BrushSettings=ImpastoControls&NatureControls&InkEdgeControls&{size:number;opacity:number;color:string;stabilization:number;pressure:boolean;response:number;tolerance:number;smoothness?:number;pressureWidth?:boolean;pressureOpacity?:boolean;pressureCurve?:{x:number;y:number}[];taperStart?:number;taperEnd?:number;brushKind?:string;textureStrength?:number;brushTip?:PaintTip;tipAngle?:number;tipSpacing?:number;flow?:number;hardness?:number;pressureFlow?:boolean;mixColors?:boolean;mixAmount?:number;mixTipA?:PaintTip;mixTipB?:PaintTip;mixBlend?:number;mixPickupLen?:number;mixHoldLen?:number;mixStreak?:number;mixPaintLoad?:number;nativeMixEnabled?:boolean;watercolorStyle?:'paper'|'dry'|'bloom';pigmentPooling?:number}&InkFlowControls&PressureSettings&WatercolorControls&ColoringControls&DryBristleControls&SilkBlendControls&BrushBlendSettings&BrushShapeSettings;
 export const defaultBrush:BrushSettings={size:6,opacity:1,color:'#263039',stabilization:.25,pressure:true,response:1,tolerance:24};
 export type {TransformSettings} from './selectionControls';
 export class StudioEngine {
@@ -102,7 +103,7 @@ export class StudioEngine {
  private finalLayerResult?:{stroke:Stroke;base:HTMLCanvasElement;canvas:HTMLCanvasElement;bounds?:RasterRegion};
  private previewFootprint?:RasterRegion;
  private previewRestore?:{base:HTMLCanvasElement;operations:Project['layers'][number]['operations'];bounds:RasterRegion};
- private mirrorSurface?:HTMLCanvasElement;private previewStrokeId='';private previewBase?:HTMLCanvasElement;private previewBaseOperations?:Project['layers'][number]['operations'];
+ private mirrorSurface?:HTMLCanvasElement;private previewStrokeId='';private oilPreviewPoints?:string;private previewBase?:HTMLCanvasElement;private previewBaseOperations?:Project['layers'][number]['operations'];
  private lastExactFrame?:BandFrame;lastCommitBand?:{x:number;y:number;width:number;height:number}; private cachedLayerIds:string[]=[];private frame=0;private width=1;private height=1;private observer:ResizeObserver;private unsubscribe:()=>void;private lastLayer='';private lastFrame?:string;private geometricDuplicates=0;private device='unknown';preset={id:'custom',name:'Custom brush'};private disposed=false;private worker?:Worker;private pointerId?:number;private strokeDirty=false;private previewSurface=makeCanvas(1,1);private cursorOverlay:HTMLCanvasElement;
  private cursorFrame: number | undefined;
  private cursorStyle: BrushCursorStyle = 'tip';
@@ -258,15 +259,24 @@ export class StudioEngine {
   if((!snapshot.silkBlendVersion||snapshot.blendRasterVersion!==undefined)&&workerBlendEligible(snapshot)&&
      !this.strokeMirror&&this.blendWorker.available()&&this.deferUnstartedMix(snapshot))return snapshot;
   if(snapshot.silkBlendVersion)return snapshot;
+  if(!!snapshot.impastoVersion&&!snapshot.brushBlendVersion&&!this.strokeMirror&&
+     this.previewStrokeId===snapshot.id&&this.previewBase&&this.oilPreviewPoints===JSON.stringify(snapshot.points)){
+   const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===this.strokeTarget?.layer);
+   if(layer&&layer.operations===this.previewBaseOperations&&this.renderer.getDisplay(layer,doc)===this.previewBase){
+    this.finalLayerResult={stroke:snapshot,base:this.previewBase,canvas:this.previewSurface,bounds:this.previewFootprint};
+    return snapshot;
+   }
+  }
   const geometry=finalGeometry(snapshot),pencil=!!snapshot.brushKind?.startsWith('graphite-');
   if(!this.mirrorDrawing.enabled&&pencil&&!snapshot.brushBlendVersion&&!snapshot.stampVersion){const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===this.strokeTarget?.layer);if(layer)this.renderer.deferPencil(snapshot,this.scratch,layer,doc,()=>this.request());}
   if((snapshot.brushBlendVersion??0)>=10){
    const sc=this.scratch.getContext('2d')!;sc.clearRect(0,0,this.scratch.width,this.scratch.height);drawStroke(sc,snapshot,'final',geometry);
    this.renderer.rememberStrokeRaster(snapshot,this.scratch);
-  }else if(snapshot.liveRefinementVersion===3&&!this.displayInk(snapshot)){
+  }else if((snapshot.impastoVersion||snapshot.liveRefinementVersion===3)&&!this.displayInk(snapshot)){
    const doc=this.store.getSnapshot(),layer=doc.layers.find(l=>l.id===this.strokeTarget?.layer),bounds=this.pigmentPreviewBounds(snapshot,doc,geometry);
    const sc=this.scratch.getContext('2d')!;
    if(snapshot.natureVersion===1)this.liveRaster.paint(sc,snapshot,geometry);
+   else if(!!snapshot.impastoVersion)this.liveRaster.paint(sc,snapshot,geometry);
    else if(bounds){
     sc.clearRect(bounds.x,bounds.y,bounds.width,bounds.height);
     if(bounds.width&&bounds.height)drawModernStroke(sc,snapshot,'final',geometry,bounds);
@@ -295,7 +305,7 @@ export class StudioEngine {
  }
  private displayInk(stroke:Stroke){return !stroke.transform&&displayCleanInk(stroke)&&!this.mirrorDrawing.enabled&&!this.selection.length&&!this.strokeIds.length;}
  private pigmentPreviewBounds(stroke:Stroke,p:Project,geometry:ReturnType<typeof finalGeometry>){
-  if(stroke.natureVersion===1&&!this.strokeMirror&&!stroke.brushBlendVersion)return strokeRasterBounds(stroke,p.width,p.height,geometry);
+  if((stroke.natureVersion===1||!!stroke.impastoVersion)&&!this.strokeMirror&&!stroke.brushBlendVersion)return strokeRasterBounds(stroke,p.width,p.height,geometry);
   if(this.strokeMirror||stroke.nativeMixVersion||stroke.mixStops?.length||stroke.paintTipVersion!==2||stroke.coloringEngine!==1||
      (stroke.brushTip!=='color-solid'&&stroke.brushTip!=='color-soft'))return undefined;
   return strokeRasterBounds(stroke,p.width,p.height,geometry);
@@ -356,7 +366,7 @@ export class StudioEngine {
    ctx.restore();return;
   }
   if(!['brush','eraser'].includes(this.tool))return;
-  const position=toScreen(this.stroke&&this.liveTip?this.liveTip:this.cursor,this.view),b=this.stroke??this.brush,p=this.stroke?.points.at(-1);
+  const position=toScreen(this.stroke&&this.liveTip&&!this.stroke.impastoVersion?this.liveTip:this.cursor,this.view),b=this.stroke??this.brush,p=this.stroke?.points.at(-1);
   const response=this.stroke?.pressure?pressureResponse(Math.pow(p?.p??1,b.response),b.pressureCurve):1;
   const velocity=this.stroke?.velocityTaper?p?.v??1:1;
   const factor=this.stroke&&(this.stroke.pressure&&b.pressureWidth!==false||this.stroke.velocityTaper)?widthResponse(response*velocity,b):1;
@@ -621,7 +631,7 @@ export class StudioEngine {
   if(this.stroke?.brushBlendVersion)blendTiming.input();
   if(this.pointerId!==undefined&&(e.pointerId!==this.pointerId||e.timeStamp<(this.capture?.started??0)))return;const cursor=this.point(e);
   if(this.cursor&&(cursor.x!==this.cursor.x||cursor.y!==this.cursor.y))this.cursorDirection=Math.atan2(cursor.y-this.cursor.y,cursor.x-this.cursor.x);
-  this.cursor=cursor;const local=this.local(e);
+  this.cursor=cursor;if(this.stroke?.impastoVersion)this.paintCursor();const local=this.local(e);
   if(this.pointerId===undefined&&this.tool==='transform'&&this.selection.length&&this.cursor){
    const c=controls(this.selection,this.transform,this.view.zoom),index=c.corners.findIndex(q=>Math.hypot(q.x-this.cursor!.x,q.y-this.cursor!.y)<11/this.view.zoom);
    this.canvas.style.cursor=this.areaTransformMode==='rotate'?'grab':this.areaTransformMode==='scale'?(index<0?'crosshair':index%2===0?'nwse-resize':'nesw-resize'):'move';
@@ -647,6 +657,7 @@ export class StudioEngine {
  private consumeInput(e:PointerEvent,canceled=false){const capture=this.capture;if(!capture)return;const batch=capture.batch(e,!canceled);if(capture.replaying){this.geometricDuplicates=0;this.sampleTime=capture.started;if(this.stroke){this.stroke.points=[{...this.stroke.points[0],p:capture.first.pointerType==='pen'?mapPenPressure(capture.first.pressure):1}];this.initialPressurePending=this.pressureRequested&&capture.first.pointerType==='pen'&&!(Number.isFinite(capture.first.pressure)&&capture.first.pressure>0);this.stroke.pressure=this.pressureRequested&&capture.first.pointerType==='pen';}if(this.lasso)this.lasso=[this.lasso[0]];}const rect=this.canvas.getBoundingClientRect();for(const event of batch){const p=this.point(event,rect);if(this.lasso){if(this.rectangleStart)this.lasso=rectangle(this.rectangleStart,p);else{const n=this.lasso.length;appendPath(this.lasso,p);if(n===this.lasso.length)this.geometricDuplicates++;}}if(this.stroke){if(process.env.NODE_ENV!=='production'&&event.pointerType==='pen')window.dispatchEvent(new CustomEvent('solo-pen-pressure',{detail:event.pressure}));if(this.initialPressurePending&&event.pointerType==='pen'&&Number.isFinite(event.pressure)&&event.pressure>0){for(const point of this.stroke.points)point.p=p.p;this.initialPressurePending=false;}const last=this.stroke.points.at(-1)!;if(event.pointerType==='pen'&&!event.pressure)p.p=last.p;if(((this.stroke.dryBristleVersion===1||this.stroke.dryBristleVersion===2||this.stroke.dryBristleVersion===3)||this.stroke.coloringEngine===1||this.stroke.watercolorMaterialVersion===2||this.stroke.watercolorEngine===1)&&!this.stroke.velocityTaper){p.v=watercolorVelocity(Math.hypot(p.x-last.x,p.y-last.y)*this.view.zoom,event.timeStamp-this.sampleTime,last.v??.65);}if(this.stroke.velocityTaper){const d=Math.hypot(p.x-last.x,p.y-last.y);p.v=d?velocityWidth(d,event.timeStamp-this.sampleTime,last.v):last.v??1;}this.sampleTime=Math.max(this.sampleTime,event.timeStamp);const n=this.stroke.points.length;appendPath(this.stroke.points,p);if(n===this.stroke.points.length)this.geometricDuplicates++;this.strokeDirty=true;}}if(this.stroke){this.pickup?.update(this.stroke,capture.replaying);this.geometryDirty=true;if(this.diagnostics.enabled&&this.diagnostics.perEventGeometry){this.refreshLiveGeometry();this.diagnostics.observeLive(this.liveTip);}} }
  private up=(e:PointerEvent)=>{
   if(e.pointerId!==this.pointerId||e.timeStamp<(this.capture?.started??0))return;if(this.mirrorPivotDrag){this.setMirrorPivot(this.point(e));this.mirrorPivotDrag=false;this.diagnostics.finish('mirror-pivot');this.recorder.event('mirror-pivot',{pivot:this.mirrorDrawing.pivot});this.releaseCapture();this.onMirrorChange();this.request();return;}if(e.pointerType==='pen'&&(e.buttons&1)!==0&&e.button!==0){if(this.vectors.drawing)this.acceptVectorMovement(e);else this.consume(e);this.request();this.recorder.event('barrel-release',{pointerId:e.pointerId,buttons:e.buttons,button:e.button});return;}if(this.vectors.drawing)this.acceptVectorMovement(e);else this.consume(e);if(this.drag)this.move(e);
+  if(this.stroke?.impastoVersion)this.cursor=this.point(e);
   if(this.vectors.drawing){const end=this.point(e);// Keep the last REAL pen pressure; the provisional draft still contains only the down-point.
    if(e.pointerType==='pen')end.p=mapPenPressure(e.pressure,undefined,this.vectors.lastPressure);
    this.vectors.up(end);}
@@ -808,7 +819,7 @@ export class StudioEngine {
       else if(this.selection.length)applyTransform(preview,this.selection,this.matrix());
      }
     }
-    if(denseStroke){this.previewStrokeId=denseStroke.id;this.previewBase=c;this.previewBaseOperations=displayed.operations;}
+    if(denseStroke){this.oilPreviewPoints=!!denseStroke.impastoVersion?JSON.stringify(denseStroke.points):undefined;this.previewStrokeId=denseStroke.id;this.previewBase=c;this.previewBaseOperations=displayed.operations;}
     else{this.previewStrokeId='';this.previewBase=undefined;this.previewBaseOperations=undefined;}
     this.previewFootprint=bounds;
     c=preview;}

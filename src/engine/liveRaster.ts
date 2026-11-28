@@ -78,7 +78,7 @@ export class LiveStrokeRaster{
    const now=identity?stampBounds(stroke,ctx.canvas.width,ctx.canvas.height,geometry):undefined,prev=this.id===stroke.id?this.stampRegion:undefined;
    const plan=stampPlan(stroke,geometry),old=this.id===stroke.id&&this.stampCanvas===ctx.canvas?this.stampPlan:undefined;this.stampCanvas=ctx.canvas;
    // Same stroke, no pen tilt: redraw only where dabs changed (exactly the same pixels as a full redraw).
-   if(now&&old&&!stroke.tsTilt){
+   if(now&&old&&!stroke.tsTilt&&!stroke.impastoVersion){
     const a=stampChange(old.dabs,plan.dabs),b=stampChange(old.dual,plan.dual),change=a&&b?union(a,b):a??b;
     const clip=change?clipRegion(change,ctx.canvas.width,ctx.canvas.height):undefined;
     if(clip&&clip.width&&clip.height){ctx.clearRect(clip.x,clip.y,clip.width,clip.height);drawStampStroke(ctx,stroke,geometry,clip,plan);}

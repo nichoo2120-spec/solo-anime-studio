@@ -18,7 +18,15 @@ export class PointerPath {
  constructor(readonly id:number,readonly started:number,readonly first:PointerEvent,readonly gestureId=''){this.accept(first);this.samples.push(first);}
  private accept(e:PointerEvent){const key=[e.timeStamp,e.clientX,e.clientY,e.pressure,...(e.pointerType==='pen'?[e.tiltX,e.tiltY]:[])].join(':');if(this.seen.has(key))return false;this.seen.add(key);return true;}
  batch(e:PointerEvent,terminal=true){
-  this.received++;const candidates=pointerBatch(e,terminal,n=>{this.coalesced+=n;}),added=candidates.filter(s=>{const valid=s.pointerId===this.id&&Number.isFinite(s.clientX)&&Number.isFinite(s.clientY)&&s.timeStamp>=this.started;if(!valid)this.rejected++;return valid;}).filter(s=>{const valid=this.accept(s);if(!valid)this.duplicates++;return valid;}).sort((a,b)=>a.timeStamp-b.timeStamp);
+  this.received++;const candidates=pointerBatch(e,terminal,n=>{this.coalesced+=n;});
+  // A pen-up that repeats the last raw contact must not run that sample
+  // through the pressure smoother twice. Preserve any new coalesced samples.
+  if(e.pointerType==='pen'&&e.type==='pointerup'&&candidates.at(-1)===e){
+   const prior=candidates.at(-2)??this.samples.at(-1);
+   if(prior&&prior.pointerId===e.pointerId&&prior.clientX===e.clientX&&prior.clientY===e.clientY&&
+      prior.pressure===e.pressure&&prior.tiltX===e.tiltX&&prior.tiltY===e.tiltY)candidates.pop();
+  }
+  const added=candidates.filter(s=>{const valid=s.pointerId===this.id&&Number.isFinite(s.clientX)&&Number.isFinite(s.clientY)&&s.timeStamp>=this.started;if(!valid)this.rejected++;return valid;}).filter(s=>{const valid=this.accept(s);if(!valid)this.duplicates++;return valid;}).sort((a,b)=>a.timeStamp-b.timeStamp);
   this.replaying=!!added.length&&added[0].timeStamp<this.samples.at(-1)!.timeStamp;
   this.samples.push(...added);
   this.onBatch?.(e,candidates,this.replaying);

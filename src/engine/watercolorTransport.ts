@@ -54,6 +54,7 @@ export function depositionField(s:Stroke,samples:PaintSamples){
  }
  if(!segments.length){const a=samples.points[0],angle=(s.tipAngle??0)*Math.PI/180;segments.push({order:0,a,b:a,dx:Math.cos(angle),dy:Math.sin(angle),l:1,arc:0,span:0,curvature:0});}
  const sampleLane=(row:number,lane:number)=>{const b=clamp(lane,0,transport.bands-1),j=Math.floor(b),u=b-j;return transport.mass[row*transport.bands+j]*(1-u)+transport.mass[row*transport.bands+Math.min(transport.bands-1,j+1)]*u;};
+ const seed=s.watercolorSeed??watercolorSeedFor(s.id),seedX=seed&65535,seedY=seed>>>16;
  const evaluate=(q:Segment,t:number,x:number,y:number,out:Deposit)=>{
   const tx=q.dx/q.l,ty=q.dy/q.l,cx=q.a.x+q.dx*t,cy=q.a.y+q.dy*t,along=clamp((q.arc+t*q.span)/transport.step,0,transport.count-1),row=Math.floor(along),next=Math.min(transport.count-1,row+1),u=along-row;
   const lerp=(values:Float32Array)=>values[row]*(1-u)+values[next]*u,radius=Math.max(1,lerp(transport.radii)),cross=(-(x-cx)*ty+(y-cy)*tx)/radius,drift=lerp(transport.drift),lane=(cross*.5+.5+drift*.08)*transport.bands-.5;
@@ -61,7 +62,7 @@ export function depositionField(s:Stroke,samples:PaintSamples){
   const concentration=load*flow*2.6*(.85+.3*(s.pigmentBuildup??.45))/(.65+water*.7),density=(1-Math.exp(-concentration))*drag;
   // Bristle mass differences make the rough brush break along travel. Smaller
   // packet-scale granules come from this stroke's seed and bristle coordinates.
-  const seed=s.watercolorSeed??watercolorSeedFor(s.id),grain=paintHash((seed&65535)+Math.floor((q.arc+t*q.span+(x-cx)*tx+(y-cy)*ty)/2.7), (seed>>>16)+Math.floor((cross+2)*s.size*.22));
+  const grain=paintHash(seedX+Math.floor((q.arc+t*q.span+(x-cx)*tx+(y-cy)*ty)/2.7), seedY+Math.floor((cross+2)*s.size*.22));
   if(s.watercolorAppearanceVersion===1){out.along=q.arc+t*q.span+(x-cx)*tx+(y-cy)*ty;out.across=-(x-cx)*ty+(y-cy)*tx;}
   out.radius=radius;out.density=clamp(density*(.95+grain*.1)*(1+q.curvature*.08*(s.pigmentBuildup??.5)),0,1);out.water=water;out.grain=clamp(.55*(load/Math.max(.05,s.pigmentAmount??.76)-.6)+grain*.45-(.65-velocity)*(s.dryness??0)*.45-(1-pressure)*(s.dryness??0)*.15);
   const bleed=(s.edgeBleeding??.45)*(s.wetDiffusion??.5)*water,displace=(s.watercolorShape?radius*2:s.size)*(transport.kind==='wet'?.32*bleed:.012)*(drift*(transport.kind==='wet'?3:1.6)+(out.grain-.5)*.45);
@@ -104,7 +105,7 @@ export function depositionField(s:Stroke,samples:PaintSamples){
  const fastWetSample=(x:number,y:number,out:Deposit)=>{
   if(!wetNodes)return false;const fx=x/grid-gx0,fy=y/grid-gy0,ix=Math.floor(fx),iy=Math.floor(fy),u=fx-ix,v=fy-iy;wetValues.fill(0);let valid=0;
   for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){const k=((iy+dy)*columns+ix+dx)*channels;if(wetNodes[k]<=1e-6)continue;const blend=(dx?u:1-u)*(dy?v:1-v);valid+=blend;for(let j=0;j<wetValues.length;j++)wetValues[j]+=wetNodes[k+j+1]*blend;}
-  if(valid<.999)return false;const radius=Math.max(1,wetValues[4]),norm=Math.hypot(wetValues[5],wetValues[6])||1,tx=wetValues[5]/norm,ty=wetValues[6]/norm,dx=x-wetValues[7],dy=y-wetValues[8],along=wetValues[9]+dx*tx+dy*ty,cross=(-dx*ty+dy*tx)/radius,seed=s.watercolorSeed??watercolorSeedFor(s.id),grain=paintHash((seed&65535)+Math.floor(along/2.7),(seed>>>16)+Math.floor((cross+2)*s.size*.22));
+  if(valid<.999)return false;const radius=Math.max(1,wetValues[4]),norm=Math.hypot(wetValues[5],wetValues[6])||1,tx=wetValues[5]/norm,ty=wetValues[6]/norm,dx=x-wetValues[7],dy=y-wetValues[8],along=wetValues[9]+dx*tx+dy*ty,cross=(-dx*ty+dy*tx)/radius,grain=paintHash(seedX+Math.floor(along/2.7),seedY+Math.floor((cross+2)*s.size*.22));
   if(s.watercolorAppearanceVersion===1){out.along=along;out.across=-dx*ty+dy*tx;}
   if(wetAppearance){out.paintPigment=wetValues[10];if(roughAppearance)out.paintGrain=wetValues[11];}
   out.radius=radius;out.density=wetValues[0];out.water=wetValues[1];out.grain=clamp((.55*(wetValues[3]-.6)+grain*.45)*.25+(.45+(wetValues[3]-1)*.6)*.75);out.edge=clamp(.5+(wetValues[3]-1)*4+wetValues[2]*.3);const bleed=(s.edgeBleeding??.45)*(s.wetDiffusion??.5)*out.water,displace=Math.min(s.size,radius*2)*.32*bleed*(wetValues[2]*3+(out.grain-.5)*.45);out.dx=-ty*displace;out.dy=tx*displace;return true;

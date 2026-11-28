@@ -1,3 +1,4 @@
+import {mixerGpuAvailable} from './gpuMixer';
 import {MixerPreview} from './mixerPreview';
 import {isBrushBlendVersion} from '../core/brushBlend';
 import type {BlendSampleSource} from './brushBlend';
@@ -52,16 +53,24 @@ export class LiveBlendWorker{
   if(!this.job||this.job.id!==s.id||this.job.source!==source||this.job.signature!==signature||this.job.ownershipBase!==ownershipBase){
    this.cancel(true);const token=++this.token,j:Job={token,id:s.id,ownershipBase,source,signature,ready:false,inFlight:false,pointCount:0};this.job=j;
    if(this.surfaceReadback!==nativeDelta){this.surface=canvas(1,1);this.surfaceReadback=nativeDelta;}
-   if((s.brushBlendVersion??0)>=10&&!nativeDelta&&!s.nativeMixVersion){
+   const directMixer=(s.brushBlendVersion??0)>=10&&!nativeDelta&&!s.nativeMixVersion;
+   const cpuMixer=directMixer&&s.brushBlendVersion===11&&s.size>=150&&!mixerGpuAvailable();
+   if(directMixer&&!cpuMixer){
     this.mixerPreview=new MixerPreview(source);
     return this.paintMixer(s,source);
    }
    const deltaPixels=ownershipBase?.pixels.slice();
    if(nativeDelta){const seed=ownershipBase?.seed;this.delta={mask:canvas(source.width,source.height),patch:canvas(source.width,source.height),tiles:new Map(seed?.tiles),revision:0,group:ownershipBase,box:seed?.box};if(seed){this.delta.mask.getContext('2d')!.drawImage(seed.mask,seed.box.x,seed.box.y);this.delta.patch.getContext('2d')!.drawImage(seed.paint,seed.box.x,seed.box.y);}}
-   this.surface.width=source.width;this.surface.height=source.height;this.surface.getContext('2d',{willReadFrequently:nativeDelta})!.drawImage(source,0,0);
+   this.surface.width=source.width;this.surface.height=source.height;const display=this.surface.getContext('2d',{willReadFrequently:nativeDelta})!;
+   if(cpuMixer&&s.points.length===1){
+    const first=new MixerPreview(source);
+    display.drawImage(first.paint(s,source),0,0);
+    this.dirty=first.region;
+    j.geometry=geometry;
+   }else display.drawImage(source,0,0);
    // Native ownership already has exact pixels; pass them directly. Other
    // blend modes retain their existing bitmap setup and readback behavior.
-   const begin=(bitmap?:ImageBitmap)=>{if(this.job!==j){bitmap?.close();return;}this.worker!.postMessage({kind:'begin',token,width:source.width,height:source.height,base:bitmap,readFrequently:!s.nativeMixVersion,nativeDelta,deltaPixels,deltaRegion:ownershipBase?.region,seeded:!!ownershipBase?.seed,compactReplies:nativeDelta,blendSample:isBrushBlendVersion(s.brushBlendVersion)&&s.bbSample==='all'?this.blendSample:undefined},[...(bitmap?[bitmap]:[]),...(deltaPixels?[deltaPixels.buffer as ArrayBuffer]:[])]);j.ready=true;this.flush(j);};createImageBitmap(source).then(begin).catch(()=>this.fail());
+   const begin=(bitmap?:ImageBitmap)=>{if(this.job!==j){bitmap?.close();return;}this.worker!.postMessage({kind:'begin',token,width:source.width,height:source.height,base:bitmap,readFrequently:!cpuMixer&&!s.nativeMixVersion,nativeDelta,deltaPixels,deltaRegion:ownershipBase?.region,seeded:!!ownershipBase?.seed,compactReplies:nativeDelta,blendSample:isBrushBlendVersion(s.brushBlendVersion)&&s.bbSample==='all'?this.blendSample:undefined},[...(bitmap?[bitmap]:[]),...(deltaPixels?[deltaPixels.buffer as ArrayBuffer]:[])]);j.ready=true;this.flush(j);};createImageBitmap(source).then(begin).catch(()=>this.fail());
   }
   if(this.mixerPreview)return this.paintMixer(s,source);
   const j=this.job!;if(j.geometry!==geometry){j.geometry=geometry;j.queued={stroke:s,final:false};this.flush(j);}return this.surface;

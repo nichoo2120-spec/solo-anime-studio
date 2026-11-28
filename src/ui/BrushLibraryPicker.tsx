@@ -1,3 +1,4 @@
+import {oilCategory} from '../core/impasto';
 import {useEffect,useMemo,useRef,useState,type MouseEvent} from 'react';
 import {Grid2X2,List,Plus,Search} from 'lucide-react';
 import {brushList,createCustomBrush,deleteCustomBrush,duplicateCustomBrush,isRetiredBlendPresetId,renameCustomBrush,updatePreset,type BrushLibrary,type BrushPreset,type BrushCategory,type BrushFamily} from '../core/brushes';
@@ -7,7 +8,7 @@ import {BrushImportControls} from './BrushImportControls';
 import {TipCard} from './PaintBrushPicker';
 import {readPreference,writePreference} from './preferences';
 
-const tabs=['Ink','Pencil','Paint','Watercolor','Airbrush','Blend',natureCategory,importedCategory,'My brushes ★'] as const;
+const tabs=['Ink','Pencil','Paint','Watercolor','Airbrush','Blend',oilCategory,natureCategory,importedCategory,'My brushes ★'] as const;
 type Category=typeof tabs[number]|'Eraser';
 const categoryOf=(p:BrushPreset):Category=>p.category==='Paint'?(p.family==='watercolor'?'Watercolor':p.family==='blend'?'Blend':p.id==='color-air'||p.settings.brushTip==='color-air'?'Airbrush':'Paint'):p.category;
 const PAGE=24;
@@ -17,7 +18,7 @@ export function BrushLibraryPicker({library,preset,eraser,onChange,choose,notify
  const [category,setCategory]=useState<Category>(()=>categoryOf(preset));
  const [query,setQuery]=useState(''),[page,setPage]=useState(1),[importOpen,setImportOpen]=useState(!!drop);
  const [family,setFamily]=useState<BrushFamily|'all'>('all');
- const categoryOptions:BrushCategory[]=eraser?['Eraser']:['Pencil','Ink','Paint',natureCategory,...(library.presets.some(p=>p.category===importedCategory)?[importedCategory]:[])];
+ const categoryOptions:BrushCategory[]=eraser?['Eraser']:['Pencil','Ink','Paint',oilCategory,natureCategory,...(library.presets.some(p=>p.category===importedCategory)?[importedCategory]:[])];
  const nativePresets=brushList(library,preset.category,preset.category==='Paint'?(family==='all'?undefined:family):undefined);
  const nativeGroups=new Map<string,BrushPreset[]>();
  for(const item of nativePresets){const pack=item.pack??'';if(!nativeGroups.has(pack))nativeGroups.set(pack,[]);nativeGroups.get(pack)?.push(item);}

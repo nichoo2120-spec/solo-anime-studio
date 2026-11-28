@@ -29,6 +29,7 @@ export function strokeRasterBounds(s:Stroke,width:number,height:number,g=finalGe
 }
 /** The layer boundary owns opacity. New watercolor modes never alter coverage
  * inside a stroke. Historical strokes and ordinary brushes use Canvas unchanged. */
+let oilPickupSurface:HTMLCanvasElement|undefined;
 export function compositePaintStroke(ctx:CanvasRenderingContext2D,source:HTMLCanvasElement,s:Stroke,sourceX=0,sourceY=0,region?:RasterRegion,blendBase?:HTMLCanvasElement){
  // v0.5.238 Silk Blend: new strokes only; every other stroke takes its old path.
  if((s.silkBlendVersion===1||s.silkBlendVersion===2)&&s.tool==='brush'){applySilkBlend(ctx,source,s,sourceX,sourceY,region,blendBase,true);return;}
@@ -36,6 +37,24 @@ export function compositePaintStroke(ctx:CanvasRenderingContext2D,source:HTMLCan
  if(isBrushBlendVersion(s.brushBlendVersion)&&s.tool==='brush'){
   const read=((s.brushBlendVersion??0)>=7)?blendBase?.getContext('2d')??undefined:undefined;
   renderBrushBlend(ctx,source,s,sourceX,sourceY,read);
+  return;
+ }
+ if(s.impastoVersion===2&&(s.oilPickup??0)>0){
+  const box=region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height);
+  const {x,y,width:w,height:h}=box;
+  if(!w||!h)return;
+  const lifted=oilPickupSurface??=document.createElement('canvas');
+  if(lifted.width!==w)lifted.width=w;if(lifted.height!==h)lifted.height=h;
+  const lc=lifted.getContext('2d')!;
+  lc.clearRect(0,0,w,h);
+  lc.drawImage(source,x-sourceX,y-sourceY,w,h,0,0,w,h);
+  const first=s.points[0],last=s.points.at(-1)??first;
+  const dx=last.x-first.x,dy=last.y-first.y,length=Math.hypot(dx,dy)||1;
+  const travel=Math.min(8,s.size*.032,length);
+  lc.save();lc.globalAlpha=(s.oilPickup??0)*.72;lc.globalCompositeOperation='source-atop';
+  lc.drawImage(blendBase??ctx.canvas,-x+travel*dx/length,-y+travel*dy/length);lc.restore();
+  ctx.save();ctx.globalAlpha=s.opacity;ctx.globalCompositeOperation='source-over';
+  ctx.drawImage(lifted,x,y);ctx.restore();
   return;
  }
  if(!!s.nativeMixVersion&&s.tool==='brush'){applyNativeBrushMix(ctx,source,s,sourceX,sourceY,region??strokeRasterBounds(s,ctx.canvas.width,ctx.canvas.height),blendBase);return;}

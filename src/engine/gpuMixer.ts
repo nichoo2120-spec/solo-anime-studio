@@ -190,6 +190,11 @@ function getRenderer(){
  }
  return renderer;
 }
+export function mixerGpuAvailable(){
+ if(failed||preference()==='CPU')return false;
+ try{getRenderer();return true;}
+ catch(e){failed=true;publish('CPU',String(e));return false;}
+}
 let warmPending=false;
 export function warmMixer(){
  if(renderer||failed||warmPending||typeof window==='undefined'||preference()==='CPU')return;
